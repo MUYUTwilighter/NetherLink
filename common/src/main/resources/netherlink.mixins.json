@@ -5,6 +5,10 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
   "client": [
+    "FriendJoinHandlerMixin",
+    "IntegratedServerMixin",
+    "MultiplayerOptionsScreenMixin",
+    "PresenceHandlerMixin"
   ],
   "server": [],
   "injectors": {

@@ -3,6 +3,7 @@ plugins {
     id 'net.fabricmc.fabric-loom'
 }
 dependencies {
+    localRuntime "net.litetex.mcm:dev-auth-neo:1.1.0"
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
@@ -19,6 +20,7 @@ loom {
             setConfigName('Fabric Client')
             ideConfigGenerated(true)
             runDir('runs/client')
+            vmArg "-Ddevauth.enabled=1"
         }
         server {
             server()
@@ -38,6 +40,7 @@ def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', Strin
         }
     }
 }
+
 sourceSets.configureEach {
     [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName].each { variant->
         configurations.named("$variant") {
