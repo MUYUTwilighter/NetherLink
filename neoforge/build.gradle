@@ -1,0 +1,102 @@
+import net.darkhax.curseforgegradle.TaskPublishCurseForge
+
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev'
+    id "com.modrinth.minotaur" version "2.+"
+    id 'net.darkhax.curseforgegradle' version '1.1.26'
+}
+
+neoForge {
+    version = neoforge_version
+    // Automatically enable neoforge AccessTransformers if the file exists
+    def at = project(':common').file('src/main/resources/META-INF/accesstransformer.cfg')
+    if (at.exists()) {
+        accessTransformers.from(at.absolutePath)
+    }
+    runs {
+        configureEach {
+            systemProperty('neoforge.enabledGameTestNamespaces', mod_id)
+            ideName = "NeoForge ${it.name.capitalize()} (${project.path})" // Unify the run config names with fabric
+        }
+        client {
+            client()
+            gameDirectory = this.mkdir(this.file("runs/client"))
+        }
+        data {
+            clientData()
+            gameDirectory = this.mkdir(this.file("runs/data"))
+            // DataGen can be run by - "./gradlew :neoforge:runData" in Terminal.
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+        server {
+            server()
+            this.file("runs/server").createParentDirectories()
+            gameDirectory = this.mkdir(this.file("runs/server"))
+        }
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+// Implement mcgradleconventions loader attribute
+def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
+['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements'].each { variant ->
+    configurations.named("$variant") {
+        attributes {
+            attribute(loaderAttribute, 'neoforge')
+        }
+    }
+}
+sourceSets.configureEach {
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName, it.getTaskName(null, 'jarJar')].each { variant ->
+        configurations.named("$variant") {
+            attributes {
+                attribute(loaderAttribute, 'neoforge')
+            }
+        }
+    }
+}
+
+def archivesName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
+
+modrinth {
+    token = System.getenv("MODRINTH_MOD_PUBLISH")
+    projectId = modrinth_id
+    versionName = archivesName
+    versionNumber = version
+    versionType = release_state
+    uploadFile = jar
+    gameVersions = [minecraft_version]
+    loaders = ["neoforge"]
+    File changelogFile = rootProject.file("changelog.md")
+    if (changelogFile.exists()) {
+        changelog = changelogFile.text
+    }
+    dependencies {
+        required.project "fabric-api"
+    }
+}
+
+tasks.register('curseforge', TaskPublishCurseForge) {
+    apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
+    group = 'publishing'
+    def mainFile = upload('880165', jar)
+    mainFile.displayName = archivesName
+    versionType = release_state
+    File changelogFile = rootProject.file("changelog.md")
+    if (changelogFile.exists()) {
+        mainFile.changelog = changelogFile.text
+    }
+    mainFile.changelogType = 'markdown'
+    mainFile.gameVersions = [minecraft_version]
+    mainFile.addJavaVersion("Java 25")
+    mainFile.addEnvironment("server", "client")
+    mainFile.addModLoader("neoforge")
+}
