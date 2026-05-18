@@ -75,14 +75,15 @@ processResources {
             'home'                         : home,
             'sources'                      : sources,
             'issue_tracker'                : issue_tracker,
-            'release_state'                : release_state
+            'release_state'                : release_state,
+            'microsoft_client_id'          : System.getenv("NETHERLINK_CLIENT_ID")
     ]
 
     var jsonExpandProps = expandProps.collectEntries {
         key, value -> [(key): value instanceof String ? value.replace("\n", "\\\\n") : value]
     }
 
-    filesMatching(['META-INF/mods.toml', 'META-INF/neoforge.mods.toml']) {
+    filesMatching(['META-INF/mods.toml', 'META-INF/neoforge.mods.toml', 'microsoft-client-id']) {
         expand expandProps
     }
 

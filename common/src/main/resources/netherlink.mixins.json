@@ -3,7 +3,10 @@
   "minVersion": "0.8",
   "package": "cool.muyucloud.netherlink.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": [],
+  "mixins": [
+    "CommandSourceStackMixin",
+    "MinecraftServerMixin"
+  ],
   "client": [
     "FriendJoinHandlerMixin",
     "IntegratedServerMixin",
