@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink.mixin;
 
 import com.mojang.datafixers.DataFixer;
-import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
 import net.minecraft.network.chat.Component;

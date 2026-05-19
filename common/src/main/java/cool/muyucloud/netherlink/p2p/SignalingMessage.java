@@ -7,7 +7,6 @@ import net.minecraft.util.StringRepresentable;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
-import java.util.UUID;
 
 public record SignalingMessage(Type type, String sessionId, @Nullable String sdp, WebRtc.@Nullable Candidate iceCandidate) {
     public static final Codec<SignalingMessage> CODEC = RecordCodecBuilder.create(
