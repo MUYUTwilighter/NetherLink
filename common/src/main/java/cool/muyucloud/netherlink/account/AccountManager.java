@@ -7,6 +7,7 @@ import com.mojang.serialization.JsonOps;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
+import cool.muyucloud.netherlink.p2p.DedicatedP2PManager;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,6 +27,7 @@ public class AccountManager {
     private static final Map<String, Account> ACCOUNTS = new ConcurrentHashMap<>();
     private static final Map<String, AuthRequest> REQUESTS = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> PUBLISHED = new ConcurrentHashMap<>();
+    private static final Map<String, DedicatedP2PManager> P2P = new ConcurrentHashMap<>();
     private static final PresencePublisher PRESENCE = new PresencePublisher();
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "NetherLink Account");
@@ -65,6 +67,7 @@ public class AccountManager {
         ACCOUNTS.remove(name);
         REQUESTS.remove(name);
         PUBLISHED.remove(name);
+        stopP2P(name);
         deleteAccountFile(name);
         return true;
     }
@@ -96,6 +99,10 @@ public class AccountManager {
             REQUESTS.put(profileName, request);
             if (PUBLISHED.remove(name) != null) {
                 PUBLISHED.put(profileName, true);
+            }
+            DedicatedP2PManager manager = P2P.remove(name);
+            if (manager != null) {
+                P2P.put(profileName, manager);
             }
             deleteAccountFile(name);
         }
@@ -140,6 +147,8 @@ public class AccountManager {
 
     public static void clearRequests() {
         REQUESTS.clear();
+        P2P.values().forEach(DedicatedP2PManager::shutdown);
+        P2P.clear();
     }
 
     public static void dump(String name) {
@@ -202,7 +211,14 @@ public class AccountManager {
             throw new NetherLinkAuthException("Dedicated server is not ready");
         }
         refresh(name, false, (Messenger)(Object)NliConstants.SERVER);
-        PRESENCE.publish(account);
+        Map<java.util.UUID, java.util.UUID> presence = PRESENCE.publish(account);
+        DedicatedP2PManager manager = P2P.computeIfAbsent(name, key -> {
+            NliConstants.LOG.info("Starting NetherLink P2P manager for account {}", key);
+            DedicatedP2PManager created = new DedicatedP2PManager(key, account, NliConstants.SERVER);
+            created.start();
+            return created;
+        });
+        manager.updatePresence(presence);
         PUBLISHED.put(name, true);
         NliConstants.LOG.info("Published NetherLink account presence: {}", name);
     }
@@ -219,6 +235,7 @@ public class AccountManager {
         if (account.getMcToken() != null && !account.getMcToken().isBlank()) {
             PRESENCE.revoke(account);
         }
+        stopP2P(name);
         PUBLISHED.remove(name);
         NliConstants.LOG.info("Revoked NetherLink account presence: {}", name);
     }
@@ -326,6 +343,13 @@ public class AccountManager {
             Files.deleteIfExists(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
         } catch (IOException e) {
             NliConstants.LOG.error("Failed to delete account file: " + name + ".json");
+        }
+    }
+
+    private static void stopP2P(String name) {
+        DedicatedP2PManager manager = P2P.remove(name);
+        if (manager != null) {
+            manager.shutdown();
         }
     }
 
