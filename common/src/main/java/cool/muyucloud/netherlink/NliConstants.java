@@ -36,9 +36,9 @@ public class NliConstants {
             } catch (IOException e) {
                 throw new IllegalStateException("Unable to read microsoft-client-id", e);
             }
-            if (MS_CLIENT_ID.isBlank() || MS_CLIENT_ID.startsWith("${")) {
-                throw new IllegalStateException("Unable to locate microsoft-client-id");
-            }
         } else MS_CLIENT_ID = custom.trim();
+        if (MS_CLIENT_ID.isEmpty() || MS_CLIENT_ID.startsWith("${")) {
+            throw new IllegalStateException("Please specify a valid NETHERLINK_CLIENT_ID in environment variable");
+        }
     }
 }

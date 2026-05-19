@@ -6,8 +6,6 @@ import com.mojang.brigadier.tree.CommandNode;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.permissions.Permission;
-import net.minecraft.server.permissions.PermissionSet;
 import net.minecraft.server.permissions.Permissions;
 
 import java.util.concurrent.CompletableFuture;

@@ -5,8 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonWriter;
 import com.mojang.serialization.JsonOps;
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.access.Messenger;
+import cool.muyucloud.netherlink.account.data.Account;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
@@ -101,7 +101,7 @@ public class AccountManager {
     public static void dump(String name) {
         Account account = ACCOUNTS.get(name);
         if (account == null) return;
-        JsonElement json = Account.CODEC.codec().encodeStart(JsonOps.COMPRESSED, account).getOrThrow();
+        JsonElement json = Account.CODEC.codec().encodeStart(JsonOps.INSTANCE, account).getOrThrow();
         StringWriter writer = new StringWriter();
         GSON.toJson(json, new JsonWriter(writer));
         try {
@@ -120,7 +120,7 @@ public class AccountManager {
         try {
             String raw = Files.readString(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
             JsonElement json = GSON.fromJson(raw, JsonElement.class);
-            Account account = Account.CODEC.codec().decode(JsonOps.COMPRESSED, json).getOrThrow().getFirst();
+            Account account = Account.CODEC.codec().decode(JsonOps.INSTANCE, json).getOrThrow().getFirst();
             ACCOUNTS.put(name, account);
             REQUESTS.remove(name);
         } catch (Exception e) {

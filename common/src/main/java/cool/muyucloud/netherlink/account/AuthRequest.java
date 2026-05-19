@@ -4,9 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.account.data.Endpoint;
-import cool.muyucloud.netherlink.access.Messenger;
 import net.minecraft.network.chat.Component;
 
 import java.io.IOException;
