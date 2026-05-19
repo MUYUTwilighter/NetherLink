@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
@@ -162,8 +163,10 @@ public class AuthRequest {
             body.addProperty("identityToken", "XBL3.0 x=" + userHash + ";" + account.getXstsToken());
 
             JsonObject response = postJson(MC_LOGIN, body);
-            account.setMcToken(requiredString(response, "access_token"));
+            String mcToken = requiredString(response, "access_token");
+            account.setMcToken(mcToken);
             account.setMcExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
+            account.setMcPmid(extractPmid(mcToken));
         } finally {
             pendingMcToken = false;
         }
@@ -339,6 +342,21 @@ public class AuthRequest {
 
     private long expiresAtFromSeconds(long seconds) {
         return System.currentTimeMillis() + seconds * 1000L;
+    }
+
+    private String extractPmid(String token) {
+        String[] parts = token.split("\\.");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            return optionalString(json, "pmid");
+        } catch (RuntimeException e) {
+            NliConstants.LOG.warn("Failed to parse PMID from Minecraft access token", e);
+            return null;
+        }
     }
 
     private String requiredString(JsonObject object, String key) {

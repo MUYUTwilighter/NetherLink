@@ -13,13 +13,15 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.file.Files;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AccountManager {
     private static final Gson GSON = new Gson();
-    private static final Map<String, Account> ACCOUNTS = new HashMap<>();
-    private static final Map<String, AuthRequest> REQUESTS = new HashMap<>();
+    private static final Map<String, Account> ACCOUNTS = new ConcurrentHashMap<>();
+    private static final Map<String, AuthRequest> REQUESTS = new ConcurrentHashMap<>();
 
     public static void add(Messenger messenger) {
         Account account = new Account();
@@ -30,6 +32,7 @@ public class AccountManager {
             if (profileName == null || profileName.isBlank()) {
                 throw new NetherLinkAuthException("Minecraft profile name was not found");
             }
+            account.setMcProfileName(profileName);
             ACCOUNTS.put(profileName, account);
             REQUESTS.put(profileName, request);
             dump(profileName);
@@ -40,15 +43,18 @@ public class AccountManager {
         }
     }
 
-    public static void remove(String name) {
-        revoke(name);
+    public static boolean remove(String name) {
+        Account removed = ACCOUNTS.get(name);
+        if (removed == null) {
+            return false;
+        }
+        if (removed.isEnabled()) {
+            revoke(name);
+        }
         ACCOUNTS.remove(name);
         REQUESTS.remove(name);
-        try {
-            Files.deleteIfExists(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
-        } catch (IOException e) {
-            NliConstants.LOG.error("Failed to delete account file: " + name + ".json");
-        }
+        deleteAccountFile(name);
+        return true;
     }
 
     public static void refresh(@NotNull String name, boolean force, @NotNull Messenger messenger) {
@@ -76,12 +82,15 @@ public class AccountManager {
             ACCOUNTS.put(profileName, account);
             REQUESTS.remove(name);
             REQUESTS.put(profileName, request);
+            deleteAccountFile(name);
         }
         dump(profileName);
     }
 
     public static void refresh(boolean force, Messenger messenger) {
-        ACCOUNTS.forEach((name, _) -> refresh(name, force, messenger));
+        for (String name : new ArrayList<>(ACCOUNTS.keySet())) {
+            refresh(name, force, messenger);
+        }
     }
 
     public static void dumpMessages(String name) {
@@ -120,11 +129,14 @@ public class AccountManager {
         try {
             String raw = Files.readString(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
             JsonElement json = GSON.fromJson(raw, JsonElement.class);
-            Account account = Account.CODEC.codec().decode(JsonOps.INSTANCE, json).getOrThrow().getFirst();
-            ACCOUNTS.put(name, account);
+            Account account = Account.CODEC.codec().decode(JsonOps.INSTANCE, json)
+                .getOrThrow().getFirst();
+            String key = account.getMcProfileName() == null || account.getMcProfileName().isBlank() ? name : account.getMcProfileName();
+            ACCOUNTS.put(key, account);
             REQUESTS.remove(name);
+            REQUESTS.remove(key);
         } catch (Exception e) {
-            NliConstants.LOG.error("Failed to read account file: " + name + ".json");
+            NliConstants.LOG.error("Failed to read account file: " + name + ".json", e);
         }
     }
 
@@ -170,12 +182,75 @@ public class AccountManager {
 
     public static void setInability(String name, boolean enable) {
         Account account = ACCOUNTS.get(name);
-        if (account == null || !account.isEnabled()) {
+        if (account == null) {
             return;
         }
         account.setEnabled(enable);
         if (!enable) {
             revoke(name);
+        }
+        dump(name);
+    }
+
+    public static void toggle(String name, Messenger messenger) {
+        Account account = ACCOUNTS.get(name);
+        if (account == null) {
+            messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            return;
+        }
+        boolean enabled = !account.isEnabled();
+        setInability(name, enabled);
+        messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" is now " + (enabled ? "enabled" : "disabled") + "."));
+    }
+
+    public static Collection<String> names() {
+        return ACCOUNTS.keySet().stream().sorted().toList();
+    }
+
+    public static void list(Messenger messenger) {
+        if (ACCOUNTS.isEmpty()) {
+            messenger.cif$sendMessage(() -> Component.literal("No NetherLink accounts configured."));
+            return;
+        }
+
+        messenger.cif$sendMessage(() -> Component.literal("NetherLink accounts:"));
+        ACCOUNTS.entrySet()
+            .stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> messenger.cif$sendMessage(() -> Component.literal(formatStatus(entry.getKey(), entry.getValue()))));
+    }
+
+    private static String formatStatus(String name, Account account) {
+        return "- %s [%s] profile=%s pmid=%s mcToken=%s".formatted(
+            name,
+            account.isEnabled() ? "enabled" : "disabled",
+            valueOrMissing(account.getMcProfileId()),
+            valueOrMissing(account.getMcPmid()),
+            tokenStatus(account.getMcExpireAt())
+        );
+    }
+
+    private static String tokenStatus(Long expiresAt) {
+        if (expiresAt == null || expiresAt <= 0L) {
+            return "missing";
+        }
+        long remainingMillis = expiresAt - System.currentTimeMillis();
+        if (remainingMillis <= 0L) {
+            return "expired";
+        }
+        long minutes = remainingMillis / 60000L;
+        return "valid, expires in " + minutes + "m";
+    }
+
+    private static String valueOrMissing(String value) {
+        return value == null || value.isBlank() ? "<missing>" : value;
+    }
+
+    private static void deleteAccountFile(String name) {
+        try {
+            Files.deleteIfExists(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
+        } catch (IOException e) {
+            NliConstants.LOG.error("Failed to delete account file: " + name + ".json");
         }
     }
 }

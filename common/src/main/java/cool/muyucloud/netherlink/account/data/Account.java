@@ -6,43 +6,52 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
 
 import java.util.Date;
+import java.util.Optional;
+import java.util.function.Function;
 
 public class Account {
     public static final MapCodec<Account> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
         Codec.BOOL.optionalFieldOf("enabled", true).forGetter(Account::isEnabled),
-        Codec.STRING.optionalFieldOf("msRefreshToken", null).forGetter(Account::getMsRefreshToken),
-        Codec.STRING.optionalFieldOf("msToken", null).forGetter(Account::getMsToken),
-        Codec.LONG.optionalFieldOf("msExpireAt", null).forGetter(Account::getMsExpireAt),
-        Codec.STRING.optionalFieldOf("xboxToken", null).forGetter(Account::getXboxToken),
-        Codec.STRING.optionalFieldOf("xboxUserHash", null).forGetter(Account::getXboxUserHash),
-        Codec.LONG.optionalFieldOf("xboxExpireAt", null).forGetter(Account::getXboxExpireAt),
-        Codec.STRING.optionalFieldOf("xstsToken", null).forGetter(Account::getXstsToken),
-        Codec.STRING.optionalFieldOf("xstsUserHash", null).forGetter(Account::getXstsUserHash),
-        Codec.LONG.optionalFieldOf("xstsExpireAt", null).forGetter(Account::getXstsExpireAt),
-        Codec.STRING.optionalFieldOf("mcToken", null).forGetter(Account::getMcToken),
-        Codec.LONG.optionalFieldOf("mcExpireAt", null).forGetter(Account::getMcExpireAt),
-        Codec.STRING.optionalFieldOf("mcProfileId", null).forGetter(Account::getMcProfileId),
-        Codec.STRING.optionalFieldOf("mcProfileName", null).forGetter(Account::getMcProfileName)
+        optionalFieldOf(Codec.STRING, "msRefreshToken", Account::getMsRefreshToken),
+        optionalFieldOf(Codec.STRING, "msToken", Account::getMsToken),
+        Codec.LONG.optionalFieldOf("msExpireAt", 0L).forGetter(Account::getMsExpireAt),
+        optionalFieldOf(Codec.STRING, "xboxToken", Account::getXboxToken),
+        optionalFieldOf(Codec.STRING, "xboxUserHash", Account::getXboxUserHash),
+        Codec.LONG.optionalFieldOf("xboxExpireAt", 0L).forGetter(Account::getXboxExpireAt),
+        optionalFieldOf(Codec.STRING, "xstsToken", Account::getXstsToken),
+        optionalFieldOf(Codec.STRING, "xstsUserHash", Account::getXstsUserHash),
+        Codec.LONG.optionalFieldOf("xstsExpireAt", 0L).forGetter(Account::getXstsExpireAt),
+        optionalFieldOf(Codec.STRING, "mcToken", Account::getMcToken),
+        Codec.LONG.optionalFieldOf("mcExpireAt", 0L).forGetter(Account::getMcExpireAt),
+        optionalFieldOf(Codec.STRING, "mcProfileId", Account::getMcProfileId),
+        optionalFieldOf(Codec.STRING, "mcProfileName", Account::getMcProfileName),
+        optionalFieldOf(Codec.STRING, "mcPmid", Account::getMcPmid)
     ).apply(instance, (enabled, msRefreshToken, msToken, msExpireAt,
                        xboxToken, xboxUserHash, xboxExpireAt, xstsToken, xstsUserHash, xstsExpireAt,
-                       mcToken, mcExpireAt, mcProfileId, mcProfileName) -> {
+                       mcToken, mcExpireAt, mcProfileId, mcProfileName, mcPmid) -> {
         Account account = new Account();
         account.setEnabled(enabled);
-        account.setMsRefreshToken(msRefreshToken);
-        account.setMsToken(msToken);
+        account.setMsRefreshToken(msRefreshToken.orElse(null));
+        account.setMsToken(msToken.orElse(null));
         account.setMsExpireAt(msExpireAt);
-        account.setXboxToken(xboxToken);
-        account.setXboxUserHash(xboxUserHash);
+        account.setXboxToken(xboxToken.orElse(null));
+        account.setXboxUserHash(xboxUserHash.orElse(null));
         account.setXboxExpireAt(xboxExpireAt);
-        account.setXstsToken(xstsToken);
-        account.setXstsUserHash(xstsUserHash);
+        account.setXstsToken(xstsToken.orElse(null));
+        account.setXstsUserHash(xstsUserHash.orElse(null));
         account.setXstsExpireAt(xstsExpireAt);
-        account.setMcToken(mcToken);
+        account.setMcToken(mcToken.orElse(null));
         account.setMcExpireAt(mcExpireAt);
-        account.setMcProfileId(mcProfileId);
-        account.setMcProfileName(mcProfileName);
+        account.setMcProfileId(mcProfileId.orElse(null));
+        account.setMcProfileName(mcProfileName.orElse(null));
+        account.setMcPmid(mcPmid.orElse(null));
         return account;
     }));
+
+    private static <T, F> RecordCodecBuilder<T, Optional<F>> optionalFieldOf(Codec<F> codec, String key, Function<T, F> getter) {
+        MapCodec<Optional<F>> field = codec.optionalFieldOf(key);
+        return field.forGetter(t -> Optional.ofNullable(getter.apply(t)));
+    }
 
     private static long getCurrentTime() {
         return new Date().getTime();
@@ -62,6 +71,7 @@ public class Account {
     private Long mcExpireAt = 0L;
     private String mcProfileId;
     private String mcProfileName;
+    private String mcPmid;
 
     public synchronized boolean isEnabled() {
         return enabled;
@@ -189,5 +199,13 @@ public class Account {
 
     public synchronized void setMcProfileName(String mcProfileName) {
         this.mcProfileName = mcProfileName;
+    }
+
+    public synchronized String getMcPmid() {
+        return mcPmid;
+    }
+
+    public synchronized void setMcPmid(String mcPmid) {
+        this.mcPmid = mcPmid;
     }
 }
