@@ -17,11 +17,22 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AccountManager {
     private static final Gson GSON = new Gson();
     private static final Map<String, Account> ACCOUNTS = new ConcurrentHashMap<>();
     private static final Map<String, AuthRequest> REQUESTS = new ConcurrentHashMap<>();
+    private static final Map<String, Boolean> PUBLISHED = new ConcurrentHashMap<>();
+    private static final PresencePublisher PRESENCE = new PresencePublisher();
+    private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "NetherLink Account");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final AtomicBoolean MAINTENANCE_PENDING = new AtomicBoolean();
 
     public static void add(Messenger messenger) {
         Account account = new Account();
@@ -53,6 +64,7 @@ public class AccountManager {
         }
         ACCOUNTS.remove(name);
         REQUESTS.remove(name);
+        PUBLISHED.remove(name);
         deleteAccountFile(name);
         return true;
     }
@@ -82,6 +94,9 @@ public class AccountManager {
             ACCOUNTS.put(profileName, account);
             REQUESTS.remove(name);
             REQUESTS.put(profileName, request);
+            if (PUBLISHED.remove(name) != null) {
+                PUBLISHED.put(profileName, true);
+            }
             deleteAccountFile(name);
         }
         dump(profileName);
@@ -91,6 +106,26 @@ public class AccountManager {
         for (String name : new ArrayList<>(ACCOUNTS.keySet())) {
             refresh(name, force, messenger);
         }
+    }
+
+    public static void tick(int tickCount, Messenger messenger) {
+        dumpMessages();
+        boolean refresh = tickCount % NliConstants.INTERVAL_TOKEN == 0;
+        boolean publish = tickCount % NliConstants.INTERVAL_PRESENCE == 0;
+        if (refresh || publish) {
+            submitMaintenance("maintain accounts", () -> {
+                if (refresh) {
+                    refresh(false, messenger);
+                }
+                if (publish) {
+                    publish();
+                }
+            });
+        }
+    }
+
+    public static void publishAsync() {
+        submitMaintenance("publish accounts", AccountManager::publish);
     }
 
     public static void dumpMessages(String name) {
@@ -135,6 +170,8 @@ public class AccountManager {
             ACCOUNTS.put(key, account);
             REQUESTS.remove(name);
             REQUESTS.remove(key);
+            PUBLISHED.remove(name);
+            PUBLISHED.remove(key);
         } catch (Exception e) {
             NliConstants.LOG.error("Failed to read account file: " + name + ".json", e);
         }
@@ -161,7 +198,13 @@ public class AccountManager {
         if (account == null || !account.isEnabled()) {
             return;
         }
-        // TODO publish presence to p2p server
+        if (NliConstants.SERVER == null) {
+            throw new NetherLinkAuthException("Dedicated server is not ready");
+        }
+        refresh(name, false, (Messenger)(Object)NliConstants.SERVER);
+        PRESENCE.publish(account);
+        PUBLISHED.put(name, true);
+        NliConstants.LOG.info("Published NetherLink account presence: {}", name);
     }
 
     public static void publish() {
@@ -170,10 +213,14 @@ public class AccountManager {
 
     public static void revoke(String name) {
         Account account = ACCOUNTS.get(name);
-        if (account == null || !account.isEnabled()) {
+        if (account == null) {
             return;
         }
-        // TODO revoke presence to p2p server
+        if (account.getMcToken() != null && !account.getMcToken().isBlank()) {
+            PRESENCE.revoke(account);
+        }
+        PUBLISHED.remove(name);
+        NliConstants.LOG.info("Revoked NetherLink account presence: {}", name);
     }
 
     public static void revoke() {
@@ -190,6 +237,34 @@ public class AccountManager {
             revoke(name);
         }
         dump(name);
+    }
+
+    public static void publish(String name, Messenger messenger) {
+        if (!ACCOUNTS.containsKey(name)) {
+            messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            return;
+        }
+        publish(name);
+        messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" published."));
+    }
+
+    public static void publish(Messenger messenger) {
+        publish();
+        messenger.cif$sendMessage(() -> Component.literal("Published NetherLink accounts."));
+    }
+
+    public static void revoke(String name, Messenger messenger) {
+        if (!ACCOUNTS.containsKey(name)) {
+            messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            return;
+        }
+        revoke(name);
+        messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" revoked."));
+    }
+
+    public static void revoke(Messenger messenger) {
+        revoke();
+        messenger.cif$sendMessage(() -> Component.literal("Revoked NetherLink accounts."));
     }
 
     public static void toggle(String name, Messenger messenger) {
@@ -223,7 +298,7 @@ public class AccountManager {
     private static String formatStatus(String name, Account account) {
         return "- %s [%s] profile=%s pmid=%s mcToken=%s".formatted(
             name,
-            account.isEnabled() ? "enabled" : "disabled",
+            (account.isEnabled() ? "enabled" : "disabled") + "," + (PUBLISHED.containsKey(name) ? "published" : "not published"),
             valueOrMissing(account.getMcProfileId()),
             valueOrMissing(account.getMcPmid()),
             tokenStatus(account.getMcExpireAt())
@@ -252,5 +327,20 @@ public class AccountManager {
         } catch (IOException e) {
             NliConstants.LOG.error("Failed to delete account file: " + name + ".json");
         }
+    }
+
+    private static void submitMaintenance(String taskName, Runnable task) {
+        if (!MAINTENANCE_PENDING.compareAndSet(false, true)) {
+            return;
+        }
+        EXECUTOR.execute(() -> {
+            try {
+                task.run();
+            } catch (RuntimeException e) {
+                NliConstants.LOG.warn("NetherLink maintenance failed: {}", taskName, e);
+            } finally {
+                MAINTENANCE_PENDING.set(false);
+            }
+        });
     }
 }

@@ -26,6 +26,8 @@ public class NliCommand<S> {
     private final LiteralArgumentBuilder<S> remove = LiteralArgumentBuilder.literal("remove");
     private final LiteralArgumentBuilder<S> toggle = LiteralArgumentBuilder.literal("toggle");
     private final LiteralArgumentBuilder<S> list = LiteralArgumentBuilder.literal("list");
+    private final LiteralArgumentBuilder<S> publish = LiteralArgumentBuilder.literal("publish");
+    private final LiteralArgumentBuilder<S> revoke = LiteralArgumentBuilder.literal("revoke");
 
     public NliCommand() {
         add.executes(context -> executeAsync(context.getSource(), "add account", AccountManager::add));
@@ -63,7 +65,29 @@ public class NliCommand<S> {
                 return executeAsync(context.getSource(), "toggle account " + name, messenger -> AccountManager.toggle(name, messenger));
             }));
 
-        root.then(add).then(list).then(refresh).then(remove).then(toggle);
+        publish
+            .executes(context -> executeAsync(context.getSource(), "publish all accounts", AccountManager::publish))
+            .then(LiteralArgumentBuilder.<S>literal("all")
+                .executes(context -> executeAsync(context.getSource(), "publish all accounts", AccountManager::publish)))
+            .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+                .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
+                .executes(context -> {
+                    String name = StringArgumentType.getString(context, "name");
+                    return executeAsync(context.getSource(), "publish account " + name, messenger -> AccountManager.publish(name, messenger));
+                }));
+
+        revoke
+            .executes(context -> executeAsync(context.getSource(), "revoke all accounts", AccountManager::revoke))
+            .then(LiteralArgumentBuilder.<S>literal("all")
+                .executes(context -> executeAsync(context.getSource(), "revoke all accounts", AccountManager::revoke)))
+            .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+                .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
+                .executes(context -> {
+                    String name = StringArgumentType.getString(context, "name");
+                    return executeAsync(context.getSource(), "revoke account " + name, messenger -> AccountManager.revoke(name, messenger));
+                }));
+
+        root.then(add).then(list).then(refresh).then(remove).then(toggle).then(publish).then(revoke);
         root.requires(source -> {
             Messenger m = Messenger.of(source);
             return m.cif$permissions().hasPermission(Permissions.COMMANDS_ADMIN);

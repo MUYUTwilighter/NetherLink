@@ -32,10 +32,7 @@ public abstract class DedicatedServerMixin extends MinecraftServer implements Me
 
     @Inject(method = "tickServer", at = @At("TAIL"))
     private void afterTickServer(BooleanSupplier haveTime, CallbackInfo ci) {
-        AccountManager.dumpMessages();
-        if (this.getTickCount() % NliConstants.INTERVAL_TOKEN == 0) {
-            AccountManager.refresh(false, this);
-        }
+        AccountManager.tick(this.getTickCount(), this);
     }
 
     @Override

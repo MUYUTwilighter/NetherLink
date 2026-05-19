@@ -17,7 +17,7 @@ public class NliSetup {
     public static void onServerStarted(MinecraftServer server) {
         if (server instanceof DedicatedServer) {
             AccountManager.load();
-            AccountManager.publish();
+            AccountManager.publishAsync();
         }
     }
 

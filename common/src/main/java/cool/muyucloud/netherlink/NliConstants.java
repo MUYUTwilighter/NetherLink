@@ -16,7 +16,7 @@ public class NliConstants {
     public static final Logger LOG = LoggerFactory.getLogger(MOD_NAME);
     public static final String MS_CLIENT_ID;
     public static final Long TIMEOUT = 300000L;
-    public static final Integer INTERVAL_TOKEN = 20;
+    public static final Integer INTERVAL_TOKEN = 1200;
     public static final Integer INTERVAL_PRESENCE = 1200;
     public static final Path ACCOUNT_DIR = Path.of("netherlink/accounts");
     public static final NliCommand<CommandSourceStack> SERVER_COMMAND = new NliCommand<>();
