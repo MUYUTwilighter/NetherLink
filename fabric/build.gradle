@@ -1,6 +1,10 @@
+//import net.darkhax.curseforgegradle.TaskPublishCurseForge
+
 plugins {
     id 'multiloader-loader'
     id 'net.fabricmc.fabric-loom'
+    id "com.modrinth.minotaur" version "2.+"
+//    id 'net.darkhax.curseforgegradle' version '1.1.26'
 }
 
 configurations {
@@ -77,3 +81,39 @@ sourceSets.configureEach {
         }
     }
 }
+
+modrinth {
+    token = System.getenv("MODRINTH_MOD_PUBLISH")
+    projectId = "netherlink-p2p"
+    versionName = "${base.archivesName}-${version}"
+    versionNumber = "${version}"
+    versionType = "${release_state}"
+    uploadFile = jar
+    gameVersions = [minecraft_version]
+    loaders = ["fabric"]
+    File changelogFile = rootProject.file("changelog.md")
+    if (changelogFile.exists()) {
+        changelog = changelogFile.text
+    }
+    dependencies {
+        required.project "fabric-api"
+    }
+}
+
+//tasks.register('curseforge', TaskPublishCurseForge) {
+//    apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
+//    group = 'publishing'
+//    def mainFile = upload('880165', jar)
+//    mainFile.displayName = archivesName
+//    mainFile.releaseType = version.endsWith("a") || version.endsWith("alpha") ? "alpha" : version.endsWith("pre") ? "beta" : "release"
+//    File changelogFile = rootProject.file("changelog.md")
+//    if (changelogFile.exists()) {
+//        mainFile.changelog = changelogFile.text
+//    }
+//    mainFile.changelogType = 'markdown'
+//    mainFile.gameVersions = [minecraft_version]
+//    mainFile.addJavaVersion("Java 25")
+//    mainFile.addEnvironment("server", "client")
+//    mainFile.addModLoader("neoforge")
+//    mainFile.addRequirement("fabric-api")
+//}
