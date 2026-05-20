@@ -32,14 +32,14 @@ repositories {
 }
 
 sourcesJar {
-    from(rootProject.file('LICENSE')) {
-        rename { "${it}_${mod_name}" }
+    from(rootProject.file('LICENSE.md')) {
+        rename { "${it}" }
     }
 }
 
 jar {
-    from(rootProject.file('LICENSE')) {
-        rename { "${it}_${mod_name}" }
+    from(rootProject.file('LICENSE.md')) {
+        rename { "${it}" }
     }
 
     manifest {
