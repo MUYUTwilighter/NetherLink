@@ -1,12 +1,12 @@
 package cool.muyucloud.netherlink.p2p;
 
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.account.data.Account;
+import cool.muyucloud.netherlink.account.MinecraftAccount;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import net.minecraft.server.dedicated.DedicatedServer;
+import net.minecraft.server.MinecraftServer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
@@ -14,13 +14,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-public final class DedicatedP2PManager {
+public final class ServerP2PManager {
     private static final long SIGNALING_RECONNECT_DELAY_SECONDS = 1L;
     private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
     private final String accountName;
-    private final Account account;
-    private final DedicatedServer server;
+    private final MinecraftAccount account;
+    private final MinecraftServer server;
     private final SignalingClient signaling;
     private final ConcurrentHashMap<UUID, UUID> profileIdsByPmid = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, String> acceptedAwaitingOffer = new ConcurrentHashMap<>();
@@ -29,7 +29,7 @@ public final class DedicatedP2PManager {
         @Override
         public void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
             if (peerPmid != null) {
-                RtcHandshake handshake = DedicatedP2PManager.this.handshakes.get(peerPmid);
+                RtcHandshake handshake = ServerP2PManager.this.handshakes.get(peerPmid);
                 if (handshake != null) {
                     handshake.abort("signaling error: " + cause.getClass().getSimpleName());
                 }
@@ -38,13 +38,13 @@ public final class DedicatedP2PManager {
 
         @Override
         public void onSignalingDisconnected() {
-            DedicatedP2PManager.this.onSignalingDisconnected();
+            ServerP2PManager.this.onSignalingDisconnected();
         }
     };
     private @Nullable PeerConnectionFactory factory;
     private volatile boolean shutdown;
 
-    public DedicatedP2PManager(String accountName, Account account, DedicatedServer server) {
+    public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server) {
         this.accountName = accountName;
         this.account = account;
         this.server = server;
@@ -56,7 +56,7 @@ public final class DedicatedP2PManager {
 
     public void start() {
         this.shutdown = false;
-        NliConstants.LOG.info("[P2P][{}] Starting dedicated P2P manager", this.accountName);
+        NliConstants.LOG.info("[P2P][{}] Starting server P2P manager", this.accountName);
         this.signaling.connect();
         this.warmupTurnAuth();
     }
@@ -69,7 +69,7 @@ public final class DedicatedP2PManager {
 
     public synchronized void shutdown() {
         this.shutdown = true;
-        NliConstants.LOG.info("[P2P][{}] Shutting down dedicated P2P manager", this.accountName);
+        NliConstants.LOG.info("[P2P][{}] Shutting down server P2P manager", this.accountName);
         this.signaling.removeConnectionListener(this.connectionListener);
         this.handshakes.values().forEach(handshake -> handshake.abort("shutdown"));
         this.handshakes.clear();
@@ -248,8 +248,8 @@ public final class DedicatedP2PManager {
 
     private void acceptGuest(RtcHandshake.HandshakeResult handshakeResult, @Nullable UUID profileId) {
         this.server.execute(() -> {
-            NliConstants.LOG.info("[P2P][{}] Registering RTC channel with dedicated server profile={}", this.accountName, profileId);
-            this.server.getConnection().acceptChannel(new RtcChannel(handshakeResult), profileId);
+            NliConstants.LOG.info("[P2P][{}] Registering RTC channel with server profile={}", this.accountName, profileId);
+            ServerChannelAcceptor.accept(this.server, new RtcChannel(handshakeResult), profileId);
         });
     }
 

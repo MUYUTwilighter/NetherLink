@@ -5,7 +5,7 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [
     "CommandSourceStackMixin",
-    "DedicatedServerMixin"
+    "MinecraftServerMixin"
   ],
   "client": [
     "FriendJoinHandlerMixin",
@@ -18,4 +18,3 @@
     "defaultRequire": 1
   }
 }
-

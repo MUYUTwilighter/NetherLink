@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink;
 
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.server.dedicated.DedicatedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,5 +46,4 @@ public class NliConstants {
     public static final Integer INTERVAL_PRESENCE = 200;
     public static final Path ACCOUNT_DIR = Path.of("netherlink/accounts");
     public static final NliCommand<CommandSourceStack> SERVER_COMMAND = new NliCommand<>();
-    public static DedicatedServer SERVER;
 }

@@ -5,7 +5,7 @@ import dev.onvoid.webrtc.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
-import net.minecraft.network.Connection;
+import io.netty.util.AttributeKey;
 import org.jspecify.annotations.Nullable;
 
 import java.net.InetSocketAddress;
@@ -18,6 +18,7 @@ public final class RtcChannel extends AbstractChannel {
     private static final long HIGH_WATER_MARK = 1048576L;
     private static final long LOW_WATER_MARK = 262144L;
     private static final int BACKPRESSURE_FLAG = 1;
+    private static final AttributeKey<Boolean> SECURE_TRANSPORT = AttributeKey.valueOf("secure_transport");
 
     private final RtcHandshake.HandshakeResult handshakeResult;
     private final ChannelConfig config = new DefaultChannelConfig(this);
@@ -28,7 +29,7 @@ public final class RtcChannel extends AbstractChannel {
     public RtcChannel(RtcHandshake.HandshakeResult handshakeResult) {
         super(null);
         this.handshakeResult = handshakeResult;
-        this.attr(Connection.SECURE_TRANSPORT).set(Boolean.TRUE);
+        this.attr(SECURE_TRANSPORT).set(Boolean.TRUE);
     }
 
     @Override
