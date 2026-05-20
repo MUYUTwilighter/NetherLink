@@ -18,12 +18,12 @@ public abstract class CommandSourceStackMixin implements Messenger {
     public abstract PermissionSet permissions();
 
     @Override
-    public void cif$sendMessage(Supplier<Component> msg) {
+    public void nli$sendMessage(Supplier<Component> msg) {
         this.sendSystemMessage(msg.get());
     }
 
     @Override
-    public PermissionSet cif$permissions() {
+    public PermissionSet nli$permissions() {
         return this.permissions();
     }
 }

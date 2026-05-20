@@ -14,7 +14,7 @@ public interface Messenger {
         }
     }
 
-    void cif$sendMessage(Supplier<Component> msg);
+    void nli$sendMessage(Supplier<Component> msg);
 
-    PermissionSet cif$permissions();
+    PermissionSet nli$permissions();
 }

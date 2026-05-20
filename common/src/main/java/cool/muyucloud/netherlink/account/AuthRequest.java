@@ -61,13 +61,13 @@ public class AuthRequest {
     public void dumpMessages() {
         Supplier<Component> message;
         while ((message = messages.poll()) != null) {
-            messenger.cif$sendMessage(message);
+            messenger.nli$sendMessage(message);
         }
     }
 
     public void sendMessage(Supplier<Component> msg) {
         messages.offer(msg);
-        messenger.cif$sendMessage(msg);
+        messenger.nli$sendMessage(msg);
     }
 
     public void refreshMsToken(boolean force) throws NetherLinkAuthException {

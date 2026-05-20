@@ -51,9 +51,9 @@ public class NliCommand<S> {
                 String name = StringArgumentType.getString(context, "name");
                 return executeAsync(context.getSource(), "remove account " + name, messenger -> {
                     if (AccountManager.remove(name)) {
-                        messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" removed."));
+                        messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" removed."));
                     } else {
-                        messenger.cif$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+                        messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
                     }
                 });
             }));
@@ -90,7 +90,7 @@ public class NliCommand<S> {
         root.then(add).then(list).then(refresh).then(remove).then(toggle).then(publish).then(revoke);
         root.requires(source -> {
             Messenger m = Messenger.of(source);
-            return m.cif$permissions().hasPermission(Permissions.COMMANDS_ADMIN);
+            return m.nli$permissions().hasPermission(Permissions.COMMANDS_ADMIN);
         });
     }
 
@@ -102,13 +102,13 @@ public class NliCommand<S> {
 
     private int executeAsync(S source, String taskName, Consumer<Messenger> action) {
         Messenger messenger = Messenger.of(source);
-        messenger.cif$sendMessage(() -> Component.literal("NetherLink task started: " + taskName));
+        messenger.nli$sendMessage(() -> Component.literal("NetherLink task started: " + taskName));
         CompletableFuture.runAsync(() -> action.accept(messenger), executor)
-            .thenRun(() -> messenger.cif$sendMessage(() -> Component.literal("NetherLink task completed: " + taskName)))
+            .thenRun(() -> messenger.nli$sendMessage(() -> Component.literal("NetherLink task completed: " + taskName)))
             .exceptionally(error -> {
                 Throwable cause = error.getCause() == null ? error : error.getCause();
                 NliConstants.LOG.warn("NetherLink task failed: {}", taskName, cause);
-                messenger.cif$sendMessage(() -> Component.literal("NetherLink task failed: " + cause.getMessage()));
+                messenger.nli$sendMessage(() -> Component.literal("NetherLink task failed: " + cause.getMessage()));
                 return null;
             });
         return 1;
