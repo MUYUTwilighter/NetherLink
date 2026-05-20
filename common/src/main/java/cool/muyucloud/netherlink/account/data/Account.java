@@ -4,12 +4,13 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.account.MinecraftAccount;
 
 import java.util.Date;
 import java.util.Optional;
 import java.util.function.Function;
 
-public class Account {
+public class Account implements MinecraftAccount {
     public static final MapCodec<Account> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
         Codec.BOOL.optionalFieldOf("enabled", true).forGetter(Account::isEnabled),
         optionalFieldOf(Codec.STRING, "msRefreshToken", Account::getMsRefreshToken),
