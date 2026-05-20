@@ -24,5 +24,4 @@ plugins {
 rootProject.name = "${mod_name}"
 include('common')
 include('fabric')
-// Waiting for NeoForge 26.2
-// include('neoforge')
+include('neoforge')
