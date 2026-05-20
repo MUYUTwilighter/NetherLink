@@ -23,6 +23,7 @@ public class NliSetup {
 
     public static void onServerStopping(MinecraftServer server) {
         if (server instanceof DedicatedServer) {
+            AccountManager.disconnectPlayersForShutdown(server);
             AccountManager.dump();
             AccountManager.revoke();
             AccountManager.clearRequests();

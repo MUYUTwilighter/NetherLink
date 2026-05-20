@@ -294,10 +294,9 @@ public final class SignalingClient {
             .getOrThrow(error -> new IllegalStateException("Malformed signaling payload: " + error));
         UUID fromPmid = UUID.fromString(envelope.from());
         NliConstants.LOG.info("[P2P][signaling] Received {} session={} from {}", parsed.type(), parsed.sessionId(), fromPmid);
-        switch (parsed.decode()) {
+        switch (parsed) {
             case SignalingMessage.FriendJoin friendJoin -> this.dispatchFriendJoinMessage(fromPmid, friendJoin);
             case SignalingMessage.WebRtc webRtc -> this.dispatchWebRtcMessage(fromPmid, webRtc);
-            case null -> NliConstants.LOG.debug("Ignoring malformed signaling message of type {}", parsed.type());
         }
     }
 

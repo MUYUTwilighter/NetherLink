@@ -23,7 +23,7 @@ import java.util.Optional;
 @Mixin(IntegratedServer.class)
 public abstract class IntegratedServerMixin extends MinecraftServer {
     @Shadow
-    public abstract IntegratedServer.MultiplayerScope getMultiplayerScope();
+    public abstract MinecraftServer.MultiplayerScope getMultiplayerScope();
 
     public IntegratedServerMixin(Thread serverThread, LevelStorageSource.LevelStorageAccess storageSource, PackRepository packRepository, WorldStem worldStem, Optional<GameRules> gameRules, Proxy proxy, DataFixer fixerUpper, Services services, LevelLoadListener levelLoadListener, boolean propagatesCrashes, NotificationManager notificationManager) {
         super(serverThread, storageSource, packRepository, worldStem, gameRules, proxy, fixerUpper, services, levelLoadListener, propagatesCrashes, notificationManager);

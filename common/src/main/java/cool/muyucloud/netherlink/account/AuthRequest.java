@@ -194,7 +194,7 @@ public class AuthRequest {
 
     private void requestMicrosoftTokenWithDeviceCode() {
         Endpoint endpoint = Endpoint.fromJson(postForm(MS_DEVICE_CODE, Map.of(
-            "client_id", NliConstants.MS_CLIENT_ID,
+            "client_id", NliConstants.MS_CLIENT_ID.get(),
             "scope", MS_SCOPE
         )));
         sendDeviceCodeMessage(endpoint);
@@ -205,7 +205,7 @@ public class AuthRequest {
             sleep(intervalMillis);
             HttpResult result = postFormRaw(MS_TOKEN, Map.of(
                 "grant_type", "urn:ietf:params:oauth:grant-type:device_code",
-                "client_id", NliConstants.MS_CLIENT_ID,
+                "client_id", NliConstants.MS_CLIENT_ID.get(),
                 "device_code", endpoint.getDeviceCode()
             ));
             if (result.isSuccess()) {
@@ -235,7 +235,7 @@ public class AuthRequest {
     private void refreshMicrosoftToken() {
         HttpResult result = postFormRaw(MS_TOKEN, Map.of(
             "grant_type", "refresh_token",
-            "client_id", NliConstants.MS_CLIENT_ID,
+            "client_id", NliConstants.MS_CLIENT_ID.get(),
             "refresh_token", account.getMsRefreshToken(),
             "scope", MS_SCOPE
         ));

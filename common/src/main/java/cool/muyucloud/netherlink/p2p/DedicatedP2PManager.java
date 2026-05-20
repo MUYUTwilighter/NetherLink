@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class DedicatedP2PManager {
     private static final long SIGNALING_RECONNECT_DELAY_SECONDS = 1L;
-    private static final long HANDSHAKE_TIMEOUT_SECONDS = 10L;
+    private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
     private final String accountName;
     private final Account account;
@@ -195,7 +195,7 @@ public final class DedicatedP2PManager {
     private @Nullable RtcHandshake createHandshake(UUID peerPmid, @Nullable UUID profileId, String sessionId, RTCIceServer turnAuth, CompletableFuture<Void> result) {
         RTCConfiguration config = new RTCConfiguration();
         config.iceServers.add(turnAuth);
-        config.portAllocatorConfig.setDisableTcp(true).setEnableIpv6(true).setEnableIpv6OnWifi(true);
+        config.portAllocatorConfig.setEnableIpv6(true).setEnableIpv6OnWifi(true);
         RtcHandshake handshake;
         synchronized (this) {
             handshake = new RtcHandshake(
@@ -239,7 +239,7 @@ public final class DedicatedP2PManager {
             return;
         }
         NliConstants.LOG.debug("[P2P][{}] Applying ICE candidate session={}", this.accountName, ice.sessionId());
-        RTCIceCandidate candidate = ice.candidate().toRtcIceCandidate();
+        RTCIceCandidate candidate = ice.toRtcIceCandidate();
         handshake.addRemoteIceCandidate(candidate).exceptionally(error -> {
             NliConstants.LOG.warn("[P2P][{}] Failed to add ICE candidate for {}: {}", this.accountName, ice.sessionId(), error.getMessage());
             return null;

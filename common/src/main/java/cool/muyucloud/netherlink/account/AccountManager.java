@@ -9,6 +9,7 @@ import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.p2p.DedicatedP2PManager;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -149,6 +150,19 @@ public class AccountManager {
         REQUESTS.clear();
         P2P.values().forEach(DedicatedP2PManager::shutdown);
         P2P.clear();
+    }
+
+    public static void disconnectPlayersForShutdown(MinecraftServer server) {
+        if (server.getPlayerList() == null || server.getPlayerList().getPlayers().isEmpty()) {
+            return;
+        }
+        NliConstants.LOG.info("Disconnecting players before NetherLink P2P shutdown");
+        server.getPlayerList().removeAll();
+        try {
+            Thread.sleep(1000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public static void dump(String name) {

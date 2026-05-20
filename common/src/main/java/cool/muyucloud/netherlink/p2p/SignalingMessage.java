@@ -1,118 +1,154 @@
 package cool.muyucloud.netherlink.p2p;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import net.minecraft.util.StringRepresentable;
-import org.jspecify.annotations.Nullable;
 
-import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Supplier;
 
-public record SignalingMessage(Type type, String sessionId, @Nullable String sdp, WebRtc.@Nullable Candidate iceCandidate) {
-    public static final Codec<SignalingMessage> CODEC = RecordCodecBuilder.create(
-        instance -> instance.group(
-                Type.CODEC.fieldOf("type").forGetter(SignalingMessage::type),
-                Codec.STRING.fieldOf("sessionId").forGetter(SignalingMessage::sessionId),
-                Codec.STRING.optionalFieldOf("sdp").forGetter(message -> Optional.ofNullable(message.sdp())),
-                WebRtc.Candidate.CODEC.optionalFieldOf("iceCandidate").forGetter(message -> Optional.ofNullable(message.iceCandidate()))
-            )
-            .apply(instance, (type, sessionId, sdp, iceCandidate) -> new SignalingMessage(type, sessionId, sdp.orElse(null), iceCandidate.orElse(null)))
-    );
+public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, SignalingMessage.WebRtc {
+    Codec<SignalingMessage> CODEC = Type.CODEC.dispatch(SignalingMessage::type, Type::codec);
 
-    public static SignalingMessage joinAccepted(String sessionId) {
-        return new SignalingMessage(Type.JOIN_ACCEPTED, sessionId, null, null);
+    static SignalingMessage joinAccepted(String sessionId) {
+        return new FriendJoin.Accepted(sessionId);
     }
 
-    public static SignalingMessage joinRejected(String sessionId) {
-        return new SignalingMessage(Type.JOIN_REJECTED, sessionId, null, null);
+    static SignalingMessage joinRejected(String sessionId) {
+        return new FriendJoin.Rejected(sessionId);
     }
 
-    public static SignalingMessage answer(String sessionId, String sdp) {
-        return new SignalingMessage(Type.ANSWER, sessionId, sdp, null);
+    static SignalingMessage answer(String sessionId, String sdp) {
+        return new WebRtc.Answer(sessionId, sdp);
     }
 
-    public static SignalingMessage iceCandidate(String sessionId, RTCIceCandidate candidate) {
-        return new SignalingMessage(Type.ICE_CANDIDATE, sessionId, null, WebRtc.Candidate.from(candidate));
+    static SignalingMessage iceCandidate(String sessionId, RTCIceCandidate candidate) {
+        return new WebRtc.IceCandidate(sessionId, candidate.sdp, candidate.sdpMid, candidate.sdpMLineIndex);
     }
 
-    public @Nullable Payload decode() {
-        return switch (this.type) {
-            case JOIN_REQUEST -> new FriendJoin.Request(this.sessionId);
-            case JOIN_ACCEPTED -> new FriendJoin.Accepted(this.sessionId);
-            case JOIN_REJECTED -> new FriendJoin.Rejected(this.sessionId);
-            case INVITE_DECLINED -> FriendJoin.InviteDeclined.INSTANCE;
-            case OFFER -> this.sdp != null ? new WebRtc.Offer(this.sessionId, this.sdp) : null;
-            case ANSWER -> this.sdp != null ? new WebRtc.Answer(this.sessionId, this.sdp) : null;
-            case ICE_CANDIDATE -> this.iceCandidate != null
-                ? new WebRtc.IceCandidate(this.sessionId, this.iceCandidate)
-                : (this.sdp != null ? new WebRtc.IceCandidate(this.sessionId, new WebRtc.Candidate(this.sdp, "0", 0)) : null);
-        };
-    }
+    Type type();
 
-    public sealed interface Payload permits FriendJoin, WebRtc {
-    }
+    String sessionId();
 
-    public sealed interface FriendJoin extends Payload permits FriendJoin.Request, FriendJoin.Accepted, FriendJoin.Rejected, FriendJoin.InviteDeclined {
+    sealed interface FriendJoin extends SignalingMessage permits FriendJoin.Request, FriendJoin.Accepted, FriendJoin.Rejected, FriendJoin.InviteDeclined {
         record Request(String sessionId) implements FriendJoin {
+            private static final MapCodec<Request> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(Request::sessionId)
+            ).apply(instance, Request::new));
+
+            @Override
+            public Type type() {
+                return Type.JOIN_REQUEST;
+            }
         }
 
         record Accepted(String sessionId) implements FriendJoin {
+            private static final MapCodec<Accepted> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(Accepted::sessionId)
+            ).apply(instance, Accepted::new));
+
+            @Override
+            public Type type() {
+                return Type.JOIN_ACCEPTED;
+            }
         }
 
         record Rejected(String sessionId) implements FriendJoin {
+            private static final MapCodec<Rejected> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(Rejected::sessionId)
+            ).apply(instance, Rejected::new));
+
+            @Override
+            public Type type() {
+                return Type.JOIN_REJECTED;
+            }
         }
 
-        record InviteDeclined() implements FriendJoin {
-            private static final InviteDeclined INSTANCE = new InviteDeclined();
+        record InviteDeclined(String sessionId) implements FriendJoin {
+            private static final MapCodec<InviteDeclined> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(InviteDeclined::sessionId)
+            ).apply(instance, InviteDeclined::new));
+
+            @Override
+            public Type type() {
+                return Type.INVITE_DECLINED;
+            }
         }
     }
 
-    public sealed interface WebRtc extends Payload permits WebRtc.Offer, WebRtc.Answer, WebRtc.IceCandidate {
-        String sessionId();
-
+    sealed interface WebRtc extends SignalingMessage permits WebRtc.Offer, WebRtc.Answer, WebRtc.IceCandidate {
         record Offer(String sessionId, String sdp) implements WebRtc {
+            private static final MapCodec<Offer> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(Offer::sessionId),
+                Codec.STRING.fieldOf("sdp").forGetter(Offer::sdp)
+            ).apply(instance, Offer::new));
+
+            @Override
+            public Type type() {
+                return Type.OFFER;
+            }
         }
 
         record Answer(String sessionId, String sdp) implements WebRtc {
-        }
+            private static final MapCodec<Answer> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(Answer::sessionId),
+                Codec.STRING.fieldOf("sdp").forGetter(Answer::sdp)
+            ).apply(instance, Answer::new));
 
-        record IceCandidate(String sessionId, Candidate candidate) implements WebRtc {
-        }
-
-        record Candidate(String candidate, @Nullable String sdpMid, int sdpMLineIndex) {
-            private static final Codec<Candidate> CODEC = RecordCodecBuilder.create(
-                instance -> instance.group(
-                        Codec.STRING.fieldOf("candidate").forGetter(Candidate::candidate),
-                        Codec.STRING.optionalFieldOf("sdpMid").forGetter(candidate -> Optional.ofNullable(candidate.sdpMid())),
-                        Codec.INT.fieldOf("sdpMLineIndex").forGetter(Candidate::sdpMLineIndex)
-                    )
-                    .apply(instance, (candidate, sdpMid, sdpMLineIndex) -> new Candidate(candidate, sdpMid.orElse(null), sdpMLineIndex))
-            );
-
-            private static Candidate from(RTCIceCandidate candidate) {
-                return new Candidate(candidate.sdp, candidate.sdpMid, candidate.sdpMLineIndex);
+            @Override
+            public Type type() {
+                return Type.ANSWER;
             }
+        }
+
+        record IceCandidate(String sessionId, String candidate, String sdpMid, int sdpMLineIndex) implements WebRtc {
+            private static final MapCodec<IceCandidate> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.STRING.fieldOf("sessionId").forGetter(IceCandidate::sessionId),
+                Codec.STRING.fieldOf("candidate").forGetter(IceCandidate::candidate),
+                Codec.STRING.fieldOf("sdpMid").forGetter(IceCandidate::sdpMid),
+                Codec.INT.fieldOf("sdpMLineIndex").forGetter(IceCandidate::sdpMLineIndex)
+            ).apply(instance, IceCandidate::new));
 
             public RTCIceCandidate toRtcIceCandidate() {
-                return new RTCIceCandidate(this.sdpMid != null ? this.sdpMid : "0", this.sdpMLineIndex, this.candidate);
+                return new RTCIceCandidate(this.sdpMid, this.sdpMLineIndex, this.candidate);
+            }
+
+            @Override
+            public Type type() {
+                return Type.ICE_CANDIDATE;
             }
         }
     }
 
-    public enum Type implements StringRepresentable {
-        JOIN_REQUEST,
-        JOIN_ACCEPTED,
-        JOIN_REJECTED,
-        INVITE_DECLINED,
-        OFFER,
-        ANSWER,
-        ICE_CANDIDATE;
+    enum Type implements StringRepresentable {
+        JOIN_REQUEST(() -> FriendJoin.Request.CODEC),
+        JOIN_ACCEPTED(() -> FriendJoin.Accepted.CODEC),
+        JOIN_REJECTED(() -> FriendJoin.Rejected.CODEC),
+        INVITE_DECLINED(() -> FriendJoin.InviteDeclined.CODEC),
+        OFFER(() -> WebRtc.Offer.CODEC),
+        ANSWER(() -> WebRtc.Answer.CODEC),
+        ICE_CANDIDATE(() -> WebRtc.IceCandidate.CODEC);
 
         private static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values);
+        private final Supplier<MapCodec<? extends SignalingMessage>> codec;
+
+        Type(Supplier<MapCodec<? extends SignalingMessage>> codec) {
+            this.codec = codec;
+        }
+
+        private MapCodec<? extends SignalingMessage> codec() {
+            return this.codec.get();
+        }
 
         @Override
         public String getSerializedName() {
             return this.name();
         }
+    }
+
+    static SignalingMessage inviteDeclined() {
+        return new FriendJoin.InviteDeclined(UUID.randomUUID().toString());
     }
 }
