@@ -7,7 +7,11 @@ import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.account.data.Endpoint;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.io.IOException;
 import java.net.URI;
@@ -257,9 +261,28 @@ public class AuthRequest {
     private void sendDeviceCodeMessage(Endpoint endpoint) {
         sendMessage(() -> Component.literal("NetherLink login started"));
         String uri = endpoint.getVerificationUriComplete() != null ? endpoint.getVerificationUriComplete() : endpoint.getVerificationUri();
-        sendMessage(() -> Component.literal("Open: " + uri));
-        sendMessage(() -> Component.literal("Code: " + endpoint.getUserCode()));
+        sendMessage(() -> Component.literal("Open: ").append(openUrl(uri)));
+        sendMessage(() -> Component.literal("Code: ").append(copyToClipboard(endpoint.getUserCode())));
         sendMessage(() -> Component.literal("Expires in: " + endpoint.getExpiresIn() / 60L + " minutes"));
+    }
+
+    private static MutableComponent openUrl(String uri) {
+        return Component.literal(uri)
+            .withStyle(ChatFormatting.UNDERLINE)
+            .withStyle(style -> style
+                .withColor(ChatFormatting.BLUE)
+                .withClickEvent(new ClickEvent.OpenUrl(URI.create(uri)))
+                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open login page"))));
+    }
+
+    private static MutableComponent copyToClipboard(String value) {
+        return Component.literal(value)
+            .withStyle(ChatFormatting.UNDERLINE)
+            .withStyle(style -> style
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent.CopyToClipboard(value))
+                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copy to clipboard")))
+                .withInsertion(value));
     }
 
     private JsonObject postForm(URI uri, Map<String, String> form) {
