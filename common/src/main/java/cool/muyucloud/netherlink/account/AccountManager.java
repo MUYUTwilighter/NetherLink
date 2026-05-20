@@ -15,9 +15,11 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AccountManager {
     private static final Gson GSON = new Gson();
+    private static final Duration SIGNALING_READY_TIMEOUT = Duration.ofSeconds(15L);
     private static final Map<String, Account> ACCOUNTS = new ConcurrentHashMap<>();
     private static final Map<String, AuthRequest> REQUESTS = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> PUBLISHED = new ConcurrentHashMap<>();
@@ -243,13 +246,18 @@ public class AccountManager {
             throw new NetherLinkAuthException("Minecraft server is not ready");
         }
         refresh(name, false, (Messenger)(Object)currentServer);
-        Map<java.util.UUID, java.util.UUID> presence = PRESENCE.publish(account);
         ServerP2PManager manager = P2P.computeIfAbsent(name, key -> {
             NliConstants.LOG.info("Starting NetherLink P2P manager for account {}", key);
             ServerP2PManager created = new ServerP2PManager(key, account, currentServer);
             created.start();
             return created;
         });
+        try {
+            manager.awaitSignalingReady(SIGNALING_READY_TIMEOUT).join();
+        } catch (CompletionException e) {
+            throw new NetherLinkAuthException("Signaling did not become ready before publishing presence", e);
+        }
+        Map<java.util.UUID, java.util.UUID> presence = PRESENCE.publish(account);
         manager.updatePresence(presence);
         PUBLISHED.put(name, true);
         NliConstants.LOG.info("Published NetherLink account presence: {}", name);

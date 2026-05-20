@@ -9,6 +9,7 @@ import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.server.MinecraftServer;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +28,11 @@ public final class ServerP2PManager {
     private final ConcurrentHashMap<UUID, RtcHandshake> handshakes = new ConcurrentHashMap<>();
     private final SignalingClient.ConnectionListener connectionListener = new SignalingClient.ConnectionListener() {
         @Override
+        public void onSignalingConnected() {
+            ServerP2PManager.this.onSignalingConnected();
+        }
+
+        @Override
         public void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
             if (peerPmid != null) {
                 RtcHandshake handshake = ServerP2PManager.this.handshakes.get(peerPmid);
@@ -40,8 +46,14 @@ public final class ServerP2PManager {
         public void onSignalingDisconnected() {
             ServerP2PManager.this.onSignalingDisconnected();
         }
+
+        @Override
+        public void onSignalingConnectFailed() {
+            ServerP2PManager.this.onSignalingConnectFailed();
+        }
     };
     private @Nullable PeerConnectionFactory factory;
+    private volatile CompletableFuture<Void> signalingReady = new CompletableFuture<>();
     private volatile boolean shutdown;
 
     public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server) {
@@ -59,6 +71,19 @@ public final class ServerP2PManager {
         NliConstants.LOG.info("[P2P][{}] Starting server P2P manager", this.accountName);
         this.signaling.connect();
         this.warmupTurnAuth();
+    }
+
+    public CompletableFuture<Void> awaitSignalingReady(Duration timeout) {
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        this.signalingReady.whenComplete((ignored, error) -> {
+            if (error != null) {
+                result.completeExceptionally(error);
+            } else {
+                result.complete(null);
+            }
+        });
+        result.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        return result;
     }
 
     public void updatePresence(java.util.Map<UUID, UUID> profileIdsByPmid) {
@@ -83,6 +108,9 @@ public final class ServerP2PManager {
 
     private void onSignalingDisconnected() {
         if (!this.shutdown) {
+            if (this.signalingReady.isDone()) {
+                this.signalingReady = new CompletableFuture<>();
+            }
             NliConstants.LOG.warn("[P2P][{}] Signaling disconnected, reconnecting in {}s", this.accountName, SIGNALING_RECONNECT_DELAY_SECONDS);
             CompletableFuture.delayedExecutor(SIGNALING_RECONNECT_DELAY_SECONDS, TimeUnit.SECONDS).execute(() -> {
                 if (!this.shutdown) {
@@ -90,6 +118,17 @@ public final class ServerP2PManager {
                     this.warmupTurnAuth();
                 }
             });
+        }
+    }
+
+    private void onSignalingConnected() {
+        NliConstants.LOG.info("[P2P][{}] Signaling ready", this.accountName);
+        this.signalingReady.complete(null);
+    }
+
+    private void onSignalingConnectFailed() {
+        if (!this.shutdown) {
+            this.onSignalingDisconnected();
         }
     }
 

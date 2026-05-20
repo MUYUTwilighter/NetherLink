@@ -174,7 +174,9 @@ public final class SignalingClient {
                 Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                 NliConstants.LOG.warn("Signaling websocket connect failed: {}", cause.toString());
                 this.cachedSignalingUri = null;
-                this.teardown("websocket connect failed: " + cause.getMessage());
+                if (this.teardown("websocket connect failed: " + cause.getMessage())) {
+                    this.fireListeners(ConnectionListener::onSignalingConnectFailed);
+                }
             } else {
                 NliConstants.LOG.info("[P2P][signaling] WebSocket connected for session {}", this.sessionId);
             }
@@ -217,6 +219,7 @@ public final class SignalingClient {
             .buildAsync(URI.create(wsUrl), rpc)
             .thenApplyAsync(webSocket -> {
                 this.schedulePing(rpc);
+                this.fireListeners(ConnectionListener::onSignalingConnected);
                 return rpc;
             }, this.executor);
     }
@@ -334,7 +337,13 @@ public final class SignalingClient {
         default void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
         }
 
+        default void onSignalingConnected() {
+        }
+
         default void onSignalingDisconnected() {
+        }
+
+        default void onSignalingConnectFailed() {
         }
     }
 

@@ -19,12 +19,8 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-    implementation "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}"
-    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64"
-    include "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}"
-    include "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64"
+    webrtcBundle implementation("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}")
+    webrtcBundle runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64")
 }
 
 tasks.named('jar', Jar) {
@@ -87,7 +83,7 @@ modrinth {
     projectId = "netherlink-p2p"
     versionName = "${base.archivesName}-${version}"
     versionNumber = "${version}"
-    versionType = "${release_state}"
+    versionType = release_state
     uploadFile = jar
     gameVersions = [minecraft_version]
     loaders = [project.name]
