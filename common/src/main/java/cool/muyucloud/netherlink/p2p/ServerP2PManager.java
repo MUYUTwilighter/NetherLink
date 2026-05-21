@@ -34,6 +34,10 @@ public final class ServerP2PManager {
 
         @Override
         public void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
+            if (cause instanceof SignalingException.SignalingAuthException) {
+                ServerP2PManager.this.onSignalingAuthFailed(cause);
+                return;
+            }
             if (peerPmid != null) {
                 RtcHandshake handshake = ServerP2PManager.this.handshakes.get(peerPmid);
                 if (handshake != null) {
@@ -54,6 +58,7 @@ public final class ServerP2PManager {
     };
     private @Nullable PeerConnectionFactory factory;
     private volatile CompletableFuture<Void> signalingReady = new CompletableFuture<>();
+    private volatile SignalingException.SignalingAuthException signalingAuthFailure;
     private volatile boolean shutdown;
 
     public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server) {
@@ -68,12 +73,17 @@ public final class ServerP2PManager {
 
     public void start() {
         this.shutdown = false;
+        this.signalingAuthFailure = null;
         NliConstants.LOG.info("[P2P][{}] Starting server P2P manager", this.accountName);
         this.signaling.connect();
         this.warmupTurnAuth();
     }
 
     public CompletableFuture<Void> awaitSignalingReady(Duration timeout) {
+        SignalingException.SignalingAuthException authFailure = this.signalingAuthFailure;
+        if (authFailure != null) {
+            return CompletableFuture.failedFuture(authFailure);
+        }
         CompletableFuture<Void> result = new CompletableFuture<>();
         this.signalingReady.whenComplete((ignored, error) -> {
             if (error != null) {
@@ -123,6 +133,7 @@ public final class ServerP2PManager {
 
     private void onSignalingConnected() {
         NliConstants.LOG.info("[P2P][{}] Signaling ready", this.accountName);
+        this.signalingAuthFailure = null;
         this.signalingReady.complete(null);
     }
 
@@ -130,6 +141,17 @@ public final class ServerP2PManager {
         if (!this.shutdown) {
             this.onSignalingDisconnected();
         }
+    }
+
+    private void onSignalingAuthFailed(SignalingException cause) {
+        if (this.shutdown) {
+            return;
+        }
+        SignalingException.SignalingAuthException authFailure = cause instanceof SignalingException.SignalingAuthException typed
+            ? typed
+            : new SignalingException.SignalingAuthException(cause.getMessage());
+        this.signalingAuthFailure = authFailure;
+        this.signalingReady.completeExceptionally(authFailure);
     }
 
     private void warmupTurnAuth() {

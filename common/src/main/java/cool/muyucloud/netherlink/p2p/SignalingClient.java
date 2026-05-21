@@ -145,9 +145,7 @@ public final class SignalingClient {
                 }
             })
             .exceptionallyCompose(error -> CompletableFuture.failedFuture(
-                error.getCause() instanceof JsonRpcException rpcError
-                    ? new SignalingException.TurnAuthFailedException(rpcError.serverMessage())
-                    : error
+                this.mapTurnAuthError(error)
             ))
             .thenApplyAsync(result -> {
                 TurnAuthResult turnAuth = TurnAuthResult.CODEC.parse(JsonOps.INSTANCE, result)
@@ -156,6 +154,18 @@ public final class SignalingClient {
                 NliConstants.LOG.info("[P2P][signaling] Received TURN auth with {} server entries", turnAuth.turnAuthServers().size());
                 return turnAuth.toRtcIceServer();
             }, this.executor);
+    }
+
+    private Throwable mapTurnAuthError(Throwable error) {
+        if (error.getCause() instanceof JsonRpcException rpcError) {
+            SignalingException mapped = SignalingErrorMapper.fromJsonRpc(null, rpcError);
+            if (mapped instanceof SignalingException.SignalingAuthException) {
+                this.fireListeners(listener -> listener.onSignalingError(null, mapped));
+                return mapped;
+            }
+            return new SignalingException.TurnAuthFailedException(mapped.getMessage());
+        }
+        return error;
     }
 
     private void connectWebSocket() {
@@ -173,6 +183,9 @@ public final class SignalingClient {
             if (error != null) {
                 Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                 NliConstants.LOG.warn("Signaling websocket connect failed: {}", cause.toString());
+                if (cause instanceof SignalingException.SignalingAuthException authError) {
+                    this.fireListeners(listener -> listener.onSignalingError(null, authError));
+                }
                 this.cachedSignalingUri = null;
                 if (this.teardown("websocket connect failed: " + cause.getMessage())) {
                     this.fireListeners(ConnectionListener::onSignalingConnectFailed);
@@ -199,6 +212,9 @@ public final class SignalingClient {
             .build();
         return client.sendAsync(request, BodyHandlers.ofString())
             .thenApplyAsync(response -> {
+                if (response.statusCode() == 401) {
+                    throw new SignalingException.SignalingAuthException("Signaling configuration failed: HTTP 401");
+                }
                 if (response.statusCode() != 200) {
                     throw new IllegalStateException("Unexpected config response status: " + response.statusCode());
                 }

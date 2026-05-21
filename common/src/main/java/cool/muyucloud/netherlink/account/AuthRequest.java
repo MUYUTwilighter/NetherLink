@@ -187,7 +187,14 @@ public class AuthRequest {
 
         pendingProfileId = true;
         try {
-            JsonObject response = getJson(MC_PROFILE, Map.of("Authorization", "Bearer " + account.getMcToken()));
+            JsonObject response;
+            try {
+                response = getJson(MC_PROFILE, Map.of("Authorization", "Bearer " + account.getMcToken()));
+            } catch (UnauthorizedException e) {
+                NliConstants.LOG.warn("Minecraft profile request was unauthorized, refreshing Minecraft token and retrying once");
+                refreshMcToken(true);
+                response = getJson(MC_PROFILE, Map.of("Authorization", "Bearer " + account.getMcToken()));
+            }
             account.setMcProfileId(requiredString(response, "id"));
             account.setMcProfileName(requiredString(response, "name"));
             sendMessage(() -> Component.literal("NetherLink account logged in as " + account.getMcProfileName() + "."));
@@ -320,6 +327,9 @@ public class AuthRequest {
         headers.forEach(builder::header);
         HttpResult result = send(builder.build());
         if (!result.isSuccess()) {
+            if (result.statusCode() == 401) {
+                throw new UnauthorizedException("Request failed: " + describeError(result));
+            }
             throw fail("Request failed: " + describeError(result));
         }
         return result.body();
@@ -442,6 +452,12 @@ public class AuthRequest {
     private record HttpResult(int statusCode, JsonObject body) {
         private boolean isSuccess() {
             return statusCode >= 200 && statusCode < 300;
+        }
+    }
+
+    private static class UnauthorizedException extends NetherLinkAuthException {
+        private UnauthorizedException(String message) {
+            super(message);
         }
     }
 }
