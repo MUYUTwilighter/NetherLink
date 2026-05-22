@@ -1,0 +1,81 @@
+name: 🐞 Bug
+description: File a bug/issue
+title: "[BUG] "
+labels: ["Bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Your feedback is important to us, no worry how it's gonna be!
+  - type: checkboxes
+    attributes:
+      label: I have checked following things before submitting (No worry, it won't affect our help)
+      description: Please make sure you have checked all of the following.
+      options:
+        - label: I have searched and found no existing issues
+          required: true
+        - label: The issue happens in LTS or latest STS
+          required: true
+        - label: Separated test for related mods only are done
+          required: true
+  - type: textarea
+    attributes:
+      label: Current Behavior
+      description: A concise description of what you're experiencing.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: A concise description of what you expected to happen.
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Steps To Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. In this environment...
+        1. With this config...
+        1. Run '...'
+        1. See error...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Environment
+      description: |
+        examples:
+          - **OS**: Windows 10
+          - **Minecraft & ModLoader**: 1.20.1 Fabric
+          - **Modlist or Instance Source**: Croparia IF 0.2.7, Architectury API 14.0.4
+      value: |
+        - **OS**:
+        - **Minecraft & ModLoader**:
+        - **Modlist or Instance Source**:
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Logs & Reports
+      description: |
+        You may submit logs or crash reports on [HasteBin](https://hastebin.com/) or [Pastebin](https://pastebin.com/).
+        
+        examples: 
+          - **Log: https://hastebin.com/log.txt
+          - **Crash Report**: https://hastebin.com/log.txt
+      value: |
+        - **Log**: 
+        - **Crash Report**:
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Anything else?
+      description: |
+        Links? References? Anything that will give us more context about the issue you are encountering!
+        
+        Tip: You can attach files by clicking this area to highlight it and then dragging files in.
+    validations:
+      required: false

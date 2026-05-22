@@ -1,0 +1,31 @@
+name: 🕶 授权申请
+description: 向我们申请相关的授权
+title: "[Copyright] "
+labels: ["copyright"]
+body:
+  - type: checkboxes
+    attributes:
+      label: 我已经检查过以下事项
+      description: 请确保你已经检查所有事项
+      options:
+        - label: 我确认没有已存在的相同申请（对已有申请有异议应当在原申请中提出）
+          required: true
+        - label: 我确认想要申请的事项确实需要授权
+          required: true
+        - label: 我已知晓如果授权申请发生改变，自动通过的时间起始点将会刷新
+          required: true
+  - type: textarea
+    attributes:
+      label: 申请描述
+      description: 描述你想要申请的事项，以及简单解释申请的必要性
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 其他
+      description: |
+        其他相关的信息
+        
+        Tip: 你可以将文件拖进这里
+    validations:
+      required: false

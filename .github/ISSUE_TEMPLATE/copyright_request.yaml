@@ -1,0 +1,31 @@
+name: 🕶 Copyright Request
+description: Request permission related to this project
+title: "[Copyright] "
+labels: [ "copyright" ]
+body:
+  - type: checkboxes
+    attributes:
+      label: I have checked following things before submitting
+      description: Please make sure you have checked all of the following.
+      options:
+        - label: There isn't an existing issue for this request (objections should be made in the existing issue)
+          required: true
+        - label: Permission to request is necessary
+          required: true
+        - label: I understood that if changes to this request in the future will result in refreshing the starting date | of the automatic approval
+          required: true
+  - type: textarea
+    attributes:
+      label: Description
+      description: Describe what you want to request, along with a simple explanation of its necessity
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Other
+      description: |
+        Links? References? Anything that will give us more context about the issue you are encountering!
+        
+        Tip: You can attach files by clicking this area to highlight it and then dragging files in.
+    validations:
+      required: false

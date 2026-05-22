@@ -1,0 +1,35 @@
+name: 🚀 功能建议
+description: 告诉我们有什么想要的功能
+title: "[Suggest] "
+labels: ["suggest"]
+body:
+  - type: checkboxes
+    attributes:
+      label: 我已经检查过以下事项
+      description: 请确保你已经检查所有事项
+      options:
+        - label: 我已经搜索并确认问题未被发布过
+          required: true
+        - label: 问题发生在长期支持版本或最新支持版本
+          required: true
+  - type: textarea
+    attributes:
+      label: 问题描述
+      description: 描述你为什么需要这个功能，如：模组缺少 XXX、XXX 功能不够便利等
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 你的想法
+      description: 给出可能的解决方案
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: 其他
+      description: |
+        其他相关的信息
+        
+        Tip: 你可以将文件拖进这里
+    validations:
+      required: false
