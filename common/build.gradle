@@ -28,17 +28,15 @@ configurations {
 }
 
 dependencies {
-    def webrtcJavaVersion = "0.14.0"
-
     compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
     // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
     compileOnly group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.5.3'
     annotationProcessor group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.5.3'
 
-    implementation "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}"
-    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64"
+    implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 }
 
 artifacts {

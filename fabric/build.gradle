@@ -8,15 +8,14 @@ plugins {
 }
 
 dependencies {
-    def webrtcJavaVersion = "0.14.0"
 
     localRuntime "net.litetex.mcm:dev-auth-neo:1.1.0"
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}")
-    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64")
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 }
 
 loom {
@@ -84,14 +83,14 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     group = 'publishing'
     def mainFile = upload(curseforge_id, jar)
     mainFile.displayName = "${base.archivesName}-${version}"
-    versionType = release_state
+    mainFile.releaseType = "${release_state}"
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
         mainFile.changelog = changelogFile.text
     }
     mainFile.changelogType = 'markdown'
     mainFile.gameVersions = [minecraft_version]
-    mainFile.addJavaVersion("Java 25")
+    mainFile.addJavaVersion("Java ${java_version}")
     mainFile.addEnvironment("server", "client")
     mainFile.addModLoader(project.name)
     mainFile.addRequirement("fabric-api")
