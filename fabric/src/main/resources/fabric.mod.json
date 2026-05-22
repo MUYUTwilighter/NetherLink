@@ -17,14 +17,11 @@
   "entrypoints": {
     "main": [
       "cool.muyucloud.netherlink.platform.NetherLink"
-    ],
-    "client": [
-      "cool.muyucloud.netherlink.platform.NetherLinkClient"
     ]
   },
   "mixins": [
     "${mod_id}.mixins.json",
-    "${mod_id}.fabric.mixin.json"
+    "${mod_id}.fabric.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.0",

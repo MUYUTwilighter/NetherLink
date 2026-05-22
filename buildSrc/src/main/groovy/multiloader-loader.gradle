@@ -54,10 +54,16 @@ tasks.named('sourcesJar', Jar) {
     from(configurations.commonResources)
 }
 
+def shouldUnpackCommonShadow = providers.provider {
+    !project.plugins.hasPlugin('net.fabricmc.fabric-loom')
+}
+
 tasks.named('jar', Jar) {
-    dependsOn(configurations.commonShadow)
+    dependsOn({
+        shouldUnpackCommonShadow.get() ? configurations.commonShadow : []
+    })
     from({
-        configurations.commonShadow.collect { zipTree(it) }
+        shouldUnpackCommonShadow.get() ? configurations.commonShadow.collect { zipTree(it) } : []
     }) {
         exclude 'META-INF/MANIFEST.MF'
         exclude 'META-INF/*.SF'

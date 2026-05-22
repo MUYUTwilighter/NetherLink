@@ -8,10 +8,15 @@ plugins {
 }
 
 dependencies {
+    def webrtcJavaVersion = "0.14.0"
+
     localRuntime "net.litetex.mcm:dev-auth-neo:1.1.0"
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}")
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtcJavaVersion}:windows-x86_64")
 }
 
 loom {
