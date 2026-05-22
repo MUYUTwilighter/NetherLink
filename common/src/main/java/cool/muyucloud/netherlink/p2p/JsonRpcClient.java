@@ -66,7 +66,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
     }
 
     public void sendNotification(String method) {
-        this.executor.execute(() -> this.send(JsonRPCUtils.createRequest(null, method, List.of()).toString()));
+        this.executor.execute(() -> this.send(createRequest(null, method, List.of()).toString()));
     }
 
     public void sendResponse(JsonElement id, JsonElement result) {
@@ -87,7 +87,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
                 return;
             }
             int id = ++this.transactionId;
-            String payload = JsonRPCUtils.createRequest(id, method, params).toString();
+            String payload = createRequest(id, method, params).toString();
             this.pendingRequests.put(id, future);
             NliConstants.LOG.info("[P2P][jsonrpc] Sending request id={} method={}", id, method);
             this.sendChain = this.sendChain.<Void>thenCompose(ignored -> ws.sendText(payload, true).thenApply(sent -> null)).exceptionally(error -> {
@@ -188,6 +188,21 @@ public final class JsonRpcClient implements WebSocket.Listener {
 
     private static boolean isValidResponseId(JsonElement id) {
         return id instanceof JsonPrimitive primitive && primitive.isNumber();
+    }
+
+    private static JsonObject createRequest(@Nullable Integer id, String method, List<JsonElement> params) {
+        JsonObject request = new JsonObject();
+        request.addProperty("jsonrpc", "2.0");
+        if (id != null) {
+            request.addProperty("id", id);
+        }
+        request.addProperty("method", method);
+        if (!params.isEmpty()) {
+            com.google.gson.JsonArray array = new com.google.gson.JsonArray(params.size());
+            params.forEach(array::add);
+            request.add("params", array);
+        }
+        return request;
     }
 
     private void teardown(Throwable cause, boolean fireDisconnect) {

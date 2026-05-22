@@ -64,30 +64,25 @@ sourceSets.configureEach {
     }
 }
 
-def archivesName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
-
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
-    versionName = archivesName
+    versionName = "${base.archivesName}-${version}"
     versionNumber = version
     versionType = release_state
     uploadFile = jar
     gameVersions = [minecraft_version]
-    loaders = ["neoforge"]
+    loaders = [project.name]
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
         changelog = changelogFile.text
-    }
-    dependencies {
-        required.project "fabric-api"
     }
 }
 
 tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
-    def mainFile = upload('880165', jar)
+    def mainFile = upload(curseforge_id, jar)
     mainFile.displayName = archivesName
     versionType = release_state
     File changelogFile = rootProject.file("changelog.md")
@@ -98,5 +93,5 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     mainFile.gameVersions = [minecraft_version]
     mainFile.addJavaVersion("Java 25")
     mainFile.addEnvironment("server", "client")
-    mainFile.addModLoader("neoforge")
+    mainFile.addModLoader(project.name)
 }

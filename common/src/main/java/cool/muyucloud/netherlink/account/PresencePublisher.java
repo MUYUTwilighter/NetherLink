@@ -52,6 +52,9 @@ public class PresencePublisher {
             .build();
         try {
             HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 401) {
+                throw new UnauthorizedException("Presence " + status + " failed: HTTP 401");
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 NliConstants.LOG.warn("Presence {} failed: HTTP {}", status, response.statusCode());
                 return Map.of();
@@ -103,5 +106,11 @@ public class PresencePublisher {
     private enum PresenceStatus {
         PLAYING_HOSTED_SERVER,
         OFFLINE
+    }
+
+    public static class UnauthorizedException extends NetherLinkAuthException {
+        public UnauthorizedException(String message) {
+            super(message);
+        }
     }
 }

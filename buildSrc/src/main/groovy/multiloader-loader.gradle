@@ -9,6 +9,9 @@ configurations {
     commonResources{
         canBeResolved = true
     }
+    commonShadow {
+        canBeResolved = true
+    }
 }
 
 dependencies {
@@ -20,11 +23,18 @@ dependencies {
     }
     commonJava project(path: ':common', configuration: 'commonJava')
     commonResources project(path: ':common', configuration: 'commonResources')
+    commonShadow project(path: ':common', configuration: 'webrtcBundle')
+    compileOnly project(path: ':common', configuration: 'webrtcBundle')
 }
 
 tasks.named('compileJava', JavaCompile) {
     dependsOn(configurations.commonJava)
     source(configurations.commonJava)
+    exclude 'cool/muyucloud/netherlink/client/**'
+    exclude 'cool/muyucloud/netherlink/mixin/FriendJoinHandlerMixin.java'
+    exclude 'cool/muyucloud/netherlink/mixin/IntegratedServerMixin.java'
+    exclude 'cool/muyucloud/netherlink/mixin/MultiplayerOptionsScreenMixin.java'
+    exclude 'cool/muyucloud/netherlink/mixin/PresenceHandlerMixin.java'
 }
 
 processResources {
@@ -42,4 +52,18 @@ tasks.named('sourcesJar', Jar) {
     from(configurations.commonJava)
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
+}
+
+tasks.named('jar', Jar) {
+    dependsOn(configurations.commonShadow)
+    from({
+        configurations.commonShadow.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+        exclude 'fabric.mod.json'
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
 }
