@@ -2,20 +2,22 @@ import net.darkhax.curseforgegradle.TaskPublishCurseForge
 
 plugins {
     id 'multiloader-loader'
-    id 'net.fabricmc.fabric-loom'
+    id 'fabric-loom'
     id "com.modrinth.minotaur" version "2.+"
     id 'net.darkhax.curseforgegradle' version '1.1.26'
 }
 
 dependencies {
-
-    localRuntime "net.litetex.mcm:dev-auth-neo:1.1.0"
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    mappings loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${parchment_minecraft}:${parchment_version}@zip")
+    }
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
-    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
+    modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
+    modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 }
 
 loom {
@@ -23,13 +25,15 @@ loom {
     if (aw.exists()) {
         accessWidenerPath.set(aw)
     }
+    mixin {
+        defaultRefmapName.set("${mod_id}.refmap.json")
+    }
     runs {
         client {
             client()
             setConfigName('Fabric Client')
             ideConfigGenerated(true)
             runDir('runs/client')
-            vmArg "-Ddevauth.enabled=1"
         }
         server {
             server()
@@ -60,13 +64,21 @@ sourceSets.configureEach {
     }
 }
 
+loom.remapConfigurations.configureEach {
+    configurations.named(it.name) {
+        attributes {
+            attribute(loaderAttribute, 'fabric')
+        }
+    }
+}
+
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
     versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     versionNumber = "${version}"
     versionType = release_state
-    uploadFile = jar
+    uploadFile = assemble
     gameVersions = [minecraft_version]
     loaders = [project.name]
     File changelogFile = rootProject.file("changelog.md")
@@ -81,9 +93,9 @@ modrinth {
 tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
-    def mainFile = upload(curseforge_id, jar)
+    def mainFile = upload(curseforge_id, assemble)
     mainFile.displayName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
-    mainFile.releaseType = "${release_state}"
+    mainFile.releaseType = release_state
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
         mainFile.changelog = changelogFile.text

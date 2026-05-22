@@ -9,13 +9,13 @@ configurations {
     commonResources{
         canBeResolved = true
     }
-    commonShadow {
-        canBeResolved = true
-    }
 }
 
 dependencies {
     compileOnly(project(':common')) {
+        capabilities {
+            requireCapability "$group:$mod_id"
+        }
         def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
         attributes {
             attribute(loaderAttribute, 'common')
@@ -23,8 +23,6 @@ dependencies {
     }
     commonJava project(path: ':common', configuration: 'commonJava')
     commonResources project(path: ':common', configuration: 'commonResources')
-    commonShadow project(path: ':common', configuration: 'webrtcBundle')
-    compileOnly project(path: ':common', configuration: 'webrtcBundle')
 }
 
 tasks.named('compileJava', JavaCompile) {
@@ -47,24 +45,4 @@ tasks.named('sourcesJar', Jar) {
     from(configurations.commonJava)
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
-}
-
-def shouldUnpackCommonShadow = providers.provider {
-    !project.plugins.hasPlugin('net.fabricmc.fabric-loom')
-}
-
-tasks.named('jar', Jar) {
-    dependsOn({
-        shouldUnpackCommonShadow.get() ? configurations.commonShadow : []
-    })
-    from({
-        shouldUnpackCommonShadow.get() ? configurations.commonShadow.collect { zipTree(it) } : []
-    }) {
-        exclude 'META-INF/MANIFEST.MF'
-        exclude 'META-INF/*.SF'
-        exclude 'META-INF/*.DSA'
-        exclude 'META-INF/*.RSA'
-        exclude 'fabric.mod.json'
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
 }
