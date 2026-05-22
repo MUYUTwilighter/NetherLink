@@ -55,6 +55,22 @@ public final class RtcHandshake {
             );
     }
 
+    public CompletableFuture<String> createOffer() {
+        NliConstants.LOG.info("[P2P][{}] Creating local offer", this.id);
+        if (!this.initiator) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Only initiators can create offers"));
+        }
+        if (!this.started.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Cannot create offer after handshake has started"));
+        }
+        RTCDataChannelInit init = new RTCDataChannelInit();
+        this.wireDataChannel(this.peerConnection.createDataChannel("minecraft", init));
+        return this.startSdpExchange(
+            this.createOfferSdp()
+                .thenCompose(this::setLocalDescription)
+        );
+    }
+
     public CompletableFuture<Void> applyAnswer(String answerSdp) {
         if (this.result.isDone()) {
             return CompletableFuture.completedFuture(null);
@@ -137,6 +153,22 @@ public final class RtcHandshake {
             @Override
             public void onFailure(String error) {
                 future.completeExceptionally(new RuntimeException("createAnswer: " + error));
+            }
+        });
+        return future;
+    }
+
+    private CompletableFuture<RTCSessionDescription> createOfferSdp() {
+        CompletableFuture<RTCSessionDescription> future = new CompletableFuture<>();
+        this.peerConnection.createOffer(new RTCOfferOptions(), new CreateSessionDescriptionObserver() {
+            @Override
+            public void onSuccess(RTCSessionDescription description) {
+                future.complete(description);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                future.completeExceptionally(new RuntimeException("createOffer: " + error));
             }
         });
         return future;
