@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -231,7 +232,32 @@ public final class ClientFriendService {
                 presence != null ? presence.status() : "OFFLINE",
                 presence != null && presence.joinable()
             );
-        }).toList();
+        }).sorted(ENTRY_ORDER).toList();
+    }
+
+    private static final Comparator<Entry> ENTRY_ORDER = Comparator.<Entry>comparingInt(entry -> relationshipRank(entry.relationship()))
+        .thenComparingInt(entry -> presenceRank(entry.status()))
+        .thenComparing(Entry::name, String.CASE_INSENSITIVE_ORDER)
+        .thenComparing(entry -> entry.profileId().toString());
+
+    private static int relationshipRank(Relationship relationship) {
+        return switch (relationship) {
+            case INCOMING -> 0;
+            case OUTGOING -> 1;
+            case FRIEND -> 2;
+        };
+    }
+
+    private static int presenceRank(String status) {
+        return switch (status.toUpperCase(Locale.ROOT)) {
+            case "PLAYING_HOSTED_SERVER" -> 0;
+            case "PLAYING_REALMS" -> 1;
+            case "PLAYING_SERVER" -> 2;
+            case "PLAYING_OFFLINE" -> 3;
+            case "ONLINE" -> 4;
+            case "OFFLINE" -> 5;
+            default -> 6;
+        };
     }
 
     private static ResultCode handleHttpStatus(int status) {
