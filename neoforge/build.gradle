@@ -67,7 +67,7 @@ sourceSets.configureEach {
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
-    versionName = "${base.archivesName}-${version}"
+    versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     versionNumber = "${version}"
     versionType = release_state
     uploadFile = jar
@@ -83,7 +83,7 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
     def mainFile = upload(curseforge_id, jar)
-    mainFile.displayName = "${base.archivesName}-${version}"
+    mainFile.displayName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     mainFile.releaseType = release_state
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
@@ -91,7 +91,7 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     }
     mainFile.changelogType = 'markdown'
     mainFile.gameVersions = [minecraft_version]
-    mainFile.addJavaVersion("Java 25")
+    mainFile.addJavaVersion("Java ${java_version}")
     mainFile.addEnvironment("server", "client")
     mainFile.addModLoader(project.name)
 }
