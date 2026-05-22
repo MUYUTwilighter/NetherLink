@@ -4,6 +4,7 @@ Minecraft 26.2-snapshot-7 introduced P2P networking and friend-list support. Thi
 
 ## Client Features
 
+- (For Minecraft 26.1.2 or older) This mod just adds full official P2P feature :)
 - Add an Integrated Server sharing mode for single-player worlds.
 - Stop Minecraft from broadcasting presence status except "In a joinable world" to avoid conflicts with server features.
 
