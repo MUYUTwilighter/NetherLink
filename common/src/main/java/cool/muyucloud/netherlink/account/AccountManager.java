@@ -104,7 +104,7 @@ public class AccountManager {
             messenger.nli$sendMessage(() -> Component.literal("NetherLink account %s is disabled".formatted(name)));
             return;
         }
-        AuthRequest request = REQUESTS.computeIfAbsent(name, _ -> new AuthRequest(account, messenger));
+        AuthRequest request = REQUESTS.computeIfAbsent(name, ignored -> new AuthRequest(account, messenger));
         if (!request.isPending()) {
             request.setMessenger(messenger);
         }
@@ -164,7 +164,7 @@ public class AccountManager {
     }
 
     public static void dumpMessages() {
-        REQUESTS.forEach((name, _) -> dumpMessages(name));
+        REQUESTS.forEach((name, ignored) -> dumpMessages(name));
     }
 
     public static void clearRequests() {
@@ -201,7 +201,7 @@ public class AccountManager {
     }
 
     public static void dump() {
-        ACCOUNTS.forEach((name, _) -> dump(name));
+        ACCOUNTS.forEach((name, ignored) -> dump(name));
     }
 
     public static void load(String name) {
@@ -270,7 +270,7 @@ public class AccountManager {
     }
 
     public static void publish() {
-        ACCOUNTS.forEach((s, _) -> publish(s));
+        ACCOUNTS.forEach((s, ignored) -> publish(s));
     }
 
     public static void revoke(String name) {
@@ -297,7 +297,7 @@ public class AccountManager {
     }
 
     public static void revoke() {
-        ACCOUNTS.forEach((s, _) -> revoke(s));
+        ACCOUNTS.forEach((s, ignored) -> revoke(s));
     }
 
     public static void setInability(String name, boolean enable) {

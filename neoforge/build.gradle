@@ -44,6 +44,19 @@ neoForge {
     }
 }
 
+dependencies {
+    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")) {
+        version {
+            prefer webrtc_version
+        }
+    }
+    jarJar(runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")) {
+        version {
+            prefer webrtc_version
+        }
+    }
+}
+
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 // Implement mcgradleconventions loader attribute

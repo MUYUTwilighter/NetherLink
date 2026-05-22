@@ -155,7 +155,7 @@ public final class ServerP2PManager {
     }
 
     private void warmupTurnAuth() {
-        this.signaling.requestTurnAuth().whenComplete((_, error) -> {
+        this.signaling.requestTurnAuth().whenComplete((ignored, error) -> {
             if (error != null) {
                 NliConstants.LOG.warn("[P2P][{}] TURN auth warmup failed: {}", this.accountName, error.toString());
             } else {

@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -157,24 +157,24 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
-        super.extractRenderState(graphics, mouseX, mouseY, a);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float a) {
+        super.render(graphics, mouseX, mouseY, a);
         int left = this.width / 2 - 154;
-        graphics.centeredText(this.font, this.title, this.width / 2, 18, -1);
+        graphics.drawCenteredString(this.font, this.title, this.width / 2, 18, -1);
         int y = 42;
         List<ClientFriendService.Entry> visible = this.visibleEntries();
         for (int i = 0; i < visible.size(); i++) {
             int global = this.page * this.pageSize() + i;
             ClientFriendService.Entry entry = visible.get(i);
             int color = global == this.selected ? 0xFFFFE08A : 0xFFFFFFFF;
-            graphics.text(this.font, Component.literal(entry.name()), left, y, color);
-            graphics.text(this.font, statusText(entry), left, y + 10, 0xFFAAAAAA);
+            graphics.drawString(this.font, Component.literal(entry.name()), left, y, color);
+            graphics.drawString(this.font, statusText(entry), left, y + 10, 0xFFAAAAAA);
             y += 24;
         }
         if (visible.isEmpty()) {
-            graphics.text(this.font, Component.translatable("netherlink.friends.empty").withStyle(ChatFormatting.GRAY), left, y, -1);
+            graphics.drawString(this.font, Component.translatable("netherlink.friends.empty").withStyle(ChatFormatting.GRAY), left, y, -1);
         }
-        graphics.text(this.font, this.status, left, this.height - 72, -1);
+        graphics.drawString(this.font, this.status, left, this.height - 72, -1);
     }
 
     @Override

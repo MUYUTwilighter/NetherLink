@@ -138,7 +138,7 @@ public final class ClientP2PController {
     private static void message(Minecraft minecraft, Component message) {
         minecraft.execute(() -> {
             if (minecraft.gui != null) {
-                minecraft.gui.getChat().addClientSystemMessage(message);
+                minecraft.gui.getChat().addMessage(message);
             }
         });
     }

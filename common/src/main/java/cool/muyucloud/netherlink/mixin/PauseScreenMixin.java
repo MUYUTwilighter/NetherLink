@@ -26,7 +26,7 @@ public abstract class PauseScreenMixin extends Screen {
         IntegratedServer server = this.minecraft.getSingleplayerServer();
         int rowY = this.height / 4 + 80;
         this.addRenderableWidget(
-            Button.builder(Component.translatable("netherlink.friends.short"), _ -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, false)))
+            Button.builder(Component.translatable("netherlink.friends.short"), ignored -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, false)))
                 .bounds(this.width / 2 + 106, rowY, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("netherlink.friends.tooltip")))
                 .build()

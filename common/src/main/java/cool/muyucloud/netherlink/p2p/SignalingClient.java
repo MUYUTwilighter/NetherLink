@@ -125,7 +125,7 @@ public final class SignalingClient {
             }
             CompletableFuture<RTCIceServer> refresh = this.refreshTurnAuth();
             this.pendingTurnRefresh = refresh;
-            refresh.whenCompleteAsync((_, _) -> this.pendingTurnRefresh = null, this.executor);
+            refresh.whenCompleteAsync((turn, error) -> this.pendingTurnRefresh = null, this.executor);
             return refresh;
         }, this.executor);
     }
