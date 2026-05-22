@@ -32,14 +32,9 @@ being overwritten by the same account playing on a client.
 
 ### Server
 
-**NOTE**: NetherLink's APP ID used for Minecraft Account authentication is still under review by Mojang, and integrating
-other launchers' APP ID may violate Minecraft EULA. Thus, you need to manually specify a valid APP ID with respect to
-the owner of the APP ID you want to use.
-
 1. Install NetherLink on the server.
-2. Make sure the server has a valid Microsoft OAuth client id available. Set it
-   with the `NETHERLINK_CLIENT_ID` environment variable, or package it through
-   the `microsoft-client-id` resource during development builds.
+2. [Optional] If you want to use your own `APP ID` used for authentication, set it with environment variable
+   `NETHERLINK_CLIENT_ID`.
 3. Start the server and run:
 
    ```mcfunction
