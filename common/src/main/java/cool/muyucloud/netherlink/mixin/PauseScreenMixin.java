@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.mixin;
 
 import cool.muyucloud.netherlink.client.ClientP2PController;
+import cool.muyucloud.netherlink.client.NetherLinkFriendsScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -20,14 +21,20 @@ public abstract class PauseScreenMixin extends Screen {
     @Inject(method = "createPauseMenu", at = @At("TAIL"))
     private void onCreatePauseMenu(CallbackInfo ci) {
         IntegratedServer server = this.minecraft.getSingleplayerServer();
-        if (server == null || !server.isPublished()) {
-            return;
+        int y = this.height / 4 + 152;
+        if (server != null && server.isPublished()) {
+            this.addRenderableWidget(Button.builder(label(server), button -> {
+                boolean open = !ClientP2PController.isFriendsOpen(server);
+                ClientP2PController.setFriendsOpen(this.minecraft, server, open);
+                button.setMessage(label(server));
+            }).bounds(this.width / 2 - 102, y, 204, 20).build());
+            y += 24;
         }
-        this.addRenderableWidget(Button.builder(label(server), button -> {
-            boolean open = !ClientP2PController.isFriendsOpen(server);
-            ClientP2PController.setFriendsOpen(this.minecraft, server, open);
-            button.setMessage(label(server));
-        }).bounds(this.width / 2 - 102, this.height / 4 + 152, 204, 20).build());
+        this.addRenderableWidget(
+            Button.builder(Component.translatable("netherlink.friends.title"), button -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, false)))
+                .bounds(this.width / 2 - 102, y, 204, 20)
+                .build()
+        );
     }
 
     private static Component label(IntegratedServer server) {

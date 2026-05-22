@@ -11,7 +11,8 @@
     "IntegratedServerMixin",
     "MinecraftAccessor",
     "PauseScreenMixin",
-    "ShareToLanScreenMixin"
+    "ShareToLanScreenMixin",
+    "TitleScreenMixin"
   ],
   "server": [],
   "injectors": {

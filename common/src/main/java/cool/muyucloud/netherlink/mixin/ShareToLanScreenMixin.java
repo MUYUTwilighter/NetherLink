@@ -23,11 +23,12 @@ public abstract class ShareToLanScreenMixin extends Screen {
         IntegratedServer server = this.minecraft.getSingleplayerServer();
         boolean friendsOpen = server != null && ClientP2PController.isFriendsOpen(server);
         ClientLanSettings.setFriendsOpen(friendsOpen);
+        int friendsButtonY = Math.min(184, this.height - 52);
         this.addRenderableWidget(
             CycleButton.onOffBuilder(friendsOpen)
                 .create(
                     this.width / 2 - 155,
-                    124,
+                    friendsButtonY,
                     310,
                     20,
                     Component.translatable("netherlink.lan.friends"),
