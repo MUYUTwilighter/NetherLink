@@ -30,11 +30,6 @@ dependencies {
 tasks.named('compileJava', JavaCompile) {
     dependsOn(configurations.commonJava)
     source(configurations.commonJava)
-    exclude 'cool/muyucloud/netherlink/client/**'
-    exclude 'cool/muyucloud/netherlink/mixin/FriendJoinHandlerMixin.java'
-    exclude 'cool/muyucloud/netherlink/mixin/IntegratedServerMixin.java'
-    exclude 'cool/muyucloud/netherlink/mixin/MultiplayerOptionsScreenMixin.java'
-    exclude 'cool/muyucloud/netherlink/mixin/PresenceHandlerMixin.java'
 }
 
 processResources {

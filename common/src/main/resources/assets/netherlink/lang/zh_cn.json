@@ -1,4 +1,12 @@
 {
   "menu.multiplayerOptions.network.integrated_server": "集成服务端",
-  "menu.multiplayerOptions.network.integrated_server.tooltip": "你所有的好友都可以不通过批准直接进入世界"
+  "menu.multiplayerOptions.network.integrated_server.tooltip": "你所有的好友都可以不通过批准直接进入世界",
+  "netherlink.lan.friends": "向好友开放",
+  "netherlink.lan.friends.open": "向好友开放",
+  "netherlink.lan.friends.close": "关闭好友访问",
+  "netherlink.client.friends.opened": "NetherLink 好友访问已开放。",
+  "netherlink.client.friends.closed": "NetherLink 好友访问已关闭。",
+  "netherlink.client.friends.failed": "NetherLink 好友访问开放失败。",
+  "netherlink.client.friends.unavailable": "启动器账号缺少所需的在线会话。",
+  "netherlink.client.friends.token_rejected": "启动器 Minecraft token 已被拒绝，请重启游戏后重试。"
 }

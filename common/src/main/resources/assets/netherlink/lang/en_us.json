@@ -1,4 +1,12 @@
 {
   "menu.multiplayerOptions.network.integrated_server": "Integrated Server",
-  "menu.multiplayerOptions.network.integrated_server.tooltip": "All your friends in list can join in this world without approvement"
+  "menu.multiplayerOptions.network.integrated_server.tooltip": "All your friends in list can join in this world without approvement",
+  "netherlink.lan.friends": "Open to Friends",
+  "netherlink.lan.friends.open": "Open to Friends",
+  "netherlink.lan.friends.close": "Close Friends Access",
+  "netherlink.client.friends.opened": "NetherLink friends access opened.",
+  "netherlink.client.friends.closed": "NetherLink friends access closed.",
+  "netherlink.client.friends.failed": "Failed to open NetherLink friends access.",
+  "netherlink.client.friends.unavailable": "Launcher account is missing the required online session.",
+  "netherlink.client.friends.token_rejected": "Launcher Minecraft token was rejected. Restart the game and try again."
 }

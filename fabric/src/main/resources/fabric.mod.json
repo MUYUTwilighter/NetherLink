@@ -17,6 +17,9 @@
   "entrypoints": {
     "main": [
       "cool.muyucloud.netherlink.platform.NetherLink"
+    ],
+    "client": [
+      "cool.muyucloud.netherlink.platform.NetherLinkClient"
     ]
   },
   "mixins": [
