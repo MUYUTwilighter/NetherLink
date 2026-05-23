@@ -94,7 +94,10 @@ public final class SignalingClient {
 
     public CompletableFuture<Void> sendClientMessage(UUID toPlayerId, SignalingMessage message) {
         NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), toPlayerId);
-        String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message).getOrThrow(IllegalStateException::new).toString();
+        String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message)
+            .getOrThrow(false, error -> {
+                throw new IllegalStateException(error);
+            }).toString();
         return CompletableFuture.completedFuture(null)
             .thenComposeAsync(ignored -> this.sendRequest("Signaling_SendClientMessage_v1_0", List.of(
                 JsonNull.INSTANCE,
@@ -148,7 +151,9 @@ public final class SignalingClient {
             ))
             .thenApplyAsync(result -> {
                 TurnAuthResult turnAuth = TurnAuthResult.CODEC.parse(JsonOps.INSTANCE, result)
-                    .getOrThrow(message -> new IllegalStateException("Malformed TurnAuth response: " + message));
+                    .getOrThrow(false, message -> {
+                        throw new IllegalStateException("Malformed TurnAuth response: " + message);
+                    });
                 this.cachedTurn = new CachedTurn(turnAuth);
                 NliConstants.LOG.info("[P2P][signaling] Received TURN auth with {} server entries", turnAuth.turnAuthServers().size());
                 return turnAuth.toRtcIceServer();
@@ -218,7 +223,9 @@ public final class SignalingClient {
                     throw new IllegalStateException("Unexpected config response status: " + response.statusCode());
                 }
                 String baseUri = SIGNALING_URI_CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(response.body()))
-                    .getOrThrow(message -> new IllegalStateException("Malformed config response: " + message));
+                    .getOrThrow(false, message -> {
+                        throw new IllegalStateException("Malformed config response: " + message);
+                    });
                 String wsUrl = baseUri + "/ws/v1.0/messaging/connect/java";
                 this.cachedSignalingUri = new CachedSignalingUri(wsUrl);
                 NliConstants.LOG.info("[P2P][signaling] Signaling URI acquired");
@@ -264,7 +271,8 @@ public final class SignalingClient {
         this.pendingTurnRefresh = null;
         connectFuture.whenComplete((rpc, error) -> {
             CompletableFuture<?> closed = rpc != null ? rpc.close() : CompletableFuture.completedFuture(null);
-            closed.whenComplete((ignored, closeError) -> CompletableFuture.runAsync(client::close));
+            closed.whenComplete((ignored, closeError) -> {
+            });
         });
         connectFuture.completeExceptionally(new IllegalStateException("Signaling torn down: " + reason));
         this.httpClient = null;
@@ -299,7 +307,9 @@ public final class SignalingClient {
             rpc.sendResponse(id, new JsonObject());
         }
         ClientWebRtcMessage envelope = ClientWebRtcMessage.CODEC.parse(JsonOps.INSTANCE, first)
-            .getOrThrow(error -> new IllegalStateException("Malformed ReceiveMessage envelope: " + error));
+            .getOrThrow(false, error -> {
+                throw new IllegalStateException("Malformed ReceiveMessage envelope: " + error);
+            });
         JsonElement inner = JsonParser.parseString(envelope.message());
         SignalingException serviceError = SignalingErrorMapper.fromServiceEnvelope(inner);
         if (serviceError != null) {
@@ -309,12 +319,15 @@ public final class SignalingClient {
             return;
         }
         SignalingMessage parsed = SignalingMessage.CODEC.parse(JsonOps.INSTANCE, inner)
-            .getOrThrow(error -> new IllegalStateException("Malformed signaling payload: " + error));
+            .getOrThrow(false, error -> {
+                throw new IllegalStateException("Malformed signaling payload: " + error);
+            });
         UUID fromPmid = UUID.fromString(envelope.from());
         NliConstants.LOG.info("[P2P][signaling] Received {} session={} from {}", parsed.type(), parsed.sessionId(), fromPmid);
-        switch (parsed) {
-            case SignalingMessage.FriendJoin friendJoin -> this.dispatchFriendJoinMessage(fromPmid, friendJoin);
-            case SignalingMessage.WebRtc webRtc -> this.dispatchWebRtcMessage(fromPmid, webRtc);
+        if (parsed instanceof SignalingMessage.FriendJoin friendJoin) {
+            this.dispatchFriendJoinMessage(fromPmid, friendJoin);
+        } else if (parsed instanceof SignalingMessage.WebRtc webRtc) {
+            this.dispatchWebRtcMessage(fromPmid, webRtc);
         }
     }
 
@@ -407,7 +420,7 @@ public final class SignalingClient {
         );
 
         private RTCIceServer toRtcIceServer() {
-            TurnAuthServer first = this.turnAuthServers.getFirst();
+            TurnAuthServer first = this.turnAuthServers.get(0);
             RTCIceServer ice = new RTCIceServer();
             ice.username = first.username();
             ice.password = first.password();

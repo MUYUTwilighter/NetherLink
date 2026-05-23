@@ -13,12 +13,16 @@ import net.minecraft.network.chat.Component;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class NliCommand<S> {
-    private final ExecutorService executor = Executors.newThreadPerTaskExecutor(
-        Thread.ofVirtual().name("NetherLink Command-", 0).factory()
-    );
+    private static final AtomicInteger THREAD_ID = new AtomicInteger();
+    private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
+        Thread thread = new Thread(task, "NetherLink Command-" + THREAD_ID.getAndIncrement());
+        thread.setDaemon(true);
+        return thread;
+    });
     private final LiteralArgumentBuilder<S> rootFull = LiteralArgumentBuilder.literal("netherlink");
     private final LiteralArgumentBuilder<S> root = LiteralArgumentBuilder.literal("nli");
     private final LiteralArgumentBuilder<S> add = LiteralArgumentBuilder.literal("add");

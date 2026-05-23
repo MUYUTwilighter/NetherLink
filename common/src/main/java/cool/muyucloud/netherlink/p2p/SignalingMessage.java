@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, SignalingMessage.WebRtc {
-    Codec<SignalingMessage> CODEC = Type.CODEC.dispatch(SignalingMessage::type, Type::codec);
+    Codec<SignalingMessage> CODEC = Type.CODEC.dispatch(SignalingMessage::type, Type::dispatchCodec);
 
     static SignalingMessage joinAccepted(String sessionId) {
         return new FriendJoin.Accepted(sessionId);
@@ -140,6 +140,10 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
 
         private MapCodec<? extends SignalingMessage> codec() {
             return this.codec.get();
+        }
+
+        private Codec<? extends SignalingMessage> dispatchCodec() {
+            return this.codec().codec();
         }
 
         @Override

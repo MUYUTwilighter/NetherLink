@@ -32,9 +32,9 @@ public final class ServerChannelAcceptor {
                     ? new RateKickingConnection(rateLimitPacketsPerSecond)
                     : new Connection(PacketFlow.SERVERBOUND);
                 ChannelPipeline pipeline = ch.pipeline().addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
-                Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND, false, null);
-                connection.configurePacketHandler(pipeline);
-                connection.setListenerForServerboundHandshake(new ServerHandshakePacketListenerImpl(server, connection));
+                Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND);
+                pipeline.addLast("packet_handler", connection);
+                connection.setListener(new ServerHandshakePacketListenerImpl(server, connection));
                 setIntendedProfileId(connection, profileId);
                 listener.getConnections().add(connection);
             }

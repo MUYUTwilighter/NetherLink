@@ -166,13 +166,10 @@ public final class ServerP2PManager {
 
     private void handleFriendJoin(UUID fromPmid, SignalingMessage.FriendJoin message) {
         NliConstants.LOG.info("[P2P][{}] Received friend join message {} from {}", this.accountName, message.getClass().getSimpleName(), fromPmid);
-        switch (message) {
-            case SignalingMessage.FriendJoin.Request request -> this.acceptJoinRequest(fromPmid, request.sessionId());
-            case SignalingMessage.FriendJoin.InviteDeclined ignored -> this.acceptedAwaitingOffer.remove(fromPmid);
-            case SignalingMessage.FriendJoin.Accepted ignored -> {
-            }
-            case SignalingMessage.FriendJoin.Rejected ignored -> {
-            }
+        if (message instanceof SignalingMessage.FriendJoin.Request request) {
+            this.acceptJoinRequest(fromPmid, request.sessionId());
+        } else if (message instanceof SignalingMessage.FriendJoin.InviteDeclined) {
+            this.acceptedAwaitingOffer.remove(fromPmid);
         }
     }
 
@@ -197,11 +194,10 @@ public final class ServerP2PManager {
 
     private void handleWebRtc(UUID fromPmid, SignalingMessage.WebRtc message) {
         NliConstants.LOG.info("[P2P][{}] Received WebRTC message {} session={} from {}", this.accountName, message.getClass().getSimpleName(), message.sessionId(), fromPmid);
-        switch (message) {
-            case SignalingMessage.WebRtc.Offer offer -> this.handleOffer(fromPmid, offer);
-            case SignalingMessage.WebRtc.IceCandidate ice -> this.handleIceCandidate(fromPmid, ice);
-            case SignalingMessage.WebRtc.Answer ignored -> {
-            }
+        if (message instanceof SignalingMessage.WebRtc.Offer offer) {
+            this.handleOffer(fromPmid, offer);
+        } else if (message instanceof SignalingMessage.WebRtc.IceCandidate ice) {
+            this.handleIceCandidate(fromPmid, ice);
         }
     }
 

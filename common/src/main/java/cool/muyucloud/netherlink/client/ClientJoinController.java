@@ -20,10 +20,13 @@ import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -109,17 +112,12 @@ public final class ClientJoinController {
     }
 
     private static void handleFriendJoin(Minecraft minecraft, UUID fromPmid, SignalingMessage.FriendJoin message) {
-        switch (message) {
-            case SignalingMessage.FriendJoin.Accepted accepted -> handleAccepted(minecraft, fromPmid, accepted.sessionId());
-            case SignalingMessage.FriendJoin.Rejected rejected -> {
-                OutgoingJoin join = OUTGOING.get(fromPmid);
-                if (join != null && join.sessionId().equals(rejected.sessionId())) {
-                    join.result().completeExceptionally(new IllegalStateException("Join request rejected"));
-                }
-            }
-            case SignalingMessage.FriendJoin.Request ignored -> {
-            }
-            case SignalingMessage.FriendJoin.InviteDeclined ignored -> {
+        if (message instanceof SignalingMessage.FriendJoin.Accepted accepted) {
+            handleAccepted(minecraft, fromPmid, accepted.sessionId());
+        } else if (message instanceof SignalingMessage.FriendJoin.Rejected rejected) {
+            OutgoingJoin join = OUTGOING.get(fromPmid);
+            if (join != null && join.sessionId().equals(rejected.sessionId())) {
+                join.result().completeExceptionally(new IllegalStateException("Join request rejected"));
             }
         }
     }
@@ -172,38 +170,33 @@ public final class ClientJoinController {
         if (handshake == null || !handshake.id().equals(message.sessionId())) {
             return;
         }
-        switch (message) {
-            case SignalingMessage.WebRtc.Answer answer -> handshake.applyAnswer(answer.sdp()).exceptionally(error -> {
+        if (message instanceof SignalingMessage.WebRtc.Answer answer) {
+            handshake.applyAnswer(answer.sdp()).exceptionally(error -> {
                 handshake.abort("answer failed: " + error.getMessage());
                 return null;
             });
-            case SignalingMessage.WebRtc.IceCandidate ice -> {
-                RTCIceCandidate candidate = ice.toRtcIceCandidate();
-                handshake.addRemoteIceCandidate(candidate).exceptionally(error -> null);
-            }
-            case SignalingMessage.WebRtc.Offer ignored -> {
-            }
+        } else if (message instanceof SignalingMessage.WebRtc.IceCandidate ice) {
+            RTCIceCandidate candidate = ice.toRtcIceCandidate();
+            handshake.addRemoteIceCandidate(candidate).exceptionally(error -> null);
         }
     }
 
     private static void joinHost(Minecraft minecraft, RtcHandshake.HandshakeResult handshakeResult) {
         minecraft.execute(() -> {
-            minecraft.disconnect(new ProgressScreen(true), false);
+            minecraft.clearLevel(new ProgressScreen(true));
             Connection connection = connectionFromRtc(handshakeResult);
-            connection.initiateServerboundPlayConnection("rtc-peer", 0,
-                new ClientHandshakePacketListenerImpl(
-                    connection,
-                    minecraft,
-                    new ServerData("NetherLink", "rtc-peer", ServerData.Type.OTHER),
-                    null,
-                    false,
-                    null,
-                    component -> {
-                    },
-                    null
-                )
-            );
-            connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), minecraft.getUser().getProfileId()));
+            connection.setListener(new ClientHandshakePacketListenerImpl(
+                connection,
+                minecraft,
+                new ServerData("NetherLink", "rtc-peer", false),
+                null,
+                false,
+                null,
+                component -> {
+                }
+            ));
+            connection.send(new ClientIntentionPacket("rtc-peer", 0, ConnectionProtocol.LOGIN));
+            connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), Optional.ofNullable(minecraft.getUser().getProfileId())));
             ((MinecraftAccessor)minecraft).nli$setPendingConnection(connection);
         });
     }
@@ -215,8 +208,8 @@ public final class ClientJoinController {
             @Override
             protected void initChannel(Channel ch) {
                 ChannelPipeline pipeline = ch.pipeline().addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
-                Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND, false, null);
-                connection.configurePacketHandler(pipeline);
+                Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND);
+                pipeline.addLast("packet_handler", connection);
             }
         });
         Connection.LOCAL_WORKER_GROUP.get().register(channel).syncUninterruptibly();

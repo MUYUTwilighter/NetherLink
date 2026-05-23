@@ -18,6 +18,7 @@ dependencies {
 
     modRuntimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 
+    compileOnly group: 'org.jetbrains', name: 'annotations', version: '24.1.0'
     modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
     modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 }
@@ -26,6 +27,9 @@ loom {
     def aw = project(':common').file("src/main/resources/${mod_id}.accesswidener")
     if (aw.exists()) {
         accessWidenerPath.set(aw)
+    }
+    mixin {
+        defaultRefmapName.set("${mod_id}.refmap.json")
     }
     runs {
         client {
@@ -39,34 +43,6 @@ loom {
             setConfigName('Fabric Server')
             ideConfigGenerated(true)
             runDir('runs/server')
-        }
-    }
-}
-
-// Implement mcgradleconventions loader attribute
-def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
-['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements', 'includeInternal', 'modCompileClasspath'].each { variant ->
-    configurations.named("$variant") {
-        attributes {
-            attribute(loaderAttribute, 'fabric')
-        }
-    }
-}
-
-sourceSets.configureEach {
-    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName].each { variant ->
-        configurations.named("$variant") {
-            attributes {
-                attribute(loaderAttribute, 'fabric')
-            }
-        }
-    }
-}
-
-loom.remapConfigurations.configureEach {
-    configurations.named(it.name) {
-        attributes {
-            attribute(loaderAttribute, 'fabric')
         }
     }
 }

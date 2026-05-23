@@ -189,7 +189,10 @@ public class AccountManager {
     public static void dump(String name) {
         Account account = ACCOUNTS.get(name);
         if (account == null) return;
-        JsonElement json = Account.CODEC.codec().encodeStart(JsonOps.INSTANCE, account).getOrThrow();
+        JsonElement json = Account.CODEC.codec().encodeStart(JsonOps.INSTANCE, account)
+            .getOrThrow(false, message -> {
+                throw new IllegalStateException(message);
+            });
         StringWriter writer = new StringWriter();
         GSON.toJson(json, new JsonWriter(writer));
         try {
@@ -209,7 +212,9 @@ public class AccountManager {
             String raw = Files.readString(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
             JsonElement json = GSON.fromJson(raw, JsonElement.class);
             Account account = Account.CODEC.codec().decode(JsonOps.INSTANCE, json)
-                .getOrThrow().getFirst();
+                .getOrThrow(false, message -> {
+                    throw new IllegalStateException(message);
+                }).getFirst();
             String key = account.getMcProfileName() == null || account.getMcProfileName().isBlank() ? name : account.getMcProfileName();
             ACCOUNTS.put(key, account);
             REQUESTS.remove(name);
