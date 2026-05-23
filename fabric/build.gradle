@@ -16,6 +16,8 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
+    modRuntimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
+
     modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
     modImplementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 }

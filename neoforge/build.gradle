@@ -20,7 +20,7 @@ neoForge {
     }
     runs {
         configureEach {
-            systemProperty('neoforge.enabledGameTestNamespaces', mod_id)
+            systemProperty('neoforge.enabledGameTestNamespaces', "${mod_id}")
             ideName = "NeoForge ${it.name.capitalize()} (${project.path})" // Unify the run config names with fabric
         }
         client {
@@ -55,6 +55,8 @@ dependencies {
             prefer webrtc_version
         }
     }
+
+    runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
@@ -83,7 +85,7 @@ modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
     versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
-    versionNumber = version
+    versionNumber = "${version}"
     versionType = release_state
     uploadFile = assemble
     gameVersions = [minecraft_version]
