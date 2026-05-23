@@ -50,13 +50,27 @@ dependencies {
             prefer webrtc_version
         }
     }
-    jarJar(runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")) {
-        version {
-            prefer webrtc_version
-        }
-    }
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 
     runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
+}
+
+configurations {
+    webrtcNative {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+dependencies {
+    webrtcNative "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+}
+
+tasks.named('jar', Jar) {
+    from({ configurations.webrtcNative.collect { zipTree(it) } }) {
+        include '*.dll'
+    }
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
