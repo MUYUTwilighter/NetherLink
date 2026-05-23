@@ -5,9 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import cool.muyucloud.netherlink.NliConstants;
-import net.minecraft.server.jsonrpc.JsonRPCErrors;
-import net.minecraft.server.jsonrpc.JsonRPCUtils;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.http.WebSocket;
@@ -70,11 +68,11 @@ public final class JsonRpcClient implements WebSocket.Listener {
     }
 
     public void sendResponse(JsonElement id, JsonElement result) {
-        this.executor.execute(() -> this.send(JsonRPCUtils.createSuccessResult(id, result).toString()));
+        this.executor.execute(() -> this.send(createSuccessResult(id, result).toString()));
     }
 
-    public void sendError(JsonElement id, JsonRPCErrors error, String data) {
-        this.executor.execute(() -> this.send(error.create(id, data).toString()));
+    public void sendMethodNotFound(JsonElement id, String method) {
+        this.executor.execute(() -> this.send(createError(id, -32601, "Method not found", method).toString()));
     }
 
     public CompletableFuture<JsonElement> sendRequest(String method, List<JsonElement> params) {
@@ -152,14 +150,14 @@ public final class JsonRpcClient implements WebSocket.Listener {
             return;
         }
         JsonObject object = root.getAsJsonObject();
-        JsonElement id = JsonRPCUtils.getRequestId(object);
+        JsonElement id = object.get("id");
         boolean hasId = id != null && !id.isJsonNull();
-        String method = JsonRPCUtils.getMethodName(object);
-        JsonElement result = JsonRPCUtils.getResult(object);
-        JsonObject error = JsonRPCUtils.getError(object);
+        String method = string(object, "method");
+        JsonElement result = object.get("result");
+        JsonObject error = object.get("error") instanceof JsonObject errorObject ? errorObject : null;
         if (method != null && result == null && error == null) {
             NliConstants.LOG.debug("[P2P][jsonrpc] Received request method={}", method);
-            this.methodHandler.onMethod(this, hasId ? id : null, method, JsonRPCUtils.getParams(object));
+            this.methodHandler.onMethod(this, hasId ? id : null, method, object.get("params"));
         } else if (method == null && error == null && result != null && hasId && isValidResponseId(id)) {
             CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id.getAsInt());
             if (pending != null) {
@@ -203,6 +201,31 @@ public final class JsonRpcClient implements WebSocket.Listener {
             request.add("params", array);
         }
         return request;
+    }
+
+    private static JsonObject createSuccessResult(JsonElement id, JsonElement result) {
+        JsonObject response = new JsonObject();
+        response.addProperty("jsonrpc", "2.0");
+        response.add("id", id);
+        response.add("result", result);
+        return response;
+    }
+
+    private static JsonObject createError(JsonElement id, int code, String message, String data) {
+        JsonObject error = new JsonObject();
+        error.addProperty("code", code);
+        error.addProperty("message", message);
+        error.addProperty("data", data);
+        JsonObject response = new JsonObject();
+        response.addProperty("jsonrpc", "2.0");
+        response.add("id", id);
+        response.add("error", error);
+        return response;
+    }
+
+    private static @Nullable String string(JsonObject object, String key) {
+        JsonElement value = object.get(key);
+        return value instanceof JsonPrimitive primitive && primitive.isString() ? primitive.getAsString() : null;
     }
 
     private void teardown(Throwable cause, boolean fireDisconnect) {

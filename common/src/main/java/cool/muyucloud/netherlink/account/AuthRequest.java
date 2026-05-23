@@ -278,8 +278,8 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.BLUE)
-                .withClickEvent(new ClickEvent.OpenUrl(URI.create(uri)))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open login page"))));
+                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, uri))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Open login page"))));
     }
 
     private static MutableComponent copyToClipboard(String value) {
@@ -287,8 +287,8 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent.CopyToClipboard(value))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copy to clipboard")))
+                .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, value))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Copy to clipboard")))
                 .withInsertion(value));
     }
 

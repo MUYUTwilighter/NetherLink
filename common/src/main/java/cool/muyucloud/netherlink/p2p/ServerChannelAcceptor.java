@@ -9,10 +9,9 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.RateKickingConnection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.EventLoopGroupHolder;
 import net.minecraft.server.network.ServerConnectionListener;
 import net.minecraft.server.network.ServerHandshakePacketListenerImpl;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
@@ -40,7 +39,7 @@ public final class ServerChannelAcceptor {
                 listener.getConnections().add(connection);
             }
         });
-        EventLoopGroupHolder.local().eventLoopGroup().register(channel).syncUninterruptibly();
+        Connection.LOCAL_WORKER_GROUP.get().register(channel).syncUninterruptibly();
     }
 
     private static void setIntendedProfileId(Connection connection, @Nullable UUID profileId) {

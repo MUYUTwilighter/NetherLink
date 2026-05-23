@@ -7,8 +7,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.core.UUIDUtil;
-import net.minecraft.server.jsonrpc.JsonRPCErrors;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -284,7 +283,7 @@ public final class SignalingClient {
             default -> {
                 NliConstants.LOG.debug("[P2P][signaling] Unknown RPC method {}", method);
                 if (id != null) {
-                    rpc.sendError(id, JsonRPCErrors.METHOD_NOT_FOUND, method);
+                    rpc.sendMethodNotFound(id, method);
                 }
             }
         }

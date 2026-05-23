@@ -18,14 +18,11 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
-import net.minecraft.client.multiplayer.LevelLoadTracker;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.PacketFlow;
-import net.minecraft.network.protocol.login.LoginProtocols;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
-import net.minecraft.server.network.EventLoopGroupHolder;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -193,12 +190,7 @@ public final class ClientJoinController {
         minecraft.execute(() -> {
             minecraft.disconnect(new ProgressScreen(true), false);
             Connection connection = connectionFromRtc(handshakeResult);
-            LevelLoadTracker tracker = new LevelLoadTracker(0L);
-            connection.initiateServerboundPlayConnection(
-                "rtc-peer",
-                0,
-                LoginProtocols.SERVERBOUND,
-                LoginProtocols.CLIENTBOUND,
+            connection.initiateServerboundPlayConnection("rtc-peer", 0,
                 new ClientHandshakePacketListenerImpl(
                     connection,
                     minecraft,
@@ -208,10 +200,8 @@ public final class ClientJoinController {
                     null,
                     component -> {
                     },
-                    tracker,
                     null
-                ),
-                false
+                )
             );
             connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), minecraft.getUser().getProfileId()));
             ((MinecraftAccessor)minecraft).nli$setPendingConnection(connection);
@@ -229,7 +219,7 @@ public final class ClientJoinController {
                 connection.configurePacketHandler(pipeline);
             }
         });
-        EventLoopGroupHolder.local().eventLoopGroup().register(channel).syncUninterruptibly();
+        Connection.LOCAL_WORKER_GROUP.get().register(channel).syncUninterruptibly();
         return connection;
     }
 

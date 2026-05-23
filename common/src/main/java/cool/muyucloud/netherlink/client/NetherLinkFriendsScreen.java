@@ -5,7 +5,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
@@ -141,19 +140,19 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int left = this.width / 2 - 154;
         int y = 42;
         List<ClientFriendService.Entry> visible = this.visibleEntries();
         for (int i = 0; i < visible.size(); i++) {
-            if (event.x() >= left && event.x() < left + 200 && event.y() >= y && event.y() < y + 22) {
+            if (mouseX >= left && mouseX < left + 200 && mouseY >= y && mouseY < y + 22) {
                 this.selected = this.page * this.pageSize() + i;
                 this.updateButtons();
                 return true;
             }
             y += 24;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override

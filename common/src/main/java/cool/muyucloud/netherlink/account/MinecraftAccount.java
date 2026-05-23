@@ -1,6 +1,6 @@
 package cool.muyucloud.netherlink.account;
 
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public interface MinecraftAccount {
     @Nullable

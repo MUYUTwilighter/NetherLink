@@ -4,7 +4,6 @@ import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.permissions.PermissionSet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,7 +32,7 @@ public abstract class MinecraftServerMixin implements Messenger {
     }
 
     @Override
-    public PermissionSet nli$permissions() {
-        return PermissionSet.ALL_PERMISSIONS;
+    public boolean nli$hasPermission(int level) {
+        return true;
     }
 }

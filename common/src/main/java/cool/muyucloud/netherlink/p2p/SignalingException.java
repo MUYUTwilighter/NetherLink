@@ -1,6 +1,6 @@
 package cool.muyucloud.netherlink.p2p;
 
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
