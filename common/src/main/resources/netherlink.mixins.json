@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "cool.muyucloud.netherlink.mixin",
+  "refmap": "${mod_id}.refmap.json",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "CommandSourceStackMixin",
@@ -9,7 +10,7 @@
   ],
   "client": [
     "IntegratedServerMixin",
-    "MinecraftAccessor",
+    "MinecraftMixin",
     "PauseScreenMixin",
     "ShareToLanScreenMixin",
     "TitleScreenMixin"

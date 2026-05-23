@@ -52,20 +52,37 @@ sourceSets.main.resources.srcDir 'src/generated/resources'
 dependencies {
     compileOnly project(":common")
     compileOnly group: 'org.jetbrains', name: 'annotations', version: '24.1.0'
-    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")) {
-        version {
-            prefer webrtc_version
-        }
-    }
-    jarJar(runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")) {
-        version {
-            prefer webrtc_version
-        }
-    }
+    implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    runtimeOnly "me.djtheredstoner:DevAuth-forge-latest:1.2.2"
     annotationProcessor("org.spongepowered:mixin:0.8.5-SNAPSHOT:processor")
 }
 
+configurations {
+    webrtcJava {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+    webrtcNative {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+dependencies {
+    webrtcJava "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    webrtcNative "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+}
+
 jar {
+    from({ configurations.webrtcJava.collect { zipTree(it) } }) {
+        include 'dev/onvoid/**'
+    }
+    from({ configurations.webrtcNative.collect { zipTree(it) } }) {
+        include '*.dll'
+    }
     finalizedBy('reobfJar')
     manifest.attributes([
         "MixinConfigs": "${mod_id}.mixins.json,${mod_id}.forge.mixins.json"

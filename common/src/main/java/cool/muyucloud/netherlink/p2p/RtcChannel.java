@@ -81,16 +81,39 @@ public final class RtcChannel extends AbstractChannel {
             this.handshakeResult.dataChannel().registerObserver(new RTCDataChannelObserver() {
                 @Override
                 public void onMessage(RTCDataChannelBuffer buffer) {
-                    NliConstants.LOG.debug("[P2P-Netty] Received DataChannel message bytes={}", buffer.data.remaining());
-                    ByteBuf copy = Unpooled.copiedBuffer(buffer.data);
-                    RtcChannel.this.eventLoop().execute(() -> RtcChannel.this.handleMessage(copy));
+                    try {
+                        NliConstants.LOG.debug("[P2P-Netty] Received DataChannel message bytes={}", buffer.data.remaining());
+                        ByteBuf copy = Unpooled.copiedBuffer(buffer.data);
+                        RtcChannel.this.eventLoop().execute(() -> {
+                            try {
+                                RtcChannel.this.handleMessage(copy);
+                            } catch (Throwable error) {
+                                NliConstants.LOG.error("[P2P-Netty] Failed to handle inbound DataChannel message", error);
+                                copy.release();
+                                RtcChannel.this.pipeline().fireExceptionCaught(error);
+                            }
+                        });
+                    } catch (Throwable error) {
+                        NliConstants.LOG.error("[P2P-Netty] Failed while receiving DataChannel message", error);
+                    }
                 }
 
                 @Override
                 public void onStateChange() {
-                    RTCDataChannelState state = RtcChannel.this.handshakeResult.dataChannel().getState();
-                    NliConstants.LOG.info("[P2P-Netty] DataChannel state -> {}", state);
-                    RtcChannel.this.eventLoop().execute(() -> RtcChannel.this.handleStateChange(state));
+                    try {
+                        RTCDataChannelState state = RtcChannel.this.handshakeResult.dataChannel().getState();
+                        NliConstants.LOG.info("[P2P-Netty] DataChannel state -> {}", state);
+                        RtcChannel.this.eventLoop().execute(() -> {
+                            try {
+                                RtcChannel.this.handleStateChange(state);
+                            } catch (Throwable error) {
+                                NliConstants.LOG.error("[P2P-Netty] Failed to handle DataChannel state {}", state, error);
+                                RtcChannel.this.pipeline().fireExceptionCaught(error);
+                            }
+                        });
+                    } catch (Throwable error) {
+                        NliConstants.LOG.error("[P2P-Netty] Failed while processing DataChannel state change", error);
+                    }
                 }
 
                 @Override
@@ -148,7 +171,12 @@ public final class RtcChannel extends AbstractChannel {
             int chunk = Math.min(remaining, MAX_CHUNK_SIZE);
             byte[] bytes = new byte[chunk];
             buffer.getBytes(index, bytes);
-            this.handshakeResult.dataChannel().send(new RTCDataChannelBuffer(ByteBuffer.wrap(bytes), true));
+            try {
+                this.handshakeResult.dataChannel().send(new RTCDataChannelBuffer(ByteBuffer.wrap(bytes), true));
+            } catch (RuntimeException e) {
+                NliConstants.LOG.error("[P2P-Netty] DataChannel send failed chunk={} remaining={}", chunk, remaining, e);
+                throw e;
+            }
             NliConstants.LOG.debug("[P2P-Netty] Sent DataChannel chunk bytes={}", chunk);
             index += chunk;
             remaining -= chunk;
@@ -156,6 +184,13 @@ public final class RtcChannel extends AbstractChannel {
     }
 
     private void handleMessage(ByteBuf buffer) {
+        NliConstants.LOG.debug(
+            "[P2P-Netty] Handling inbound bytes={} closed={} activated={} autoRead={}",
+            buffer.readableBytes(),
+            closed,
+            activated,
+            this.config.isAutoRead()
+        );
         if (!closed && activated && this.config.isAutoRead()) {
             this.pipeline().fireChannelRead(buffer);
             this.pipeline().fireChannelReadComplete();

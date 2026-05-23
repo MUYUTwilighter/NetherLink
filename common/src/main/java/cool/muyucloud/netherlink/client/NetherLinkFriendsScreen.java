@@ -157,6 +157,7 @@ public class NetherLinkFriendsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float a) {
+        this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, a);
         int left = this.width / 2 - 154;
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 18, -1);

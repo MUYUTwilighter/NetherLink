@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.mixin.MinecraftAccessor;
+import cool.muyucloud.netherlink.access.MinecraftConnectionAccess;
 import cool.muyucloud.netherlink.p2p.RtcChannel;
 import cool.muyucloud.netherlink.p2p.RtcHandshake;
 import cool.muyucloud.netherlink.p2p.SignalingClient;
@@ -11,9 +11,13 @@ import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ProgressScreen;
@@ -156,7 +160,7 @@ public final class ClientJoinController {
             if (error != null) {
                 join.result().completeExceptionally(error);
             } else {
-                joinHost(minecraft, handshakeResult);
+                joinHost(minecraft, handshake.id(), handshakeResult);
                 join.result().complete(null);
             }
         });
@@ -181,10 +185,21 @@ public final class ClientJoinController {
         }
     }
 
-    private static void joinHost(Minecraft minecraft, RtcHandshake.HandshakeResult handshakeResult) {
+    private static void joinHost(Minecraft minecraft, String sessionId, RtcHandshake.HandshakeResult handshakeResult) {
         minecraft.execute(() -> {
+            NliConstants.LOG.info("[P2P][client][{}] Preparing Minecraft login over RTC", sessionId);
             minecraft.clearLevel(new ProgressScreen(true));
-            Connection connection = connectionFromRtc(handshakeResult);
+            RtcConnection rtcConnection = connectionFromRtc(sessionId, handshakeResult);
+            Connection connection = rtcConnection.connection();
+            registerLoaderClientLoginChannel(connection);
+            NliConstants.LOG.info(
+                "[P2P][client][{}] Created pending connection local={} remote={} active={} open={}",
+                sessionId,
+                rtcConnection.channel().localAddress(),
+                rtcConnection.channel().remoteAddress(),
+                rtcConnection.channel().isActive(),
+                rtcConnection.channel().isOpen()
+            );
             connection.setListener(new ClientHandshakePacketListenerImpl(
                 connection,
                 minecraft,
@@ -195,25 +210,54 @@ public final class ClientJoinController {
                 component -> {
                 }
             ));
-            connection.send(new ClientIntentionPacket("rtc-peer", 0, ConnectionProtocol.LOGIN));
-            connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), Optional.ofNullable(minecraft.getUser().getProfileId())));
-            ((MinecraftAccessor)minecraft).nli$setPendingConnection(connection);
+            ((MinecraftConnectionAccess)minecraft).nli$setPendingConnection(connection);
+            NliConstants.LOG.info("[P2P][client][{}] Pending connection installed, scheduling login packets", sessionId);
+            rtcConnection.channel().eventLoop().execute(() -> {
+                try {
+                    NliConstants.LOG.info("[P2P][client][{}] Sending ClientIntentionPacket while protocol is handshaking", sessionId);
+                    connection.send(new ClientIntentionPacket("rtc-peer", 0, ConnectionProtocol.LOGIN));
+                    NliConstants.LOG.info(
+                        "[P2P][client][{}] Sending ServerboundHelloPacket name={} profile={}",
+                        sessionId,
+                        minecraft.getUser().getName(),
+                        minecraft.getUser().getProfileId()
+                    );
+                    connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), Optional.ofNullable(minecraft.getUser().getProfileId())));
+                } catch (Throwable error) {
+                    NliConstants.LOG.error("[P2P][client][{}] Failed while starting Minecraft login over RTC", sessionId, error);
+                    throw error;
+                }
+            });
         });
     }
 
-    private static Connection connectionFromRtc(RtcHandshake.HandshakeResult handshakeResult) {
+    private static RtcConnection connectionFromRtc(String sessionId, RtcHandshake.HandshakeResult handshakeResult) {
         Connection connection = new Connection(PacketFlow.CLIENTBOUND);
         Channel channel = new RtcChannel(handshakeResult);
         channel.pipeline().addLast(new ChannelInitializer<>() {
             @Override
             protected void initChannel(Channel ch) {
-                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
+                ChannelPipeline pipeline = ch.pipeline()
+                    .addLast("nli_diagnostics", new ClientDiagnosticsHandler(sessionId, connection))
+                    .addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
                 Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND);
+                pipeline.addLast("nli_packet_diagnostics", new ClientPacketDiagnosticsHandler(sessionId, connection));
                 pipeline.addLast("packet_handler", connection);
             }
         });
         Connection.LOCAL_WORKER_GROUP.get().register(channel).syncUninterruptibly();
-        return connection;
+        return new RtcConnection(connection, channel);
+    }
+
+    private static void registerLoaderClientLoginChannel(Connection connection) {
+        try {
+            Class<?> hooks = Class.forName("net.minecraftforge.network.NetworkHooks");
+            hooks.getMethod("registerClientLoginChannel", Connection.class).invoke(null, connection);
+            NliConstants.LOG.info("[P2P][client] Registered Forge client login channel");
+        } catch (ClassNotFoundException ignored) {
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to register loader client login channel", e);
+        }
     }
 
     private static PeerConnectionFactory factory() {
@@ -226,6 +270,104 @@ public final class ClientJoinController {
     private static void maybeDisconnectSignaling() {
         if (OUTGOING.isEmpty() && signaling != null) {
             signaling.disconnect();
+        }
+    }
+
+    private record RtcConnection(Connection connection, Channel channel) {
+    }
+
+    private static final class ClientPacketDiagnosticsHandler extends ChannelDuplexHandler {
+        private final String sessionId;
+        private final Connection connection;
+
+        private ClientPacketDiagnosticsHandler(String sessionId, Connection connection) {
+            this.sessionId = sessionId;
+            this.connection = connection;
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (shouldLog(ctx)) {
+                NliConstants.LOG.info(
+                    "[P2P][client][{}] IN packet={} protocol={} listener={}",
+                    this.sessionId,
+                    msg.getClass().getName(),
+                    protocolName(ctx),
+                    listenerName()
+                );
+            }
+            super.channelRead(ctx, msg);
+        }
+
+        @Override
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+            if (shouldLog(ctx)) {
+                NliConstants.LOG.info(
+                    "[P2P][client][{}] OUT packet={} protocol={} listener={}",
+                    this.sessionId,
+                    msg.getClass().getName(),
+                    protocolName(ctx),
+                    listenerName()
+                );
+            }
+            super.write(ctx, msg, promise);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+            NliConstants.LOG.error(
+                "[P2P][client][{}] Packet pipeline exception protocol={} listener={}",
+                this.sessionId,
+                protocolName(ctx),
+                listenerName(),
+                cause
+            );
+            super.exceptionCaught(ctx, cause);
+        }
+
+        private static boolean shouldLog(ChannelHandlerContext ctx) {
+            return ctx.channel().attr(Connection.ATTRIBUTE_PROTOCOL).get() != ConnectionProtocol.PLAY;
+        }
+
+        private static String protocolName(ChannelHandlerContext ctx) {
+            ConnectionProtocol protocol = ctx.channel().attr(Connection.ATTRIBUTE_PROTOCOL).get();
+            return protocol == null ? "<null>" : protocol.toString();
+        }
+
+        private String listenerName() {
+            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
+        }
+    }
+
+    private static final class ClientDiagnosticsHandler extends ChannelInboundHandlerAdapter {
+        private final String sessionId;
+        private final Connection connection;
+
+        private ClientDiagnosticsHandler(String sessionId, Connection connection) {
+            this.sessionId = sessionId;
+            this.connection = connection;
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            NliConstants.LOG.info("[P2P][client][{}] Netty channelActive listener={}", this.sessionId, listenerName());
+            super.channelActive(ctx);
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            NliConstants.LOG.info("[P2P][client][{}] Netty channelInactive listener={}", this.sessionId, listenerName());
+            super.channelInactive(ctx);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+            NliConstants.LOG.error("[P2P][client][{}] Netty pipeline exception listener={}", this.sessionId, listenerName(), cause);
+            super.exceptionCaught(ctx, cause);
+        }
+
+        private String listenerName() {
+            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
         }
     }
 
