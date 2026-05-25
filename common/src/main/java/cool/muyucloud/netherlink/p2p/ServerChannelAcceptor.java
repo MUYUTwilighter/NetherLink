@@ -1,14 +1,7 @@
 package cool.muyucloud.netherlink.p2p;
 
 import cool.muyucloud.netherlink.NliConstants;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.*;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
@@ -64,7 +57,7 @@ public final class ServerChannelAcceptor {
                 NliConstants.LOG.info("[P2P-Netty][server] RTC connection added to server list profile={}", profileId);
             }
         });
-        Connection.LOCAL_WORKER_GROUP.get().register(channel).syncUninterruptibly();
+        LoaderNetworkEventLoops.serverGroup().register(channel).syncUninterruptibly();
     }
 
     private static void setIntendedProfileId(Connection connection, @Nullable UUID profileId) {
@@ -106,7 +99,9 @@ public final class ServerChannelAcceptor {
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (!this.registered && msg instanceof ClientIntentionPacket packet) {
                 this.registered = true;
+                LoaderNetworkDiagnostics.logServerIntention(this.connection, packet, "before-server-login-channel", this.profileId);
                 registerLoaderServerLoginChannel(this.connection, packet, this.profileId);
+                LoaderNetworkDiagnostics.logServerIntention(this.connection, packet, "after-server-login-channel", this.profileId);
             }
             super.channelRead(ctx, msg);
         }

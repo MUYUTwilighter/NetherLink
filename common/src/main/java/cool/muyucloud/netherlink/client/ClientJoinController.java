@@ -2,22 +2,12 @@ package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.MinecraftConnectionAccess;
-import cool.muyucloud.netherlink.p2p.RtcChannel;
-import cool.muyucloud.netherlink.p2p.RtcHandshake;
-import cool.muyucloud.netherlink.p2p.SignalingClient;
-import cool.muyucloud.netherlink.p2p.SignalingMessage;
+import cool.muyucloud.netherlink.p2p.*;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPromise;
+import io.netty.channel.*;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ProgressScreen;
@@ -191,7 +181,9 @@ public final class ClientJoinController {
             minecraft.clearLevel(new ProgressScreen(true));
             RtcConnection rtcConnection = connectionFromRtc(sessionId, handshakeResult);
             Connection connection = rtcConnection.connection();
+            LoaderNetworkDiagnostics.logClientConnection(connection, "before-client-login-channel");
             registerLoaderClientLoginChannel(connection);
+            LoaderNetworkDiagnostics.logClientConnection(connection, "after-client-login-channel");
             NliConstants.LOG.info(
                 "[P2P][client][{}] Created pending connection local={} remote={} active={} open={}",
                 sessionId,
@@ -215,7 +207,9 @@ public final class ClientJoinController {
             rtcConnection.channel().eventLoop().execute(() -> {
                 try {
                     NliConstants.LOG.info("[P2P][client][{}] Sending ClientIntentionPacket while protocol is handshaking", sessionId);
-                    connection.send(new ClientIntentionPacket("rtc-peer", 0, ConnectionProtocol.LOGIN));
+                    ClientIntentionPacket intention = new ClientIntentionPacket("rtc-peer", 0, ConnectionProtocol.LOGIN);
+                    LoaderNetworkDiagnostics.logClientIntention(intention, "before-send");
+                    connection.send(intention);
                     NliConstants.LOG.info(
                         "[P2P][client][{}] Sending ServerboundHelloPacket name={} profile={}",
                         sessionId,
