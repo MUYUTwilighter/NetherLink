@@ -117,9 +117,9 @@ public final class SignalingClient {
                 if (error.getCause() instanceof JsonRpcException rpcError) {
                     SignalingException mapped = SignalingErrorMapper.fromJsonRpc(toPlayerId, rpcError);
                     this.fireListeners(listener -> listener.onSignalingError(toPlayerId, mapped));
-                    return CompletableFuture.<Void>failedFuture(mapped);
+                    return CompletableFuture.failedFuture(mapped);
                 }
-                return CompletableFuture.<Void>failedFuture(error);
+                return CompletableFuture.failedFuture(error);
             });
     }
 

@@ -120,10 +120,6 @@ public final class ClientP2PController {
         return ((NetherLinkIntegratedServer)integratedServer).nli$isFriendsOpen();
     }
 
-    public static boolean isPublishedBy(IntegratedServer integratedServer) {
-        return server == integratedServer && manager != null;
-    }
-
     private static void awaitSignalingReady(ServerP2PManager p2pManager) {
         try {
             p2pManager.awaitSignalingReady(SIGNALING_READY_TIMEOUT).join();
