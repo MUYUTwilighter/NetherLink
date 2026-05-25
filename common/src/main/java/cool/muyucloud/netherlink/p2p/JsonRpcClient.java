@@ -11,12 +11,11 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.http.WebSocket;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.*;
 
 public final class JsonRpcClient implements WebSocket.Listener {
     private static final int MAX_MESSAGE_BYTES = 65536;
@@ -77,7 +76,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
         this.executor.execute(() -> this.send(error.create(id, data).toString()));
     }
 
-    public CompletableFuture<JsonElement> sendRequest(String method, List<JsonElement> params) {
+    public CompletableFuture<JsonElement> sendRequest(String method, List<JsonElement> params, @Nullable Duration timeout) {
         CompletableFuture<JsonElement> future = new CompletableFuture<>();
         this.executor.execute(() -> {
             WebSocket ws = this.webSocket;
@@ -90,7 +89,20 @@ public final class JsonRpcClient implements WebSocket.Listener {
             String payload = createRequest(id, method, params).toString();
             this.pendingRequests.put(id, future);
             NliConstants.LOG.info("[P2P][jsonrpc] Sending request id={} method={}", id, method);
-            this.sendChain = this.sendChain.<Void>thenCompose(ignored -> ws.sendText(payload, true).thenApply(sent -> null)).exceptionally(error -> {
+            if (timeout != null && !timeout.isZero() && !timeout.isNegative()) {
+                ScheduledFuture<?> timeoutTask = this.executor.schedule(() -> {
+                    CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id);
+                    if (pending != null) {
+                        NliConstants.LOG.warn("[P2P][jsonrpc] Request timed out id={} method={} after {}ms", id, method, timeout.toMillis());
+                        pending.completeExceptionally(new TimeoutException("JSON-RPC request timed out: id=" + id + " method=" + method));
+                    }
+                }, timeout.toMillis(), TimeUnit.MILLISECONDS);
+                future.whenComplete((ignored, error) -> timeoutTask.cancel(false));
+            }
+            this.sendChain = this.sendChain.<Void>thenCompose(ignored -> ws.sendText(payload, true).thenApply(sent -> {
+                NliConstants.LOG.info("[P2P][jsonrpc] Sent request id={} method={}", id, method);
+                return null;
+            })).exceptionally(error -> {
                 this.executor.execute(() -> {
                     CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id);
                     if (pending != null) {

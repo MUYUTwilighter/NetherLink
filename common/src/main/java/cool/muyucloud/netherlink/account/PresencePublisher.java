@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import cool.muyucloud.netherlink.ExternalNetwork;
 import cool.muyucloud.netherlink.NliConstants;
 import org.jspecify.annotations.Nullable;
 
@@ -12,13 +13,16 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class PresencePublisher {
     private static final URI PRESENCE_URI = URI.create("https://api.minecraftservices.com/presence");
-    private final HttpClient http = HttpClient.newHttpClient();
+    private final HttpClient http = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(15L))
+        .build();
 
     public Map<UUID, UUID> publish(MinecraftAccount account) {
         NliConstants.LOG.info("Publishing NetherLink presence as PLAYING_HOSTED_SERVER for {}", account.getMcProfileName());
@@ -45,12 +49,15 @@ public class PresencePublisher {
             requestBody.add("joinInfo", joinInfo);
         }
 
+        ExternalNetwork.logCurrentPrefs("Publishing presence " + status);
         HttpRequest request = HttpRequest.newBuilder(PRESENCE_URI)
+            .timeout(Duration.ofSeconds(20L))
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
             .build();
         try {
+            NliConstants.LOG.info("Sending presence {} request to {}", status, PRESENCE_URI);
             HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 401) {
                 throw new UnauthorizedException("Presence " + status + " failed: HTTP 401");

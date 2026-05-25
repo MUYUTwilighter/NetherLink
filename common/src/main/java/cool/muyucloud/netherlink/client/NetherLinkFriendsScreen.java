@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.client;
 
+import cool.muyucloud.netherlink.NliConstants;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -8,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +21,6 @@ public class NetherLinkFriendsScreen extends Screen {
     private ClientFriendService service;
     private EditBox addName;
     private Button refreshButton;
-    private Button addButton;
     private Button joinButton;
     private Button removeButton;
     private Button acceptButton;
@@ -46,7 +47,7 @@ public class NetherLinkFriendsScreen extends Screen {
         this.addName.setHint(Component.translatable("netherlink.friends.add.hint"));
         this.addName.setMaxLength(32);
         this.refreshButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.refresh"), button -> this.refresh()).bounds(left, this.height - 30, 98, 20).build());
-        this.addButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.add"), button -> this.addFriend()).bounds(left + 210, this.height - 56, 98, 20).build());
+//        Button addButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.add"), button -> this.addFriend()).bounds(left + 210, this.height - 56, 98, 20).build());
         this.joinButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.join"), button -> this.joinSelected()).bounds(left + 210, top, 98, 20).build());
         this.removeButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.remove"), button -> this.removeSelected()).bounds(left + 210, top + 24, 98, 20).build());
         this.acceptButton = this.addRenderableWidget(Button.builder(Component.translatable("netherlink.friends.accept"), button -> this.acceptSelected()).bounds(left + 210, top + 48, 98, 20).build());
@@ -114,13 +115,24 @@ public class NetherLinkFriendsScreen extends Screen {
     private void joinSelected() {
         ClientFriendService.Entry entry = this.selectedEntry();
         if (entry == null || entry.pmid() == null) {
+            NliConstants.LOG.warn("[P2P][friends] Join selected without joinable PMID entryPresent={}", entry != null);
             return;
         }
+        NliConstants.LOG.info(
+            "[P2P][friends] Joining friend name={} profileId={} pmid={} status={} joinable={}",
+            entry.name(),
+            entry.profileId(),
+            entry.pmid(),
+            entry.status(),
+            entry.joinable()
+        );
         this.status = Component.translatable("netherlink.friends.joining", entry.name()).withStyle(ChatFormatting.YELLOW);
         ClientJoinController.join(this.minecraft, entry.pmid()).whenComplete((ignored, error) -> this.minecraft.execute(() -> {
             if (error != null) {
+                NliConstants.LOG.error("[P2P][friends] Join action failed for {}: {}", entry.name(), error, error);
                 this.status = Component.translatable("netherlink.friends.join_failed", error.getMessage()).withStyle(ChatFormatting.RED);
             } else {
+                NliConstants.LOG.info("[P2P][friends] Join action completed for {}", entry.name());
                 this.status = Component.translatable("netherlink.friends.join_sent", entry.name()).withStyle(ChatFormatting.GRAY);
             }
         }));
@@ -141,7 +153,7 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
         int left = this.width / 2 - 154;
         int y = 42;
         List<ClientFriendService.Entry> visible = this.visibleEntries();
@@ -157,7 +169,7 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float a) {
+    public void render(@NonNull GuiGraphics graphics, int mouseX, int mouseY, float a) {
         super.render(graphics, mouseX, mouseY, a);
         int left = this.width / 2 - 154;
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 18, -1);

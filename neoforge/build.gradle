@@ -44,8 +44,18 @@ neoForge {
     }
 }
 
+configurations {
+    webrtcApiEmbed {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
 dependencies {
-    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")) {
+    implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    webrtcApiEmbed "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")) {
         version {
             prefer webrtc_version
         }
@@ -55,21 +65,15 @@ dependencies {
     runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 }
 
-configurations {
-    webrtcNative {
-        canBeResolved = true
-        canBeConsumed = false
-        transitive = false
-    }
-}
-
-dependencies {
-    webrtcNative "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-}
-
 tasks.named('jar', Jar) {
-    from({ configurations.webrtcNative.collect { zipTree(it) } }) {
-        include '*.dll'
+    dependsOn configurations.webrtcApiEmbed
+    from({
+        configurations.webrtcApiEmbed.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.RSA'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
     }
 }
 

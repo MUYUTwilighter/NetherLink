@@ -32,6 +32,7 @@ public final class ClientP2PController {
     }
 
     public static void setFriendsOpen(Minecraft minecraft, IntegratedServer integratedServer, boolean open) {
+        NliConstants.LOG.info("[P2P][client] Setting friends access open={} published={}", open, integratedServer.isPublished());
         ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(open);
         if (open) {
             publish(minecraft, integratedServer);
@@ -42,11 +43,14 @@ public final class ClientP2PController {
 
     public static void publish(Minecraft minecraft, IntegratedServer integratedServer) {
         if (!integratedServer.isPublished()) {
+            NliConstants.LOG.info("[P2P][client] Skipping friends access publish because integrated server is not published yet");
             return;
         }
         if (!PENDING.compareAndSet(false, true)) {
+            NliConstants.LOG.info("[P2P][client] Skipping friends access publish because another publish is pending");
             return;
         }
+        NliConstants.LOG.info("[P2P][client] Scheduling friends access publish");
         EXECUTOR.execute(() -> {
             try {
                 LauncherSessionAccount sessionAccount = new LauncherSessionAccount(minecraft.getUser());
@@ -61,7 +65,9 @@ public final class ClientP2PController {
                 server = integratedServer;
                 manager = new ServerP2PManager("launcher:" + sessionAccount.getMcProfileName(), sessionAccount, integratedServer);
                 manager.start();
+                NliConstants.LOG.info("[P2P][client] Waiting for signaling before publishing presence");
                 awaitSignalingReady(manager);
+                NliConstants.LOG.info("[P2P][client] Signaling ready; publishing presence");
                 manager.updatePresence(PRESENCE.publish(sessionAccount));
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
                 message(minecraft, Component.translatable("netherlink.client.friends.opened"));

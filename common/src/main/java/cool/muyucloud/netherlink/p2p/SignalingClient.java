@@ -4,6 +4,7 @@ import com.google.gson.*;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import cool.muyucloud.netherlink.ExternalNetwork;
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.core.UUIDUtil;
@@ -21,12 +22,13 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public final class SignalingClient {
     private static final Codec<String> SIGNALING_URI_CODEC = Codec.STRING.fieldOf("signalingUri").codec().fieldOf("result").codec();
     private static final Duration PING_INTERVAL = Duration.ofSeconds(50L);
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15L);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30L);
     private static final String HEADER_AUTH = "x-mojangauth";
     private static final String HEADER_SESSION_ID = "Session-Id";
     private static final String HEADER_REQUEST_ID = "Request-Id";
@@ -38,6 +40,7 @@ public final class SignalingClient {
     private final String accessToken;
     private final String sessionId = UUID.randomUUID().toString();
     private final ScheduledExecutorService executor;
+    private final ExecutorService httpExecutor;
     private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
     private @Nullable HttpClient httpClient;
     private @Nullable CompletableFuture<JsonRpcClient> websocketConnect;
@@ -52,6 +55,12 @@ public final class SignalingClient {
         this.accessToken = accessToken;
         this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, threadName);
+            thread.setDaemon(true);
+            return thread;
+        });
+        AtomicInteger httpThreadId = new AtomicInteger();
+        this.httpExecutor = Executors.newCachedThreadPool(r -> {
+            Thread thread = new Thread(r, threadName + " HTTP #" + httpThreadId.incrementAndGet());
             thread.setDaemon(true);
             return thread;
         });
@@ -89,6 +98,7 @@ public final class SignalingClient {
             this.friendJoinHandler = null;
             this.webRtcSignalingHandler = null;
             this.teardown("shutdown");
+            this.httpExecutor.shutdownNow();
             this.executor.shutdown();
         });
     }
@@ -133,27 +143,59 @@ public final class SignalingClient {
     private CompletableFuture<JsonElement> sendRequest(String method, List<JsonElement> params) {
         return this.websocketConnect == null
             ? CompletableFuture.failedFuture(new IllegalStateException("Signaling is not connected; call connect() first"))
-            : this.websocketConnect.thenCompose(rpc -> rpc.sendRequest(method, params).orTimeout(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS));
+            : this.websocketConnect.thenCompose(rpc -> rpc.sendRequest(method, params, REQUEST_TIMEOUT));
     }
 
     private CompletableFuture<RTCIceServer> refreshTurnAuth() {
+        return this.refreshTurnAuth(false);
+    }
+
+    private CompletableFuture<RTCIceServer> refreshTurnAuth(boolean retry) {
         NliConstants.LOG.info("[P2P][signaling] Requesting TURN auth");
-        return this.sendRequest("Signaling_TurnAuth_v1_0", List.of())
-            .whenComplete((ignored, error) -> {
-                if (error != null) {
-                    NliConstants.LOG.warn("[P2P][signaling] TURN auth request failed: {}", error.toString());
-                }
-            })
+        return this.refreshTurnAuthResponse(retry)
             .exceptionallyCompose(error -> CompletableFuture.failedFuture(
                 this.mapTurnAuthError(error)
             ))
             .thenApplyAsync(result -> {
+                NliConstants.LOG.info("[P2P][signaling] TURN auth response received");
                 TurnAuthResult turnAuth = TurnAuthResult.CODEC.parse(JsonOps.INSTANCE, result)
                     .getOrThrow(message -> new IllegalStateException("Malformed TurnAuth response: " + message));
                 this.cachedTurn = new CachedTurn(turnAuth);
                 NliConstants.LOG.info("[P2P][signaling] Received TURN auth with {} server entries", turnAuth.turnAuthServers().size());
                 return turnAuth.toRtcIceServer();
             }, this.executor);
+    }
+
+    private CompletableFuture<JsonElement> refreshTurnAuthResponse(boolean retry) {
+        ExternalNetwork.logCurrentPrefs("Requesting TURN auth");
+        logNetworkPreferences("Requesting TURN auth");
+        return this.sendRequest("Signaling_TurnAuth_v1_0", List.of())
+            .whenComplete((ignored, error) -> {
+                if (error != null) {
+                    NliConstants.LOG.warn("[P2P][signaling] TURN auth request failed: {}", error.toString());
+                }
+            })
+            .exceptionallyComposeAsync(error -> {
+                if (!retry && isTimeout(error)) {
+                    NliConstants.LOG.warn("[P2P][signaling] TURN auth timed out; reconnecting signaling session and retrying once");
+                    this.cachedSignalingUri = null;
+                    this.teardown("TURN auth timeout");
+                    this.connectWebSocket();
+                    return this.refreshTurnAuthResponse(true);
+                }
+                return CompletableFuture.failedFuture(error);
+            }, this.executor);
+    }
+
+    private static boolean isTimeout(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof TimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private Throwable mapTurnAuthError(Throwable error) {
@@ -173,7 +215,10 @@ public final class SignalingClient {
             NliConstants.LOG.debug("[P2P][signaling] Connect skipped; websocket already pending/connected");
             return;
         }
-        HttpClient client = HttpClient.newHttpClient();
+        HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(15L))
+            .executor(this.httpExecutor)
+            .build();
         this.httpClient = client;
         JsonRpcClient rpc = new JsonRpcClient(this.executor, this::onRpcMethod, this::onWebsocketDown);
         String requestId = UUID.randomUUID().toString();
@@ -202,6 +247,8 @@ public final class SignalingClient {
             NliConstants.LOG.debug("[P2P][signaling] Using cached signaling URI");
             return CompletableFuture.completedFuture(cached.wsUrl());
         }
+        ExternalNetwork.logCurrentPrefs("Fetching signaling configuration");
+        logNetworkPreferences("Fetching signaling configuration");
         NliConstants.LOG.info("[P2P][signaling] Fetching signaling configuration from {}", ENVIRONMENT.getConfigurationUri());
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(ENVIRONMENT.getConfigurationUri()))
@@ -228,6 +275,7 @@ public final class SignalingClient {
     }
 
     private CompletableFuture<JsonRpcClient> openWebSocket(HttpClient client, JsonRpcClient rpc, String wsUrl, String requestId) {
+        ExternalNetwork.logCurrentPrefs("Opening signaling websocket");
         return client.newWebSocketBuilder()
             .header(HEADER_AUTH, this.accessToken)
             .header(HEADER_SESSION_ID, this.sessionId)
@@ -265,7 +313,13 @@ public final class SignalingClient {
         this.pendingTurnRefresh = null;
         connectFuture.whenComplete((rpc, error) -> {
             CompletableFuture<?> closed = rpc != null ? rpc.close() : CompletableFuture.completedFuture(null);
-            closed.whenComplete((ignored, closeError) -> CompletableFuture.runAsync(client::close));
+            closed.whenComplete((ignored, closeError) -> {
+                try {
+                    client.close();
+                } catch (RuntimeException closeError2) {
+                    NliConstants.LOG.debug("[P2P][signaling] HttpClient close failed", closeError2);
+                }
+            });
         });
         connectFuture.completeExceptionally(new IllegalStateException("Signaling torn down: " + reason));
         this.httpClient = null;
@@ -337,6 +391,15 @@ public final class SignalingClient {
         for (ConnectionListener listener : this.connectionListeners) {
             action.accept(listener);
         }
+    }
+
+    private static void logNetworkPreferences(String action) {
+        NliConstants.LOG.info(
+            "[P2P][signaling] {} network prefs preferIPv4Stack={} preferIPv6Addresses={}",
+            action,
+            System.getProperty("java.net.preferIPv4Stack"),
+            System.getProperty("java.net.preferIPv6Addresses")
+        );
     }
 
     @FunctionalInterface

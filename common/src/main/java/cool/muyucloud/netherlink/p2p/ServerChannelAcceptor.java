@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink.p2p;
 
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -32,8 +31,9 @@ public final class ServerChannelAcceptor {
                 Connection connection = rateLimitPacketsPerSecond > 0
                     ? new RateKickingConnection(rateLimitPacketsPerSecond)
                     : new Connection(PacketFlow.SERVERBOUND);
-                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
+                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", new ReadTimeoutHandler(30));
                 Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND, false, null);
+                pipeline.addLast("netherlink_platform", new RtcConnectionPlatformHandler("server"));
                 connection.configurePacketHandler(pipeline);
                 connection.setListenerForServerboundHandshake(new ServerHandshakePacketListenerImpl(server, connection));
                 setIntendedProfileId(connection, profileId);

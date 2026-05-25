@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.mixin;
 
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.client.ClientLanSettings;
 import cool.muyucloud.netherlink.client.ClientP2PController;
 import cool.muyucloud.netherlink.client.NetherLinkIntegratedServer;
@@ -37,6 +38,11 @@ public abstract class IntegratedServerMixin implements NetherLinkIntegratedServe
 
     @Inject(method = "publishServer", at = @At("RETURN"))
     private void onPublishServer(@Nullable GameType gameMode, boolean allowCommands, int port, CallbackInfoReturnable<Boolean> cir) {
+        NliConstants.LOG.info(
+            "[P2P][client] IntegratedServer.publishServer returned {} friendsOpen={}",
+            cir.getReturnValueZ(),
+            ClientLanSettings.friendsOpen()
+        );
         if (cir.getReturnValueZ()) {
             ClientP2PController.setFriendsOpen(this.minecraft, (IntegratedServer)(Object)this, ClientLanSettings.friendsOpen());
         }

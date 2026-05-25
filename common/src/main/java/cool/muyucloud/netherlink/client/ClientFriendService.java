@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import cool.muyucloud.netherlink.ExternalNetwork;
 import cool.muyucloud.netherlink.NliConstants;
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
@@ -13,6 +14,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -27,7 +29,9 @@ public final class ClientFriendService {
         return thread;
     });
 
-    private final HttpClient http = HttpClient.newHttpClient();
+    private final HttpClient http = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(15L))
+        .build();
     private final String accessToken;
     private @Nullable String friendsEtag;
     private @Nullable String presenceEtag;
@@ -72,7 +76,10 @@ public final class ClientFriendService {
     }
 
     private FriendLists getFriends() {
-        HttpRequest.Builder builder = this.authorized(FRIENDS_URI).GET();
+        ExternalNetwork.logCurrentPrefs("Fetching friends");
+        HttpRequest.Builder builder = this.authorized(FRIENDS_URI)
+            .timeout(Duration.ofSeconds(20L))
+            .GET();
         if (this.friendsEtag != null) {
             builder.header("If-None-Match", this.friendsEtag);
         }
@@ -97,7 +104,9 @@ public final class ClientFriendService {
     private Map<UUID, Presence> getPresence() {
         JsonObject body = new JsonObject();
         body.addProperty("status", "ONLINE");
+        ExternalNetwork.logCurrentPrefs("Fetching friend presence");
         HttpRequest.Builder builder = this.authorized(PRESENCE_URI)
+            .timeout(Duration.ofSeconds(20L))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body.toString()));
         if (this.presenceEtag != null) {
@@ -135,7 +144,9 @@ public final class ClientFriendService {
         }
         body.addProperty("updateType", updateType);
 
+        ExternalNetwork.logCurrentPrefs("Updating friend relationship");
         HttpRequest request = this.authorized(FRIENDS_URI)
+            .timeout(Duration.ofSeconds(20L))
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(body.toString()))
             .build();
