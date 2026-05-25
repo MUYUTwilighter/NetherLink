@@ -9,7 +9,6 @@ import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.p2p.ServerP2PManager;
 import cool.muyucloud.netherlink.p2p.SignalingException;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
@@ -71,7 +70,7 @@ public class AccountManager {
             ACCOUNTS.put(profileName, account);
             REQUESTS.put(profileName, request);
             dump(profileName);
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account stored as \"" + profileName + "\"."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account stored as \"" + profileName + "\"."));
         } catch (NetherLinkAuthException e) {
             NliConstants.LOG.warn("Failed to add NetherLink account", e);
             throw e;
@@ -97,11 +96,11 @@ public class AccountManager {
     public static void refresh(@NotNull String name, boolean force, @NotNull Messenger messenger) {
         Account account = ACCOUNTS.get(name);
         if (account == null) {
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" was not found."));
             return;
         }
         if (!account.isEnabled()) {
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account %s is disabled".formatted(name)));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account %s is disabled".formatted(name)));
             return;
         }
         AuthRequest request = REQUESTS.computeIfAbsent(name, ignored -> new AuthRequest(account, messenger));
@@ -174,7 +173,7 @@ public class AccountManager {
     }
 
     public static void disconnectPlayersForShutdown(MinecraftServer server) {
-        if (server.getPlayerList() == null || server.getPlayerList().getPlayers().isEmpty()) {
+        if (server.getPlayerList().getPlayers().isEmpty()) {
             return;
         }
         NliConstants.LOG.info("Disconnecting players before NetherLink P2P shutdown");
@@ -251,7 +250,7 @@ public class AccountManager {
         if (currentServer == null) {
             throw new NetherLinkAuthException("Minecraft server is not ready");
         }
-        refresh(name, false, (Messenger)(Object)currentServer);
+        refresh(name, false, (Messenger) currentServer);
         ServerP2PManager manager;
         Map<java.util.UUID, java.util.UUID> presence;
         try {
@@ -263,7 +262,7 @@ public class AccountManager {
                 throw e;
             }
             NliConstants.LOG.warn("Minecraft token for {} was rejected, refreshing and retrying publish once", name);
-            refresh(name, true, (Messenger)(Object)currentServer);
+            refresh(name, true, (Messenger) currentServer);
             stopP2P(name);
             manager = ensureP2P(name, account, currentServer);
             awaitSignalingReady(manager);
@@ -292,7 +291,7 @@ public class AccountManager {
                     throw e;
                 }
                 NliConstants.LOG.warn("Presence revoke for {} was unauthorized, refreshing Minecraft token and retrying once", name);
-                refresh(name, true, (Messenger)(Object)currentServer);
+                refresh(name, true, (Messenger) currentServer);
                 PRESENCE.revoke(account);
             }
         }
@@ -319,41 +318,41 @@ public class AccountManager {
 
     public static void publish(String name, Messenger messenger) {
         if (!ACCOUNTS.containsKey(name)) {
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" was not found."));
             return;
         }
         publish(name);
-        messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" published."));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" published."));
     }
 
     public static void publish(Messenger messenger) {
         publish();
-        messenger.nli$sendMessage(() -> Component.literal("Published NetherLink accounts."));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("Published NetherLink accounts."));
     }
 
     public static void revoke(String name, Messenger messenger) {
         if (!ACCOUNTS.containsKey(name)) {
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" was not found."));
             return;
         }
         revoke(name);
-        messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" revoked."));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" revoked."));
     }
 
     public static void revoke(Messenger messenger) {
         revoke();
-        messenger.nli$sendMessage(() -> Component.literal("Revoked NetherLink accounts."));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("Revoked NetherLink accounts."));
     }
 
     public static void toggle(String name, Messenger messenger) {
         Account account = ACCOUNTS.get(name);
         if (account == null) {
-            messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" was not found."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" was not found."));
             return;
         }
         boolean enabled = !account.isEnabled();
         setInability(name, enabled);
-        messenger.nli$sendMessage(() -> Component.literal("NetherLink account \"" + name + "\" is now " + (enabled ? "enabled" : "disabled") + "."));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account \"" + name + "\" is now " + (enabled ? "enabled" : "disabled") + "."));
     }
 
     public static Collection<String> names() {
@@ -362,15 +361,15 @@ public class AccountManager {
 
     public static void list(Messenger messenger) {
         if (ACCOUNTS.isEmpty()) {
-            messenger.nli$sendMessage(() -> Component.literal("No NetherLink accounts configured."));
+            messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("No NetherLink accounts configured."));
             return;
         }
 
-        messenger.nli$sendMessage(() -> Component.literal("NetherLink accounts:"));
+        messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink accounts:"));
         ACCOUNTS.entrySet()
             .stream()
             .sorted(Map.Entry.comparingByKey())
-            .forEach(entry -> messenger.nli$sendMessage(() -> Component.literal(formatStatus(entry.getKey(), entry.getValue()))));
+            .forEach(entry -> messenger.nli$sendMessage(() -> new net.minecraft.network.chat.TextComponent(formatStatus(entry.getKey(), entry.getValue()))));
     }
 
     private static String formatStatus(String name, Account account) {

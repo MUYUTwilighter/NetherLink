@@ -26,7 +26,6 @@ public final class ClientP2PController {
     private static final AtomicBoolean PENDING = new AtomicBoolean();
     private static ServerP2PManager manager;
     private static LauncherSessionAccount account;
-    private static IntegratedServer server;
 
     private ClientP2PController() {
     }
@@ -53,26 +52,25 @@ public final class ClientP2PController {
                 if (!sessionAccount.isUsable()) {
                     ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
                     NliConstants.LOG.warn("Launcher account is missing Minecraft token or PMID; NetherLink friends access is unavailable");
-                    message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
+                    message(minecraft, new net.minecraft.network.chat.TranslatableComponent("netherlink.client.friends.unavailable"));
                     return;
                 }
                 stopManager();
                 account = sessionAccount;
-                server = integratedServer;
                 manager = new ServerP2PManager("launcher:" + sessionAccount.getMcProfileName(), sessionAccount, integratedServer);
                 manager.start();
                 awaitSignalingReady(manager);
                 manager.updatePresence(PRESENCE.publish(sessionAccount));
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
-                message(minecraft, Component.translatable("netherlink.client.friends.opened"));
+                message(minecraft, new net.minecraft.network.chat.TranslatableComponent("netherlink.client.friends.opened"));
             } catch (RuntimeException e) {
                 ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
                 if (isMinecraftTokenRejected(e)) {
                     NliConstants.LOG.warn("Launcher Minecraft token was rejected; restart the game to get a fresh token", e);
-                    message(minecraft, Component.translatable("netherlink.client.friends.token_rejected"));
+                    message(minecraft, new net.minecraft.network.chat.TranslatableComponent("netherlink.client.friends.token_rejected"));
                 } else {
                     NliConstants.LOG.warn("Failed to publish NetherLink client presence", e);
-                    message(minecraft, Component.translatable("netherlink.client.friends.failed"));
+                    message(minecraft, new net.minecraft.network.chat.TranslatableComponent("netherlink.client.friends.failed"));
                 }
                 stopManager();
             } finally {
@@ -91,7 +89,7 @@ public final class ClientP2PController {
                 NliConstants.LOG.warn("Failed to revoke NetherLink client presence", e);
             } finally {
                 stopManager();
-                message(minecraft, Component.translatable("netherlink.client.friends.closed"));
+                message(minecraft, new net.minecraft.network.chat.TranslatableComponent("netherlink.client.friends.closed"));
             }
         });
     }
@@ -114,10 +112,6 @@ public final class ClientP2PController {
         return ((NetherLinkIntegratedServer)integratedServer).nli$isFriendsOpen();
     }
 
-    public static boolean isPublishedBy(IntegratedServer integratedServer) {
-        return server == integratedServer && manager != null;
-    }
-
     private static void awaitSignalingReady(ServerP2PManager p2pManager) {
         try {
             p2pManager.awaitSignalingReady(SIGNALING_READY_TIMEOUT).join();
@@ -132,15 +126,10 @@ public final class ClientP2PController {
             manager = null;
         }
         account = null;
-        server = null;
     }
 
     private static void message(Minecraft minecraft, Component message) {
-        minecraft.execute(() -> {
-            if (minecraft.gui != null) {
-                minecraft.gui.getChat().addMessage(message);
-            }
-        });
+        minecraft.execute(() -> minecraft.gui.getChat().addMessage(message));
     }
 
     private static boolean isMinecraftTokenRejected(Throwable error) {

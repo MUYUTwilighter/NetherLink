@@ -6,7 +6,6 @@ import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.RTCIceServer;
-import net.minecraft.core.UUIDUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
@@ -24,6 +23,7 @@ import java.util.function.Consumer;
 
 public final class SignalingClient {
     private static final Codec<String> SIGNALING_URI_CODEC = Codec.STRING.fieldOf("signalingUri").codec().fieldOf("result").codec();
+    private static final Codec<UUID> UUID_CODEC = Codec.STRING.xmap(UUID::fromString, UUID::toString);
     private static final Duration PING_INTERVAL = Duration.ofSeconds(50L);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15L);
     private static final String HEADER_AUTH = "x-mojangauth";
@@ -109,9 +109,9 @@ public final class SignalingClient {
                 if (error.getCause() instanceof JsonRpcException rpcError) {
                     SignalingException mapped = SignalingErrorMapper.fromJsonRpc(toPlayerId, rpcError);
                     this.fireListeners(listener -> listener.onSignalingError(toPlayerId, mapped));
-                    return CompletableFuture.<Void>failedFuture(mapped);
+                    return CompletableFuture.failedFuture(mapped);
                 }
-                return CompletableFuture.<Void>failedFuture(error);
+                return CompletableFuture.failedFuture(error);
             });
     }
 
@@ -206,6 +206,7 @@ public final class SignalingClient {
             NliConstants.LOG.debug("[P2P][signaling] Using cached signaling URI");
             return CompletableFuture.completedFuture(cached.wsUrl());
         }
+        assert ENVIRONMENT != null;
         NliConstants.LOG.info("[P2P][signaling] Fetching signaling configuration from {}", ENVIRONMENT.getConfigurationUri());
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(ENVIRONMENT.getConfigurationUri()))
@@ -404,7 +405,7 @@ public final class SignalingClient {
             instance -> instance.group(
                     Codec.STRING.fieldOf("From").forGetter(ClientWebRtcMessage::from),
                     Codec.STRING.fieldOf("Message").forGetter(ClientWebRtcMessage::message),
-                    UUIDUtil.STRING_CODEC.optionalFieldOf("Id").forGetter(message -> Optional.ofNullable(message.id()))
+                    UUID_CODEC.optionalFieldOf("Id").forGetter(message -> Optional.ofNullable(message.id()))
                 )
                 .apply(instance, (from, message, id) -> new ClientWebRtcMessage(from, message, id.orElse(null)))
         );

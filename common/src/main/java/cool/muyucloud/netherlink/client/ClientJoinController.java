@@ -12,7 +12,6 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
-import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.PacketFlow;
@@ -20,7 +19,6 @@ import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -102,7 +100,7 @@ public final class ClientJoinController {
         account = current;
         signaling = new SignalingClient(current.getMcToken(), "NetherLink Client Signaling");
         signaling.setFriendJoinHandler((fromPmid, message) -> handleFriendJoin(minecraft, fromPmid, message));
-        signaling.setWebRtcSignalingHandler((fromPmid, message) -> handleWebRtc(minecraft, fromPmid, message));
+        signaling.setWebRtcSignalingHandler(ClientJoinController::handleWebRtc);
     }
 
     private static void handleFriendJoin(Minecraft minecraft, UUID fromPmid, SignalingMessage.FriendJoin message) {
@@ -158,7 +156,7 @@ public final class ClientJoinController {
             .thenCompose(offer -> client.sendClientMessage(hostPmid, new SignalingMessage.WebRtc.Offer(sessionId, offer)));
     }
 
-    private static void handleWebRtc(Minecraft minecraft, UUID fromPmid, SignalingMessage.WebRtc message) {
+    private static void handleWebRtc(UUID fromPmid, SignalingMessage.WebRtc message) {
         OutgoingJoin join = OUTGOING.get(fromPmid);
         RtcHandshake handshake = join != null ? join.handshake() : null;
         if (handshake == null || !handshake.id().equals(message.sessionId())) {
@@ -192,16 +190,8 @@ public final class ClientJoinController {
                 rtcConnection.channel().isActive(),
                 rtcConnection.channel().isOpen()
             );
-            connection.setListener(new ClientHandshakePacketListenerImpl(
-                connection,
-                minecraft,
-                new ServerData("NetherLink", "rtc-peer", false),
-                null,
-                false,
-                null,
-                component -> {
-                }
-            ));
+            connection.setListener(new ClientHandshakePacketListenerImpl(connection, minecraft, null, component -> {
+            }));
             ((MinecraftConnectionAccess)minecraft).nli$setPendingConnection(connection);
             NliConstants.LOG.info("[P2P][client][{}] Pending connection installed, scheduling login packets", sessionId);
             rtcConnection.channel().eventLoop().execute(() -> {
@@ -214,9 +204,9 @@ public final class ClientJoinController {
                         "[P2P][client][{}] Sending ServerboundHelloPacket name={} profile={}",
                         sessionId,
                         minecraft.getUser().getName(),
-                        minecraft.getUser().getProfileId()
+                        minecraft.getUser().getGameProfile().getId()
                     );
-                    connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), Optional.ofNullable(minecraft.getUser().getProfileId())));
+                    connection.send(new ServerboundHelloPacket(minecraft.getUser().getGameProfile()));
                 } catch (Throwable error) {
                     NliConstants.LOG.error("[P2P][client][{}] Failed while starting Minecraft login over RTC", sessionId, error);
                     throw error;
@@ -233,8 +223,8 @@ public final class ClientJoinController {
             protected void initChannel(Channel ch) {
                 ChannelPipeline pipeline = ch.pipeline()
                     .addLast("nli_diagnostics", new ClientDiagnosticsHandler(sessionId, connection))
-                    .addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
-                Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND);
+                    .addLast("timeout", new ReadTimeoutHandler(30));
+                NetworkPipelineCompatibility.configureSerialization(pipeline, PacketFlow.CLIENTBOUND);
                 pipeline.addLast("nli_packet_diagnostics", new ClientPacketDiagnosticsHandler(sessionId, connection));
                 pipeline.addLast("packet_handler", connection);
             }
@@ -329,7 +319,7 @@ public final class ClientJoinController {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener().getClass().getName();
         }
     }
 
@@ -361,7 +351,7 @@ public final class ClientJoinController {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener().getClass().getName();
         }
     }
 

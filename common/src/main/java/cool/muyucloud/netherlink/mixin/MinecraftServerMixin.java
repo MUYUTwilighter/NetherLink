@@ -2,6 +2,7 @@ package cool.muyucloud.netherlink.mixin;
 
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
+import net.minecraft.Util;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,7 +20,7 @@ public abstract class MinecraftServerMixin implements Messenger {
     public abstract int getTickCount();
 
     @Shadow
-    public abstract void sendSystemMessage(Component message);
+    public abstract void sendMessage(Component component, java.util.UUID senderUUID);
 
     @Inject(method = "tickServer", at = @At("TAIL"))
     private void afterTickServer(BooleanSupplier haveTime, CallbackInfo ci) {
@@ -28,7 +29,7 @@ public abstract class MinecraftServerMixin implements Messenger {
 
     @Override
     public void nli$sendMessage(Supplier<Component> msg) {
-        this.sendSystemMessage(msg.get());
+        this.sendMessage(msg.get(), Util.NIL_UUID);
     }
 
     @Override

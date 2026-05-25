@@ -197,7 +197,7 @@ public class AuthRequest {
             }
             account.setMcProfileId(requiredString(response, "id"));
             account.setMcProfileName(requiredString(response, "name"));
-            sendMessage(() -> Component.literal("NetherLink account logged in as " + account.getMcProfileName() + "."));
+            sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink account logged in as " + account.getMcProfileName() + "."));
         } finally {
             pendingProfileId = false;
         }
@@ -266,29 +266,29 @@ public class AuthRequest {
     }
 
     private void sendDeviceCodeMessage(Endpoint endpoint) {
-        sendMessage(() -> Component.literal("NetherLink login started"));
+        sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink login started"));
         String uri = endpoint.getVerificationUriComplete() != null ? endpoint.getVerificationUriComplete() : endpoint.getVerificationUri();
-        sendMessage(() -> Component.literal("Open: ").append(openUrl(uri)));
-        sendMessage(() -> Component.literal("Code: ").append(copyToClipboard(endpoint.getUserCode())));
-        sendMessage(() -> Component.literal("Expires in: " + endpoint.getExpiresIn() / 60L + " minutes"));
+        sendMessage(() -> new net.minecraft.network.chat.TextComponent("Open: ").append(openUrl(uri)));
+        sendMessage(() -> new net.minecraft.network.chat.TextComponent("Code: ").append(copyToClipboard(endpoint.getUserCode())));
+        sendMessage(() -> new net.minecraft.network.chat.TextComponent("Expires in: " + endpoint.getExpiresIn() / 60L + " minutes"));
     }
 
     private static MutableComponent openUrl(String uri) {
-        return Component.literal(uri)
+        return new net.minecraft.network.chat.TextComponent(uri)
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.BLUE)
                 .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, uri))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Open login page"))));
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new net.minecraft.network.chat.TextComponent("Open login page"))));
     }
 
     private static MutableComponent copyToClipboard(String value) {
-        return Component.literal(value)
+        return new net.minecraft.network.chat.TextComponent(value)
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.GREEN)
                 .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, value))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Copy to clipboard")))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new net.minecraft.network.chat.TextComponent("Copy to clipboard")))
                 .withInsertion(value));
     }
 
@@ -436,7 +436,7 @@ public class AuthRequest {
     }
 
     private NetherLinkAuthException fail(String message) {
-        sendMessage(() -> Component.literal("NetherLink login failed: " + message));
+        sendMessage(() -> new net.minecraft.network.chat.TextComponent("NetherLink login failed: " + message));
         return new NetherLinkAuthException(message);
     }
 

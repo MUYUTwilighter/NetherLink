@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import net.minecraft.client.User;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
@@ -20,17 +21,17 @@ public final class LauncherSessionAccount implements MinecraftAccount {
     }
 
     @Override
-    public @Nullable String getMcToken() {
+    public @NotNull String getMcToken() {
         return this.user.getAccessToken();
     }
 
     @Override
     public @Nullable String getMcProfileId() {
-        return this.user.getProfileId().toString();
+        return this.user.getGameProfile().getId().toString();
     }
 
     @Override
-    public @Nullable String getMcProfileName() {
+    public @NotNull String getMcProfileName() {
         return this.user.getName();
     }
 
@@ -40,7 +41,8 @@ public final class LauncherSessionAccount implements MinecraftAccount {
     }
 
     public boolean isUsable() {
-        return this.getMcToken() != null && !this.getMcToken().isBlank() && this.pmid != null && !this.pmid.isBlank();
+        this.getMcToken();
+        return !this.getMcToken().isBlank() && this.pmid != null && !this.pmid.isBlank();
     }
 
     private static @Nullable String extractPmid(String token) {

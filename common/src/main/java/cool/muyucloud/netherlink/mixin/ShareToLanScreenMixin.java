@@ -20,6 +20,7 @@ public abstract class ShareToLanScreenMixin extends Screen {
 
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
+        assert this.minecraft != null;
         IntegratedServer server = this.minecraft.getSingleplayerServer();
         boolean friendsOpen = server != null && ClientP2PController.isFriendsOpen(server);
         ClientLanSettings.setFriendsOpen(friendsOpen);
@@ -31,7 +32,7 @@ public abstract class ShareToLanScreenMixin extends Screen {
                     friendsButtonY,
                     310,
                     20,
-                    Component.translatable("netherlink.lan.friends"),
+                    new net.minecraft.network.chat.TranslatableComponent("netherlink.lan.friends"),
                     (button, value) -> ClientLanSettings.setFriendsOpen(value)
                 )
         );

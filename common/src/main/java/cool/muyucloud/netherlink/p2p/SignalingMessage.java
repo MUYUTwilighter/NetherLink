@@ -5,8 +5,8 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import net.minecraft.util.StringRepresentable;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
 import java.util.function.Supplier;
 
 public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, SignalingMessage.WebRtc {
@@ -14,10 +14,6 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
 
     static SignalingMessage joinAccepted(String sessionId) {
         return new FriendJoin.Accepted(sessionId);
-    }
-
-    static SignalingMessage joinRejected(String sessionId) {
-        return new FriendJoin.Rejected(sessionId);
     }
 
     static SignalingMessage answer(String sessionId, String sdp) {
@@ -131,7 +127,7 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
         ANSWER(() -> WebRtc.Answer.CODEC),
         ICE_CANDIDATE(() -> WebRtc.IceCandidate.CODEC);
 
-        private static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values);
+        private static final Codec<Type> CODEC = StringRepresentable.fromEnum(Type::values, Type::byName);
         private final Supplier<MapCodec<? extends SignalingMessage>> codec;
 
         Type(Supplier<MapCodec<? extends SignalingMessage>> codec) {
@@ -146,13 +142,19 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
             return this.codec().codec();
         }
 
+        private static Type byName(String name) {
+            for (Type type : values()) {
+                if (type.getSerializedName().equals(name)) {
+                    return type;
+                }
+            }
+            return null;
+        }
+
         @Override
-        public String getSerializedName() {
+        public @NotNull String getSerializedName() {
             return this.name();
         }
     }
 
-    static SignalingMessage inviteDeclined() {
-        return new FriendJoin.InviteDeclined(UUID.randomUUID().toString());
-    }
 }

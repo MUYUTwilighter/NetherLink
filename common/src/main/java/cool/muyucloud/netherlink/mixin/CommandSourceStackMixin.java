@@ -11,14 +11,14 @@ import java.util.function.Supplier;
 @Mixin(CommandSourceStack.class)
 public abstract class CommandSourceStackMixin implements Messenger {
     @Shadow
-    public abstract void sendSystemMessage(Component message);
+    public abstract void sendSuccess(Component message, boolean allowLogging);
 
     @Shadow
     public abstract boolean hasPermission(int level);
 
     @Override
     public void nli$sendMessage(Supplier<Component> msg) {
-        this.sendSystemMessage(msg.get());
+        this.sendSuccess(msg.get(), false);
     }
 
     @Override

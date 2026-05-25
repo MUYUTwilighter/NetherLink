@@ -41,8 +41,8 @@ public final class ServerChannelAcceptor {
                     : new Connection(PacketFlow.SERVERBOUND);
                 ChannelPipeline pipeline = ch.pipeline()
                     .addLast("nli_diagnostics", new ServerDiagnosticsHandler(profileId, connection))
-                    .addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
-                Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND);
+                    .addLast("timeout", new ReadTimeoutHandler(30));
+                NetworkPipelineCompatibility.configureSerialization(pipeline, PacketFlow.SERVERBOUND);
                 pipeline.addLast("nli_loader_login", new ServerLoaderLoginRegistrationHandler(profileId, connection));
                 pipeline.addLast("nli_packet_diagnostics", new ServerPacketDiagnosticsHandler(profileId, connection));
                 pipeline.addLast("packet_handler", connection);
@@ -50,9 +50,10 @@ public final class ServerChannelAcceptor {
                 NliConstants.LOG.info(
                     "[P2P-Netty][server] Server connection listener installed profile={} listener={}",
                     profileId,
-                    connection.getPacketListener() == null ? "<null>" : connection.getPacketListener().getClass().getName()
+                    connection.getPacketListener().getClass().getName()
                 );
                 setIntendedProfileId(connection, profileId);
+                assert listener != null;
                 listener.getConnections().add(connection);
                 NliConstants.LOG.info("[P2P-Netty][server] RTC connection added to server list profile={}", profileId);
             }
@@ -177,7 +178,7 @@ public final class ServerChannelAcceptor {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener().getClass().getName();
         }
     }
 
@@ -209,7 +210,7 @@ public final class ServerChannelAcceptor {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener().getClass().getName();
         }
     }
 }
