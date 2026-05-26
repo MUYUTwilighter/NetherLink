@@ -21,10 +21,11 @@ public final class RtcHandshake {
     private volatile @Nullable RTCDataChannel dataChannel;
 
     public RtcHandshake(PeerConnectionFactory factory, RTCConfiguration configuration, String id, boolean initiator, Consumer<RTCIceCandidate> onLocalCandidate) {
+        RtcThreadContext.warmup();
         this.id = id;
         this.initiator = initiator;
         this.onLocalCandidate = onLocalCandidate;
-        this.peerConnection = factory.createPeerConnection(configuration, new SessionObserver());
+        this.peerConnection = RtcThreadContext.call(() -> factory.createPeerConnection(configuration, new SessionObserver()));
     }
 
     public String id() {
@@ -186,15 +187,20 @@ public final class RtcHandshake {
     private void wireDataChannel(RTCDataChannel channel) {
         this.dataChannel = channel;
         NliConstants.LOG.info("[P2P][{}] DataChannel wired, current state={}", this.id, channel.getState());
-        channel.registerObserver(new RTCDataChannelObserver() {
+        RtcThreadContext.run(() -> channel.registerObserver(new RTCDataChannelObserver() {
             @Override
             public void onStateChange() {
-                RTCDataChannelState state = channel.getState();
-                NliConstants.LOG.info("[P2P][{}] DataChannel state -> {}", RtcHandshake.this.id, state);
-                if (state == RTCDataChannelState.OPEN) {
-                    RtcHandshake.this.markOpen(channel);
-                } else if (state == RTCDataChannelState.CLOSING || state == RTCDataChannelState.CLOSED) {
-                    RtcHandshake.this.failHandshake("Data channel " + state);
+                ClassLoader previous = RtcThreadContext.enter();
+                try {
+                    RTCDataChannelState state = channel.getState();
+                    NliConstants.LOG.info("[P2P][{}] DataChannel state -> {}", RtcHandshake.this.id, state);
+                    if (state == RTCDataChannelState.OPEN) {
+                        RtcHandshake.this.markOpen(channel);
+                    } else if (state == RTCDataChannelState.CLOSING || state == RTCDataChannelState.CLOSED) {
+                        RtcHandshake.this.failHandshake("Data channel " + state);
+                    }
+                } finally {
+                    RtcThreadContext.exit(previous);
                 }
             }
 
@@ -205,7 +211,7 @@ public final class RtcHandshake {
             @Override
             public void onBufferedAmountChange(long previousAmount) {
             }
-        });
+        }));
         if (channel.getState() == RTCDataChannelState.OPEN) {
             this.markOpen(channel);
         }
@@ -213,11 +219,11 @@ public final class RtcHandshake {
 
     private void markOpen(RTCDataChannel channel) {
         if (!this.result.isDone()) {
+            RtcThreadContext.run(channel::unregisterObserver);
             this.handedOff.set(true);
             if (!this.result.complete(new HandshakeResult(this.peerConnection, channel))) {
                 this.handedOff.set(false);
             } else {
-                channel.unregisterObserver();
                 NliConstants.LOG.info("[P2P][{}] handshake complete", this.id);
             }
         }
@@ -243,44 +249,79 @@ public final class RtcHandshake {
     private final class SessionObserver implements PeerConnectionObserver {
         @Override
         public void onIceCandidate(RTCIceCandidate candidate) {
-            if (!RtcHandshake.this.result.isDone()) {
-                NliConstants.LOG.debug("[P2P][{}] Local ICE candidate gathered mid={} line={}", RtcHandshake.this.id, candidate.sdpMid, candidate.sdpMLineIndex);
-                RtcHandshake.this.onLocalCandidate.accept(candidate);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                if (!RtcHandshake.this.result.isDone()) {
+                    NliConstants.LOG.debug("[P2P][{}] Local ICE candidate gathered mid={} line={}", RtcHandshake.this.id, candidate.sdpMid, candidate.sdpMLineIndex);
+                    RtcHandshake.this.onLocalCandidate.accept(candidate);
+                }
+            } finally {
+                RtcThreadContext.exit(previous);
             }
         }
 
         @Override
         public void onConnectionChange(RTCPeerConnectionState state) {
-            NliConstants.LOG.info("[P2P][{}] PeerConnection state -> {}", RtcHandshake.this.id, state);
-            if (state == RTCPeerConnectionState.FAILED || state == RTCPeerConnectionState.CLOSED) {
-                RtcHandshake.this.failHandshake("connection " + state);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.info("[P2P][{}] PeerConnection state -> {}", RtcHandshake.this.id, state);
+                if (state == RTCPeerConnectionState.FAILED || state == RTCPeerConnectionState.CLOSED) {
+                    RtcHandshake.this.failHandshake("connection " + state);
+                }
+            } finally {
+                RtcThreadContext.exit(previous);
             }
         }
 
         @Override
         public void onDataChannel(RTCDataChannel channel) {
-            NliConstants.LOG.info("[P2P][{}] DataChannel received from peer", RtcHandshake.this.id);
-            RtcHandshake.this.wireDataChannel(channel);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.info("[P2P][{}] DataChannel received from peer", RtcHandshake.this.id);
+                RtcHandshake.this.wireDataChannel(channel);
+            } finally {
+                RtcThreadContext.exit(previous);
+            }
         }
 
         @Override
         public void onSignalingChange(RTCSignalingState state) {
-            NliConstants.LOG.debug("[P2P][{}] Signaling state -> {}", RtcHandshake.this.id, state);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.debug("[P2P][{}] Signaling state -> {}", RtcHandshake.this.id, state);
+            } finally {
+                RtcThreadContext.exit(previous);
+            }
         }
 
         @Override
         public void onIceConnectionChange(RTCIceConnectionState state) {
-            NliConstants.LOG.info("[P2P][{}] ICE connection state -> {}", RtcHandshake.this.id, state);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.info("[P2P][{}] ICE connection state -> {}", RtcHandshake.this.id, state);
+            } finally {
+                RtcThreadContext.exit(previous);
+            }
         }
 
         @Override
         public void onIceGatheringChange(RTCIceGatheringState state) {
-            NliConstants.LOG.debug("[P2P][{}] ICE gathering state -> {}", RtcHandshake.this.id, state);
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.debug("[P2P][{}] ICE gathering state -> {}", RtcHandshake.this.id, state);
+            } finally {
+                RtcThreadContext.exit(previous);
+            }
         }
 
         @Override
         public void onIceCandidateError(RTCPeerConnectionIceErrorEvent event) {
-            NliConstants.LOG.warn("[P2P][{}] ICE error: url={} code={} text={}", RtcHandshake.this.id, event.getUrl(), event.getErrorCode(), event.getErrorText());
+            ClassLoader previous = RtcThreadContext.enter();
+            try {
+                NliConstants.LOG.warn("[P2P][{}] ICE error: url={} code={} text={}", RtcHandshake.this.id, event.getUrl(), event.getErrorCode(), event.getErrorText());
+            } finally {
+                RtcThreadContext.exit(previous);
+            }
         }
     }
 }

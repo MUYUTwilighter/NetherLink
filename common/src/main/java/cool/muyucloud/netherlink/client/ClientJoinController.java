@@ -216,7 +216,7 @@ public final class ClientJoinController {
     }
 
     private static RtcConnection connectionFromRtc(String sessionId, RtcHandshake.HandshakeResult handshakeResult) {
-        Connection connection = new Connection(PacketFlow.CLIENTBOUND);
+        Connection connection = new RtcMinecraftConnection(PacketFlow.CLIENTBOUND);
         Channel channel = new RtcChannel(handshakeResult);
         channel.pipeline().addLast(new ChannelInitializer<>() {
             @Override
@@ -319,7 +319,7 @@ public final class ClientJoinController {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
         }
     }
 
@@ -351,7 +351,7 @@ public final class ClientJoinController {
         }
 
         private String listenerName() {
-            return this.connection.getPacketListener().getClass().getName();
+            return this.connection.getPacketListener() == null ? "<null>" : this.connection.getPacketListener().getClass().getName();
         }
     }
 

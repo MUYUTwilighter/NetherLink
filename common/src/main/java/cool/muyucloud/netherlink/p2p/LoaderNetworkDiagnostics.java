@@ -63,13 +63,9 @@ public final class LoaderNetworkDiagnostics {
         try {
             method.invoke(null, args);
         } catch (IllegalAccessException e) {
-            throw new IllegalStateException("Failed to access Forge RTC diagnostics", e);
+            NliConstants.LOG.warn("[P2P-Netty] Failed to access loader RTC diagnostics", e);
         } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException runtime) {
-                throw runtime;
-            }
-            throw new IllegalStateException("Forge RTC diagnostics failed", cause);
+            NliConstants.LOG.warn("[P2P-Netty] Loader RTC diagnostics failed", e.getCause());
         }
     }
 }

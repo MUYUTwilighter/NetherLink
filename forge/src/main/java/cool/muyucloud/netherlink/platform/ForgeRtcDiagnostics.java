@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.platform;
 
 import cool.muyucloud.netherlink.NliConstants;
+import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
@@ -28,7 +29,7 @@ public final class ForgeRtcDiagnostics {
             fmlVersion(connection),
             connectionType(connection),
             handshakePresent(connection),
-            connection.channel().pipeline().names()
+            pipelineNames(connection)
         );
     }
 
@@ -56,7 +57,7 @@ public final class ForgeRtcDiagnostics {
             connection == null ? "<none>" : fmlVersion(connection),
             connection == null ? "<none>" : connectionType(connection),
             connection != null && handshakePresent(connection),
-            connection == null ? "<none>" : connection.channel().pipeline().names()
+            connection == null ? "<none>" : pipelineNames(connection)
         );
     }
 
@@ -64,11 +65,13 @@ public final class ForgeRtcDiagnostics {
         if (FML_NETVERSION == null) {
             return "<attr-missing>";
         }
-        return String.valueOf(connection.channel().attr(FML_NETVERSION).get());
+        Channel channel = connection.channel();
+        return channel == null ? "<channel-missing>" : String.valueOf(channel.attr(FML_NETVERSION).get());
     }
 
     private static String connectionType(Connection connection) {
-        if (FML_NETVERSION == null || connection.channel().attr(FML_NETVERSION).get() == null) {
+        Channel channel = connection.channel();
+        if (FML_NETVERSION == null || channel == null || channel.attr(FML_NETVERSION).get() == null) {
             return "<unset>";
         }
         try {
@@ -83,7 +86,13 @@ public final class ForgeRtcDiagnostics {
         if (FML_HANDSHAKE_HANDLER == null) {
             return false;
         }
-        return connection.channel().attr(FML_HANDSHAKE_HANDLER).get() != null;
+        Channel channel = connection.channel();
+        return channel != null && channel.attr(FML_HANDSHAKE_HANDLER).get() != null;
+    }
+
+    private static Object pipelineNames(Connection connection) {
+        Channel channel = connection.channel();
+        return channel == null ? "<channel-missing>" : channel.pipeline().names();
     }
 
     @SuppressWarnings("unchecked")

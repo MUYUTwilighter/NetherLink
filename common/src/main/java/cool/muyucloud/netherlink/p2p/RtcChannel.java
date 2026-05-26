@@ -77,29 +77,24 @@ public final class RtcChannel extends AbstractChannel {
         RTCDataChannelState initial = this.handshakeResult.dataChannel().getState();
         NliConstants.LOG.info("[P2P-Netty] Registering RtcChannel, initial DataChannel state={}", initial);
         this.eventLoop().execute(() -> {
-            this.handleStateChange(initial);
-            this.handshakeResult.dataChannel().registerObserver(new RTCDataChannelObserver() {
+            RtcThreadContext.run(() -> this.handshakeResult.dataChannel().registerObserver(new RTCDataChannelObserver() {
                 @Override
                 public void onMessage(RTCDataChannelBuffer buffer) {
+                    ClassLoader previous = RtcThreadContext.enter();
                     try {
-                        NliConstants.LOG.debug("[P2P-Netty] Received DataChannel message bytes={}", buffer.data.remaining());
+                        NliConstants.LOG.info("[P2P-Netty] Received DataChannel message bytes={}", buffer.data.remaining());
                         ByteBuf copy = Unpooled.copiedBuffer(buffer.data);
-                        RtcChannel.this.eventLoop().execute(() -> {
-                            try {
-                                RtcChannel.this.handleMessage(copy);
-                            } catch (Throwable error) {
-                                NliConstants.LOG.error("[P2P-Netty] Failed to handle inbound DataChannel message", error);
-                                copy.release();
-                                RtcChannel.this.pipeline().fireExceptionCaught(error);
-                            }
-                        });
+                        RtcChannel.this.dispatchMessage(copy);
                     } catch (Throwable error) {
                         NliConstants.LOG.error("[P2P-Netty] Failed while receiving DataChannel message", error);
+                    } finally {
+                        RtcThreadContext.exit(previous);
                     }
                 }
 
                 @Override
                 public void onStateChange() {
+                    ClassLoader previous = RtcThreadContext.enter();
                     try {
                         RTCDataChannelState state = RtcChannel.this.handshakeResult.dataChannel().getState();
                         NliConstants.LOG.info("[P2P-Netty] DataChannel state -> {}", state);
@@ -113,16 +108,25 @@ public final class RtcChannel extends AbstractChannel {
                         });
                     } catch (Throwable error) {
                         NliConstants.LOG.error("[P2P-Netty] Failed while processing DataChannel state change", error);
+                    } finally {
+                        RtcThreadContext.exit(previous);
                     }
                 }
 
                 @Override
                 public void onBufferedAmountChange(long previousAmount) {
-                    if (RtcChannel.this.handshakeResult.dataChannel().getBufferedAmount() <= LOW_WATER_MARK) {
-                        RtcChannel.this.eventLoop().execute(() -> RtcChannel.this.setWriteStalled(false));
+                    ClassLoader previous = RtcThreadContext.enter();
+                    try {
+                        if (RtcChannel.this.handshakeResult.dataChannel().getBufferedAmount() <= LOW_WATER_MARK) {
+                            RtcChannel.this.eventLoop().execute(() -> RtcChannel.this.setWriteStalled(false));
+                        }
+                    } finally {
+                        RtcThreadContext.exit(previous);
                     }
                 }
-            });
+            }));
+            NliConstants.LOG.info("[P2P-Netty] DataChannel observer registered");
+            this.handleStateChange(initial);
         });
     }
 
@@ -177,14 +181,14 @@ public final class RtcChannel extends AbstractChannel {
                 NliConstants.LOG.error("[P2P-Netty] DataChannel send failed chunk={} remaining={}", chunk, remaining, e);
                 throw e;
             }
-            NliConstants.LOG.debug("[P2P-Netty] Sent DataChannel chunk bytes={}", chunk);
+            NliConstants.LOG.info("[P2P-Netty] Sent DataChannel chunk bytes={}", chunk);
             index += chunk;
             remaining -= chunk;
         }
     }
 
     private void handleMessage(ByteBuf buffer) {
-        NliConstants.LOG.debug(
+        NliConstants.LOG.info(
             "[P2P-Netty] Handling inbound bytes={} closed={} activated={} autoRead={}",
             buffer.readableBytes(),
             closed,
@@ -192,10 +196,42 @@ public final class RtcChannel extends AbstractChannel {
             this.config.isAutoRead()
         );
         if (!closed && activated && this.config.isAutoRead()) {
+            NliConstants.LOG.info("[P2P-Netty] Firing inbound bytes={} to pipeline", buffer.readableBytes());
             this.pipeline().fireChannelRead(buffer);
             this.pipeline().fireChannelReadComplete();
         } else {
             buffer.release();
+        }
+    }
+
+    private void dispatchMessage(ByteBuf buffer) {
+        EventLoop loop = this.eventLoop();
+        if (loop.inEventLoop()) {
+            NliConstants.LOG.info("[P2P-Netty] Dispatching inbound bytes={} directly on event loop", buffer.readableBytes());
+            this.handleInboundMessage(buffer);
+            return;
+        }
+
+        NliConstants.LOG.info("[P2P-Netty] Scheduling inbound bytes={} on event loop {}", buffer.readableBytes(), loop);
+        try {
+            loop.execute(() -> {
+                NliConstants.LOG.info("[P2P-Netty] Running scheduled inbound bytes={} on event loop", buffer.readableBytes());
+                RtcChannel.this.handleInboundMessage(buffer);
+            });
+        } catch (RuntimeException error) {
+            NliConstants.LOG.error("[P2P-Netty] Failed to schedule inbound DataChannel message", error);
+            buffer.release();
+            this.pipeline().fireExceptionCaught(error);
+        }
+    }
+
+    private void handleInboundMessage(ByteBuf buffer) {
+        try {
+            this.handleMessage(buffer);
+        } catch (Throwable error) {
+            NliConstants.LOG.error("[P2P-Netty] Failed to handle inbound DataChannel message", error);
+            buffer.release();
+            this.pipeline().fireExceptionCaught(error);
         }
     }
 

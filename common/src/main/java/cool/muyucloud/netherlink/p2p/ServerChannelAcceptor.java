@@ -1,23 +1,26 @@
 package cool.muyucloud.netherlink.p2p;
 
 import cool.muyucloud.netherlink.NliConstants;
+import com.mojang.authlib.GameProfile;
 import io.netty.channel.*;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.RateKickingConnection;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
+import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerConnectionListener;
 import net.minecraft.server.network.ServerHandshakePacketListenerImpl;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
 public final class ServerChannelAcceptor {
     private static final @Nullable Method SET_INTENDED_PROFILE_ID = findSetIntendedProfileId();
+    private static final @Nullable Field SERVERBOUND_HELLO_PROFILE = findServerboundHelloProfile();
 
     private ServerChannelAcceptor() {
     }
@@ -35,15 +38,13 @@ public final class ServerChannelAcceptor {
         channel.pipeline().addLast(new ChannelInitializer<>() {
             @Override
             protected void initChannel(Channel ch) {
-                int rateLimitPacketsPerSecond = server.getRateLimitPacketsPerSecond();
-                Connection connection = rateLimitPacketsPerSecond > 0
-                    ? new RateKickingConnection(rateLimitPacketsPerSecond)
-                    : new Connection(PacketFlow.SERVERBOUND);
+                Connection connection = new RtcMinecraftConnection(PacketFlow.SERVERBOUND, profileId);
                 ChannelPipeline pipeline = ch.pipeline()
                     .addLast("nli_diagnostics", new ServerDiagnosticsHandler(profileId, connection))
                     .addLast("timeout", new ReadTimeoutHandler(30));
                 NetworkPipelineCompatibility.configureSerialization(pipeline, PacketFlow.SERVERBOUND);
                 pipeline.addLast("nli_loader_login", new ServerLoaderLoginRegistrationHandler(profileId, connection));
+                pipeline.addLast("nli_profile", new ServerProfileHandler(profileId));
                 pipeline.addLast("nli_packet_diagnostics", new ServerPacketDiagnosticsHandler(profileId, connection));
                 pipeline.addLast("packet_handler", connection);
                 connection.setListener(new ServerHandshakePacketListenerImpl(server, connection));
@@ -86,6 +87,18 @@ public final class ServerChannelAcceptor {
         }
     }
 
+    private static @Nullable Field findServerboundHelloProfile() {
+        for (String name : new String[] {"gameProfile", "f_134784_"}) {
+            try {
+                Field field = ServerboundHelloPacket.class.getDeclaredField(name);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException ignored) {
+            }
+        }
+        return null;
+    }
+
     private static final class ServerLoaderLoginRegistrationHandler extends ChannelInboundHandlerAdapter {
         private final @Nullable UUID profileId;
         private final Connection connection;
@@ -116,6 +129,39 @@ public final class ServerChannelAcceptor {
         } catch (ClassNotFoundException ignored) {
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to register loader server login channel", e);
+        }
+    }
+
+    private static final class ServerProfileHandler extends ChannelInboundHandlerAdapter {
+        private final @Nullable UUID profileId;
+
+        private ServerProfileHandler(@Nullable UUID profileId) {
+            this.profileId = profileId;
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            if (msg instanceof ServerboundHelloPacket hello && this.profileId != null) {
+                applyProfileId(hello, this.profileId);
+            }
+            super.channelRead(ctx, msg);
+        }
+
+        private static void applyProfileId(ServerboundHelloPacket packet, UUID profileId) {
+            if (SERVERBOUND_HELLO_PROFILE == null) {
+                NliConstants.LOG.warn("[P2P-Netty][server] Cannot patch RTC login profile id {}; ServerboundHelloPacket field missing", profileId);
+                return;
+            }
+            GameProfile profile = packet.getGameProfile();
+            if (profile.getId() != null) {
+                return;
+            }
+            try {
+                SERVERBOUND_HELLO_PROFILE.set(packet, new GameProfile(profileId, profile.getName()));
+                NliConstants.LOG.info("[P2P-Netty][server] Applied RTC login profile id {} to {}", profileId, profile.getName());
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException("Failed to patch RTC login profile", e);
+            }
         }
     }
 
