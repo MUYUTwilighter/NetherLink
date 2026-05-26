@@ -93,7 +93,7 @@ modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
     versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
-    versionNumber = version
+    versionNumber = "${version}"
     versionType = release_state
     uploadFile = assemble
     gameVersions = [minecraft_version]
