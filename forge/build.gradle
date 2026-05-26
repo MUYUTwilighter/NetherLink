@@ -95,7 +95,7 @@ modrinth {
     versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     versionNumber = "${version}"
     versionType = release_state
-    uploadFile = assemble
+    uploadFile = jar
     gameVersions = [minecraft_version]
     loaders = [project.name]
     File changelogFile = rootProject.file("changelog.md")
@@ -107,7 +107,7 @@ modrinth {
 tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
-    def mainFile = upload(curseforge_id, assemble)
+    def mainFile = upload(curseforge_id, jar)
     mainFile.displayName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     mainFile.releaseType = release_state
     File changelogFile = rootProject.file("changelog.md")
