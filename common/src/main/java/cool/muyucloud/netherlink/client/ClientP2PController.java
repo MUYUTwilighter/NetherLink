@@ -32,7 +32,7 @@ public final class ClientP2PController {
     }
 
     public static void setFriendsOpen(Minecraft minecraft, IntegratedServer integratedServer, boolean open) {
-        ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(open);
+        ((NetherLinkIntegratedServer) integratedServer).nli$setFriendsOpen(open);
         if (open) {
             publish(minecraft, integratedServer);
         } else {
@@ -51,7 +51,7 @@ public final class ClientP2PController {
             try {
                 LauncherSessionAccount sessionAccount = new LauncherSessionAccount(minecraft.getUser());
                 if (!sessionAccount.isUsable()) {
-                    ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
+                    ((NetherLinkIntegratedServer) integratedServer).nli$setFriendsOpen(false);
                     NliConstants.LOG.warn("Launcher account is missing Minecraft token or PMID; NetherLink friends access is unavailable");
                     message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
                     return;
@@ -66,7 +66,7 @@ public final class ClientP2PController {
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
                 message(minecraft, Component.translatable("netherlink.client.friends.opened"));
             } catch (RuntimeException e) {
-                ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
+                ((NetherLinkIntegratedServer) integratedServer).nli$setFriendsOpen(false);
                 if (isMinecraftTokenRejected(e)) {
                     NliConstants.LOG.warn("Launcher Minecraft token was rejected; restart the game to get a fresh token", e);
                     message(minecraft, Component.translatable("netherlink.client.friends.token_rejected"));
@@ -111,7 +111,7 @@ public final class ClientP2PController {
     }
 
     public static boolean isFriendsOpen(IntegratedServer integratedServer) {
-        return ((NetherLinkIntegratedServer)integratedServer).nli$isFriendsOpen();
+        return ((NetherLinkIntegratedServer) integratedServer).nli$isFriendsOpen();
     }
 
     public static boolean isPublishedBy(IntegratedServer integratedServer) {
