@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.link;
+package cool.muyucloud.netherlink.link.model;
 
 import org.jspecify.annotations.Nullable;
 

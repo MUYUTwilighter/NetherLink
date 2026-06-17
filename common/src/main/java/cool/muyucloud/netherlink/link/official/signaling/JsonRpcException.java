@@ -1,23 +1,17 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jspecify.annotations.Nullable;
 
 public final class JsonRpcException extends RuntimeException {
-    private final int code;
     private final String serverMessage;
     private final @Nullable JsonElement data;
 
     public JsonRpcException(int code, String message, @Nullable JsonElement data) {
         super("JSON-RPC error " + code + ": " + message);
-        this.code = code;
         this.serverMessage = message;
         this.data = data;
-    }
-
-    public int code() {
-        return this.code;
     }
 
     public String serverMessage() {

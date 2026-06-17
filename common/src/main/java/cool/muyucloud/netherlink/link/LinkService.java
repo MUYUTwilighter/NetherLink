@@ -1,15 +1,18 @@
 package cool.muyucloud.netherlink.link;
 
+import cool.muyucloud.netherlink.link.service.LinkFriendService;
+import cool.muyucloud.netherlink.link.service.LinkHostingService;
+import cool.muyucloud.netherlink.link.service.LinkJoinService;
+import cool.muyucloud.netherlink.link.service.LinkPresenceService;
+
 public interface LinkService {
     LinkBackendId id();
 
-    LinkFriendService createFriendService(LinkClientContext context);
+    LinkFriendService createFriendService();
 
     LinkPresenceService presence();
 
     LinkHostingService hosting();
 
     LinkJoinService joining();
-
-    LinkSignalingClient createSignalingClient(LinkAccountContext context, String threadName);
 }

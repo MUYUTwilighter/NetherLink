@@ -1,8 +1,7 @@
 package cool.muyucloud.netherlink.p2p;
 
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.account.MinecraftAccount;
-import cool.muyucloud.netherlink.link.LinkSignalingClient;
+import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
@@ -21,7 +20,6 @@ public final class ServerP2PManager {
     private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
     private final String accountName;
-    private final MinecraftAccount account;
     private final MinecraftServer server;
     private final LinkSignalingClient signaling;
     private final ConcurrentHashMap<UUID, UUID> profileIdsByPmid = new ConcurrentHashMap<>();
@@ -62,13 +60,8 @@ public final class ServerP2PManager {
     private volatile SignalingException.SignalingAuthException signalingAuthFailure;
     private volatile boolean shutdown;
 
-    public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server) {
-        this(accountName, account, server, new SignalingClient(account.getMcToken(), "NetherLink Signaling-" + accountName));
-    }
-
-    public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server, LinkSignalingClient signaling) {
+    public ServerP2PManager(String accountName, MinecraftServer server, LinkSignalingClient signaling) {
         this.accountName = accountName;
-        this.account = account;
         this.server = server;
         this.signaling = signaling;
         this.signaling.setFriendJoinHandler(this::handleFriendJoin);
@@ -90,7 +83,7 @@ public final class ServerP2PManager {
             return CompletableFuture.failedFuture(authFailure);
         }
         CompletableFuture<Void> result = new CompletableFuture<>();
-        this.signalingReady.whenComplete((ignored, error) -> {
+        this.signalingReady.whenComplete((_, error) -> {
             if (error != null) {
                 result.completeExceptionally(error);
             } else {
@@ -244,13 +237,13 @@ public final class ServerP2PManager {
                 return CompletableFuture.failedFuture(new IllegalStateException("Failed to create handshake"));
             }
             return handshake.acceptOffer(offerSdp)
-                .whenComplete((answer, error) -> {
+                .whenComplete((_, error) -> {
                     if (error == null) {
                         NliConstants.LOG.info("[P2P][{}] Created answer SDP for session={}", this.accountName, sessionId);
                     }
                 })
                 .thenCompose(answer -> this.signaling.sendClientMessage(peerPmid, SignalingMessage.answer(sessionId, answer)));
-        }).whenComplete((ignored, error) -> {
+        }).whenComplete((_, error) -> {
             if (error != null) {
                 result.completeExceptionally(error);
             }
@@ -269,7 +262,7 @@ public final class ServerP2PManager {
                 config,
                 sessionId,
                 false,
-                candidate -> this.signaling.sendClientMessage(peerPmid, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(error -> null)
+                candidate -> this.signaling.sendClientMessage(peerPmid, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null)
             );
             if (this.handshakes.putIfAbsent(peerPmid, handshake) != null) {
                 handshake.abort("duplicate");

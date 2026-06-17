@@ -1,4 +1,7 @@
-package cool.muyucloud.netherlink.link;
+package cool.muyucloud.netherlink.link.service;
+
+import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
+import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

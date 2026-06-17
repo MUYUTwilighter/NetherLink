@@ -1,6 +1,12 @@
 package cool.muyucloud.netherlink.client;
 
-import cool.muyucloud.netherlink.link.*;
+import cool.muyucloud.netherlink.link.LinkServices;
+import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
+import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
+import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
+import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
+import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
+import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 
@@ -14,17 +20,8 @@ public final class ClientFriendService {
 
     public ClientFriendService(Minecraft minecraft) {
         LauncherSessionAccount account = new LauncherSessionAccount(minecraft.getUser());
-        this.backend = LinkServices.current().createFriendService(new LinkClientContext() {
-            @Override
-            public LauncherSessionAccount account() {
-                return account;
-            }
-
-            @Override
-            public Minecraft minecraft() {
-                return minecraft;
-            }
-        });
+        LinkClientHooks.setClient(minecraft, account);
+        this.backend = LinkServices.current().createFriendService();
     }
 
     public CompletableFuture<Snapshot> refresh() {

@@ -1,9 +1,9 @@
 package cool.muyucloud.netherlink.client;
 
-import cool.muyucloud.netherlink.link.LinkClientContext;
-import cool.muyucloud.netherlink.link.LinkFriendEntry;
-import cool.muyucloud.netherlink.link.LinkFriendRelationship;
 import cool.muyucloud.netherlink.link.LinkServices;
+import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
+import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
+import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
 import net.minecraft.client.Minecraft;
 
 import java.util.UUID;
@@ -15,18 +15,9 @@ public final class ClientJoinController {
 
     public static CompletableFuture<Void> join(Minecraft minecraft, UUID hostProfileId, UUID hostPresenceId) {
         LauncherSessionAccount account = new LauncherSessionAccount(minecraft.getUser());
+        LinkClientHooks.setClient(minecraft, account);
         LinkFriendEntry target = new LinkFriendEntry(hostProfileId, "", hostPresenceId, LinkFriendRelationship.FRIEND, "PLAYING_HOSTED_SERVER", true);
-        return LinkServices.current().joining().join(new LinkClientContext() {
-            @Override
-            public LauncherSessionAccount account() {
-                return account;
-            }
-
-            @Override
-            public Minecraft minecraft() {
-                return minecraft;
-            }
-        }, target);
+        return LinkServices.current().joining().join(target);
     }
 
     public static boolean hasOutgoingJoin() {

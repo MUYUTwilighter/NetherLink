@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -90,7 +90,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
             String payload = createRequest(id, method, params).toString();
             this.pendingRequests.put(id, future);
             NliConstants.LOG.info("[P2P][jsonrpc] Sending request id={} method={}", id, method);
-            this.sendChain = this.sendChain.<Void>thenCompose(ignored -> ws.sendText(payload, true).thenApply(sent -> null)).exceptionally(error -> {
+            this.sendChain = this.sendChain.<Void>thenCompose(_ -> ws.sendText(payload, true).thenApply(_ -> null)).exceptionally(error -> {
                 this.executor.execute(() -> {
                     CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id);
                     if (pending != null) {
@@ -110,7 +110,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
             WebSocket ws = this.webSocket;
             this.teardown(new IOException("JSON-RPC client closed"), false);
             if (ws != null && !ws.isOutputClosed()) {
-                ws.sendClose(1000, "shutdown").whenComplete((ignored, error) -> done.complete(null));
+                ws.sendClose(1000, "shutdown").whenComplete((_, _) -> done.complete(null));
             } else {
                 done.complete(null);
             }
@@ -121,7 +121,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
     private void send(String payload) {
         WebSocket ws = this.webSocket;
         if (ws != null) {
-            this.sendChain = this.sendChain.<Void>thenCompose(ignored -> ws.sendText(payload, true).thenApply(sent -> null)).exceptionally(error -> {
+            this.sendChain = this.sendChain.<Void>thenCompose(_ -> ws.sendText(payload, true).thenApply(_ -> null)).exceptionally(error -> {
                 NliConstants.LOG.warn("WebSocket send failed", error);
                 return null;
             });
@@ -177,7 +177,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
         int code = error.has("code") ? error.get("code").getAsInt() : 0;
         String message = error.has("message") ? error.get("message").getAsString() : "";
         JsonElement data = error.get("data");
-        if (id != null && isValidResponseId(id)) {
+        if (isValidResponseId(id)) {
             CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id.getAsInt());
             if (pending != null) {
                 NliConstants.LOG.warn("[P2P][jsonrpc] Received error response id={} code={} message={}", id.getAsInt(), code, message);

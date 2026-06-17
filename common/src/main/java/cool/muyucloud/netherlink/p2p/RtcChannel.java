@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 
+@SuppressWarnings("deprecation")
 public final class RtcChannel extends AbstractChannel {
     private static final ChannelMetadata METADATA = new ChannelMetadata(false);
     private static final int MAX_CHUNK_SIZE = 262144;
@@ -73,6 +74,7 @@ public final class RtcChannel extends AbstractChannel {
     }
 
     @Override
+    @SuppressWarnings("resource")
     protected void doRegister() {
         RTCDataChannelState initial = this.handshakeResult.dataChannel().getState();
         NliConstants.LOG.info("[P2P-Netty] Registering RtcChannel, initial DataChannel state={}", initial);

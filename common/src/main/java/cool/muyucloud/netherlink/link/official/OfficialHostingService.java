@@ -2,11 +2,11 @@ package cool.muyucloud.netherlink.link.official;
 
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
-import cool.muyucloud.netherlink.link.LinkHostContext;
-import cool.muyucloud.netherlink.link.LinkHostPublication;
-import cool.muyucloud.netherlink.link.LinkHostingService;
+import cool.muyucloud.netherlink.link.hook.LinkHostHooks;
+import cool.muyucloud.netherlink.link.model.LinkHostPublication;
+import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
+import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.p2p.ServerP2PManager;
-import cool.muyucloud.netherlink.p2p.SignalingClient;
 import net.minecraft.server.MinecraftServer;
 
 import java.time.Duration;
@@ -20,18 +20,18 @@ public final class OfficialHostingService implements LinkHostingService {
     }
 
     @Override
-    public LinkHostPublication publish(LinkHostContext context, Duration signalingReadyTimeout) {
-        MinecraftAccount account = context.account();
+    public LinkHostPublication publish(String hostKey, Duration signalingReadyTimeout) {
+        LinkHostHooks.Host host = LinkHostHooks.requireHost(hostKey);
+        MinecraftAccount account = host.account();
         ServerP2PManager manager = new ServerP2PManager(
-            context.accountName(),
-            account,
-            context.server(),
-            new SignalingClient(account.getMcToken(), "NetherLink Signaling-" + context.accountName())
+            host.key(),
+            host.server(),
+            new OfficialSignalingClient(account.getMcToken(), "NetherLink Signaling-" + host.key())
         );
         manager.start();
         try {
             awaitSignalingReady(manager, signalingReadyTimeout);
-            Publication publication = new Publication(account, context.server(), manager, this.presence);
+            Publication publication = new Publication(account, host.server(), manager, this.presence);
             publication.refresh();
             return publication;
         } catch (RuntimeException e) {

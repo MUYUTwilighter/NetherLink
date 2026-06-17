@@ -1,11 +1,13 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.*;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.link.LinkSignalingClient;
+import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
+import cool.muyucloud.netherlink.p2p.SignalingException;
+import cool.muyucloud.netherlink.p2p.SignalingMessage;
 import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.jsonrpc.JsonRPCErrors;
@@ -24,7 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-public final class SignalingClient implements LinkSignalingClient {
+public final class OfficialSignalingClient implements LinkSignalingClient {
     private static final Codec<String> SIGNALING_URI_CODEC = Codec.STRING.fieldOf("signalingUri").codec().fieldOf("result").codec();
     private static final Duration PING_INTERVAL = Duration.ofSeconds(50L);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15L);
@@ -49,7 +51,7 @@ public final class SignalingClient implements LinkSignalingClient {
     private @Nullable CachedSignalingUri cachedSignalingUri;
     private @Nullable CompletableFuture<RTCIceServer> pendingTurnRefresh;
 
-    public SignalingClient(String accessToken, String threadName) {
+    public OfficialSignalingClient(String accessToken, String threadName) {
         this.accessToken = accessToken;
         this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, threadName);
@@ -106,25 +108,25 @@ public final class SignalingClient implements LinkSignalingClient {
         NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), toPlayerId);
         String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message).getOrThrow(IllegalStateException::new).toString();
         return CompletableFuture.completedFuture(null)
-            .thenComposeAsync(ignored -> this.sendRequest("Signaling_SendClientMessage_v1_0", List.of(
+            .thenComposeAsync(_ -> this.sendRequest("Signaling_SendClientMessage_v1_0", List.of(
                 JsonNull.INSTANCE,
                 new JsonPrimitive(toPlayerId.toString()),
                 new JsonPrimitive(encoded)
             )), this.executor)
-            .thenApply(ignored -> (Void)null)
+            .thenApply(_ -> (Void)null)
             .exceptionallyCompose(error -> {
                 if (error.getCause() instanceof JsonRpcException rpcError) {
                     SignalingException mapped = SignalingErrorMapper.fromJsonRpc(toPlayerId, rpcError);
                     this.fireListeners(listener -> listener.onSignalingError(toPlayerId, mapped));
-                    return CompletableFuture.<Void>failedFuture(mapped);
+                    return CompletableFuture.failedFuture(mapped);
                 }
-                return CompletableFuture.<Void>failedFuture(error);
+                return CompletableFuture.failedFuture(error);
             });
     }
 
     @Override
     public CompletableFuture<RTCIceServer> requestTurnAuth() {
-        return CompletableFuture.completedFuture(null).thenComposeAsync(ignored -> {
+        return CompletableFuture.completedFuture(null).thenComposeAsync(_ -> {
             CachedTurn cached = this.cachedTurn;
             if (cached != null && cached.isUsable()) {
                 NliConstants.LOG.info("[P2P][signaling] Using cached TURN auth");
@@ -149,7 +151,7 @@ public final class SignalingClient implements LinkSignalingClient {
     private CompletableFuture<RTCIceServer> refreshTurnAuth() {
         NliConstants.LOG.info("[P2P][signaling] Requesting TURN auth");
         return this.sendRequest("Signaling_TurnAuth_v1_0", List.of())
-            .whenComplete((ignored, error) -> {
+            .whenComplete((_, error) -> {
                 if (error != null) {
                     NliConstants.LOG.warn("[P2P][signaling] TURN auth request failed: {}", error.toString());
                 }
@@ -189,7 +191,7 @@ public final class SignalingClient implements LinkSignalingClient {
         String requestId = UUID.randomUUID().toString();
         this.websocketConnect = this.getSignalingUri(client, requestId)
             .thenComposeAsync(wsUrl -> this.openWebSocket(client, rpc, wsUrl, requestId), this.executor);
-        this.websocketConnect.whenCompleteAsync((ignored, error) -> {
+        this.websocketConnect.whenCompleteAsync((_, error) -> {
             if (error != null) {
                 Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                 NliConstants.LOG.warn("Signaling websocket connect failed: {}", cause.toString());
@@ -206,15 +208,17 @@ public final class SignalingClient implements LinkSignalingClient {
         }, this.executor);
     }
 
+    @SuppressWarnings("DataFlowIssue")
     private CompletableFuture<String> getSignalingUri(HttpClient client, String requestId) {
         CachedSignalingUri cached = this.cachedSignalingUri;
         if (cached != null && cached.isUsable()) {
             NliConstants.LOG.debug("[P2P][signaling] Using cached signaling URI");
             return CompletableFuture.completedFuture(cached.wsUrl());
         }
-        NliConstants.LOG.info("[P2P][signaling] Fetching signaling configuration from {}", ENVIRONMENT.getConfigurationUri());
+        String configurationUri = ENVIRONMENT.getConfigurationUri();
+        NliConstants.LOG.info("[P2P][signaling] Fetching signaling configuration from {}", configurationUri);
         HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(ENVIRONMENT.getConfigurationUri()))
+            .uri(URI.create(configurationUri))
             .header(HEADER_AUTH, this.accessToken)
             .header(HEADER_SESSION_ID, this.sessionId)
             .header(HEADER_REQUEST_ID, requestId)
@@ -243,7 +247,7 @@ public final class SignalingClient implements LinkSignalingClient {
             .header(HEADER_SESSION_ID, this.sessionId)
             .header(HEADER_REQUEST_ID, requestId)
             .buildAsync(URI.create(wsUrl), rpc)
-            .thenApplyAsync(webSocket -> {
+            .thenApplyAsync(_ -> {
                 this.schedulePing(rpc);
                 this.fireListeners(ConnectionListener::onSignalingConnected);
                 return rpc;
@@ -273,9 +277,9 @@ public final class SignalingClient implements LinkSignalingClient {
             this.pingTask = null;
         }
         this.pendingTurnRefresh = null;
-        connectFuture.whenComplete((rpc, error) -> {
+        connectFuture.whenComplete((rpc, _) -> {
             CompletableFuture<?> closed = rpc != null ? rpc.close() : CompletableFuture.completedFuture(null);
-            closed.whenComplete((ignored, closeError) -> CompletableFuture.runAsync(client::close));
+            closed.whenComplete((ignored, _) -> CompletableFuture.runAsync(client::close));
         });
         connectFuture.completeExceptionally(new IllegalStateException("Signaling torn down: " + reason));
         this.httpClient = null;

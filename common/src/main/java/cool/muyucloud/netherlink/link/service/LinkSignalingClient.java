@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.link;
+package cool.muyucloud.netherlink.link.service;
 
 import cool.muyucloud.netherlink.p2p.SignalingException;
 import cool.muyucloud.netherlink.p2p.SignalingMessage;
@@ -7,7 +7,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
 
 public interface LinkSignalingClient {
     void setFriendJoinHandler(@Nullable FriendJoinHandler handler);
@@ -52,9 +51,4 @@ public interface LinkSignalingClient {
         }
     }
 
-    default void fireListeners(Iterable<ConnectionListener> listeners, Consumer<ConnectionListener> action) {
-        for (ConnectionListener listener : listeners) {
-            action.accept(listener);
-        }
-    }
 }

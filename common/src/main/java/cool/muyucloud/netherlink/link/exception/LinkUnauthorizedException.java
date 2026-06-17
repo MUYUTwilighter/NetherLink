@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.link;
+package cool.muyucloud.netherlink.link.exception;
 
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
 

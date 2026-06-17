@@ -1,15 +1,14 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.link.LinkHostContext;
-import cool.muyucloud.netherlink.link.LinkHostPublication;
 import cool.muyucloud.netherlink.link.LinkServices;
-import cool.muyucloud.netherlink.link.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.hook.LinkHostHooks;
+import cool.muyucloud.netherlink.link.model.LinkHostPublication;
 import cool.muyucloud.netherlink.p2p.SignalingException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
 
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
@@ -55,22 +54,9 @@ public final class ClientP2PController {
                     return;
                 }
                 stopPublication();
-                publication = LinkServices.current().hosting().publish(new LinkHostContext() {
-                    @Override
-                    public String accountName() {
-                        return "launcher:" + sessionAccount.getMcProfileName();
-                    }
-
-                    @Override
-                    public MinecraftServer server() {
-                        return integratedServer;
-                    }
-
-                    @Override
-                    public LauncherSessionAccount account() {
-                        return sessionAccount;
-                    }
-                }, SIGNALING_READY_TIMEOUT);
+                String hostKey = "launcher:" + sessionAccount.getMcProfileName();
+                LinkHostHooks.setHost(hostKey, sessionAccount, integratedServer);
+                publication = LinkServices.current().hosting().publish(hostKey, SIGNALING_READY_TIMEOUT);
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
                 message(minecraft, Component.translatable("netherlink.client.friends.opened"));
             } catch (RuntimeException e) {
@@ -122,6 +108,7 @@ public final class ClientP2PController {
         return ((NetherLinkIntegratedServer)integratedServer).nli$isFriendsOpen();
     }
 
+    @SuppressWarnings({"resource", "unused"})
     public static boolean isPublishedBy(IntegratedServer integratedServer) {
         return publication != null && publication.server() == integratedServer;
     }
@@ -134,11 +121,7 @@ public final class ClientP2PController {
     }
 
     private static void message(Minecraft minecraft, Component message) {
-        minecraft.execute(() -> {
-            if (minecraft.gui != null) {
-                minecraft.gui.getChat().addClientSystemMessage(message);
-            }
-        });
+        minecraft.execute(() -> minecraft.gui.getChat().addClientSystemMessage(message));
     }
 
     private static boolean isMinecraftTokenRejected(Throwable error) {

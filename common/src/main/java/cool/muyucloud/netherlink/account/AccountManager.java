@@ -7,10 +7,10 @@ import com.mojang.serialization.JsonOps;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
-import cool.muyucloud.netherlink.link.LinkHostContext;
-import cool.muyucloud.netherlink.link.LinkHostPublication;
 import cool.muyucloud.netherlink.link.LinkServices;
-import cool.muyucloud.netherlink.link.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.hook.LinkHostHooks;
+import cool.muyucloud.netherlink.link.model.LinkHostPublication;
 import cool.muyucloud.netherlink.p2p.SignalingException;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -175,7 +175,7 @@ public class AccountManager {
     }
 
     public static void disconnectPlayersForShutdown(MinecraftServer server) {
-        if (server.getPlayerList() == null || server.getPlayerList().getPlayers().isEmpty()) {
+        if (server.getPlayerList().getPlayers().isEmpty()) {
             return;
         }
         NliConstants.LOG.info("Disconnecting players before NetherLink P2P shutdown");
@@ -247,7 +247,7 @@ public class AccountManager {
         if (currentServer == null) {
             throw new NetherLinkAuthException("Minecraft server is not ready");
         }
-        refresh(name, false, (Messenger)(Object)currentServer);
+        refresh(name, false, Messenger.of(currentServer));
         try {
             publishOrRefresh(name, account, currentServer);
         } catch (NetherLinkAuthException e) {
@@ -255,7 +255,7 @@ public class AccountManager {
                 throw e;
             }
             NliConstants.LOG.warn("Minecraft token for {} was rejected, refreshing and retrying publish once", name);
-            refresh(name, true, (Messenger)(Object)currentServer);
+            refresh(name, true, Messenger.of(currentServer));
             stopP2P(name);
             publishOrRefresh(name, account, currentServer);
         }
@@ -286,7 +286,7 @@ public class AccountManager {
                     throw e;
                 }
                 NliConstants.LOG.warn("Presence revoke for {} was unauthorized, refreshing Minecraft token and retrying once", name);
-                refresh(name, true, (Messenger)(Object)currentServer);
+                refresh(name, true, Messenger.of(currentServer));
                 LinkServices.current().presence().revoke(account);
             }
         }
@@ -408,34 +408,20 @@ public class AccountManager {
         }
     }
 
-    private static LinkHostPublication publishOrRefresh(String name, Account account, MinecraftServer currentServer) {
+    private static void publishOrRefresh(String name, Account account, MinecraftServer currentServer) {
         LinkHostPublication existing = P2P.get(name);
         if (existing != null) {
             existing.refresh();
-            return existing;
+            return;
         }
-        return ensureP2P(name, account, currentServer);
+        ensureP2P(name, account, currentServer);
     }
 
-    private static LinkHostPublication ensureP2P(String name, Account account, MinecraftServer currentServer) {
-        return P2P.computeIfAbsent(name, key -> {
+    private static void ensureP2P(String name, Account account, MinecraftServer currentServer) {
+        P2P.computeIfAbsent(name, key -> {
             NliConstants.LOG.info("Starting NetherLink P2P manager for account {}", key);
-            return LinkServices.current().hosting().publish(new LinkHostContext() {
-                @Override
-                public String accountName() {
-                    return key;
-                }
-
-                @Override
-                public MinecraftServer server() {
-                    return currentServer;
-                }
-
-                @Override
-                public Account account() {
-                    return account;
-                }
-            }, SIGNALING_READY_TIMEOUT);
+            LinkHostHooks.setHost(key, account, currentServer);
+            return LinkServices.current().hosting().publish(key, SIGNALING_READY_TIMEOUT);
         });
     }
 

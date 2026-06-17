@@ -7,8 +7,8 @@ import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
-import cool.muyucloud.netherlink.link.LinkPresenceService;
-import cool.muyucloud.netherlink.link.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.service.LinkPresenceService;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;

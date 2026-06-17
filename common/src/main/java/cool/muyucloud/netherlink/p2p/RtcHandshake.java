@@ -31,10 +31,6 @@ public final class RtcHandshake {
         return id;
     }
 
-    public boolean isInitiator() {
-        return initiator;
-    }
-
     public CompletableFuture<HandshakeResult> future() {
         return result;
     }
@@ -50,7 +46,7 @@ public final class RtcHandshake {
             ? CompletableFuture.failedFuture(new IllegalStateException("Cannot accept offer after handshake has started"))
             : this.startSdpExchange(
                 this.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, offerSdp))
-                    .thenCompose(ignored -> this.createAnswerSdp())
+                    .thenCompose(_ -> this.createAnswerSdp())
                     .thenCompose(this::setLocalDescription)
             );
     }
@@ -98,7 +94,7 @@ public final class RtcHandshake {
     private CompletableFuture<String> startSdpExchange(CompletableFuture<Void> pipeline) {
         CompletableFuture<String> sdpFuture = new CompletableFuture<>();
         this.sdpResult = sdpFuture;
-        pipeline.whenComplete((ignored, error) -> {
+        pipeline.whenComplete((_, error) -> {
             if (error != null) {
                 NliConstants.LOG.warn("[P2P][{}] SDP exchange failed: {}", this.id, error.toString());
                 sdpFuture.completeExceptionally(error);
@@ -107,7 +103,7 @@ public final class RtcHandshake {
                 this.completeSdp(sdpFuture);
             }
         });
-        return sdpFuture.whenComplete((sdp, error) -> this.sdpResult = null);
+        return sdpFuture.whenComplete((_, _) -> this.sdpResult = null);
     }
 
     private CompletableFuture<Void> setRemoteDescription(RTCSessionDescription description) {

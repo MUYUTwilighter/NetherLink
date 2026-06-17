@@ -1,7 +1,12 @@
 package cool.muyucloud.netherlink.link.official;
 
-import cool.muyucloud.netherlink.link.*;
-import cool.muyucloud.netherlink.p2p.SignalingClient;
+import cool.muyucloud.netherlink.link.LinkBackendId;
+import cool.muyucloud.netherlink.link.LinkService;
+import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
+import cool.muyucloud.netherlink.link.service.LinkFriendService;
+import cool.muyucloud.netherlink.link.service.LinkHostingService;
+import cool.muyucloud.netherlink.link.service.LinkJoinService;
+import cool.muyucloud.netherlink.link.service.LinkPresenceService;
 
 public final class OfficialLinkServiceProvider implements LinkService {
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
@@ -19,8 +24,8 @@ public final class OfficialLinkServiceProvider implements LinkService {
     }
 
     @Override
-    public LinkFriendService createFriendService(LinkClientContext context) {
-        return new OfficialFriendService(context.minecraft());
+    public LinkFriendService createFriendService() {
+        return new OfficialFriendService(LinkClientHooks.requireClient().minecraft());
     }
 
     @Override
@@ -36,11 +41,6 @@ public final class OfficialLinkServiceProvider implements LinkService {
     @Override
     public LinkJoinService joining() {
         return this.joining;
-    }
-
-    @Override
-    public LinkSignalingClient createSignalingClient(LinkAccountContext context, String threadName) {
-        return new SignalingClient(context.account().getMcToken(), threadName);
     }
 
 }

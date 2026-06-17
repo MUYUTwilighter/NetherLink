@@ -1,7 +1,8 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import cool.muyucloud.netherlink.p2p.SignalingException;
 import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;

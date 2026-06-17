@@ -2,21 +2,20 @@ package cool.muyucloud.netherlink.link.official;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
-import cool.muyucloud.netherlink.link.LinkClientContext;
-import cool.muyucloud.netherlink.link.LinkFriendEntry;
-import cool.muyucloud.netherlink.link.LinkJoinService;
-import cool.muyucloud.netherlink.link.LinkSignalingClient;
+import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
+import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
+import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
+import cool.muyucloud.netherlink.link.service.LinkJoinService;
+import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
 import cool.muyucloud.netherlink.mixin.MinecraftAccessor;
 import cool.muyucloud.netherlink.p2p.RtcChannel;
 import cool.muyucloud.netherlink.p2p.RtcHandshake;
-import cool.muyucloud.netherlink.p2p.SignalingClient;
 import cool.muyucloud.netherlink.p2p.SignalingMessage;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.timeout.ReadTimeoutHandler;
@@ -47,12 +46,14 @@ public final class OfficialJoinService implements LinkJoinService {
     private @Nullable MinecraftAccount account;
 
     @Override
-    public CompletableFuture<Void> join(LinkClientContext context, LinkFriendEntry target) {
+    @SuppressWarnings("resource")
+    public CompletableFuture<Void> join(LinkFriendEntry target) {
         UUID hostPresenceId = target.presenceId();
         if (hostPresenceId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Selected friend has no joinable presence"));
         }
-        Minecraft minecraft = context.minecraft();
+        LinkClientHooks.Client clientHook = LinkClientHooks.requireClient();
+        Minecraft minecraft = clientHook.minecraft();
         if (minecraft.level != null || minecraft.getSingleplayerServer() != null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Join requests are only available from the main menu"));
         }
@@ -60,7 +61,7 @@ public final class OfficialJoinService implements LinkJoinService {
         if (existing != null) {
             return existing.result();
         }
-        this.ensureSignaling(context);
+        this.ensureSignaling(clientHook);
         LinkSignalingClient client = this.signaling;
         if (client == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Signaling client was not created"));
@@ -72,7 +73,7 @@ public final class OfficialJoinService implements LinkJoinService {
         if (raced != null) {
             return raced.result();
         }
-        result.whenComplete((ignored, error) -> {
+        result.whenComplete((_, _) -> {
             this.outgoing.remove(hostPresenceId, join);
             this.maybeDisconnectSignaling();
         });
@@ -82,7 +83,7 @@ public final class OfficialJoinService implements LinkJoinService {
                 NliConstants.LOG.warn("[P2P][client] Join request timed out session={}", sessionId);
             }
         });
-        client.sendClientMessage(hostPresenceId, new SignalingMessage.FriendJoin.Request(sessionId)).whenComplete((ignored, error) -> {
+        client.sendClientMessage(hostPresenceId, new SignalingMessage.FriendJoin.Request(sessionId)).whenComplete((_, error) -> {
             if (error != null) {
                 result.completeExceptionally(error);
             }
@@ -110,8 +111,8 @@ public final class OfficialJoinService implements LinkJoinService {
         this.account = null;
     }
 
-    private void ensureSignaling(LinkClientContext context) {
-        MinecraftAccount current = context.account();
+    private void ensureSignaling(LinkClientHooks.Client clientHook) {
+        MinecraftAccount current = clientHook.account();
         MinecraftAccount existing = this.account;
         String currentToken = current.getMcToken();
         if (this.signaling != null && existing != null && currentToken != null && currentToken.equals(existing.getMcToken())) {
@@ -119,9 +120,9 @@ public final class OfficialJoinService implements LinkJoinService {
         }
         this.shutdown();
         this.account = current;
-        this.signaling = new SignalingClient(context.account().getMcToken(), "NetherLink Client Signaling");
-        this.signaling.setFriendJoinHandler((fromPresenceId, message) -> this.handleFriendJoin(context.minecraft(), fromPresenceId, message));
-        this.signaling.setWebRtcSignalingHandler((fromPresenceId, message) -> this.handleWebRtc(context.minecraft(), fromPresenceId, message));
+        this.signaling = new OfficialSignalingClient(clientHook.account().getMcToken(), "NetherLink Client Signaling");
+        this.signaling.setFriendJoinHandler((fromPresenceId, message) -> this.handleFriendJoin(clientHook.minecraft(), fromPresenceId, message));
+        this.signaling.setWebRtcSignalingHandler(this::handleWebRtc);
     }
 
     private void handleFriendJoin(Minecraft minecraft, UUID fromPresenceId, SignalingMessage.FriendJoin message) {
@@ -151,7 +152,7 @@ public final class OfficialJoinService implements LinkJoinService {
             return;
         }
         client.requestTurnAuth().thenCompose(turn -> this.startHandshake(minecraft, client, hostPresenceId, sessionId, turn, join))
-            .whenComplete((ignored, error) -> {
+            .whenComplete((_, error) -> {
                 if (error != null) {
                     join.result().completeExceptionally(error);
                 }
@@ -163,7 +164,7 @@ public final class OfficialJoinService implements LinkJoinService {
         config.iceServers.add(turn);
         config.portAllocatorConfig.setEnableIpv6(true).setEnableIpv6OnWifi(true);
         RtcHandshake handshake = new RtcHandshake(this.factory(), config, sessionId, true,
-            candidate -> client.sendClientMessage(hostPresenceId, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(error -> null));
+            candidate -> client.sendClientMessage(hostPresenceId, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null));
         join.setHandshake(handshake);
         CompletableFuture.delayedExecutor(HANDSHAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
             if (!join.result().isDone()) {
@@ -182,7 +183,7 @@ public final class OfficialJoinService implements LinkJoinService {
             .thenCompose(offer -> client.sendClientMessage(hostPresenceId, new SignalingMessage.WebRtc.Offer(sessionId, offer)));
     }
 
-    private void handleWebRtc(Minecraft minecraft, UUID fromPresenceId, SignalingMessage.WebRtc message) {
+    private void handleWebRtc(UUID fromPresenceId, SignalingMessage.WebRtc message) {
         OutgoingJoin join = this.outgoing.get(fromPresenceId);
         RtcHandshake handshake = join != null ? join.handshake() : null;
         if (handshake == null || !handshake.id().equals(message.sessionId())) {
@@ -195,7 +196,7 @@ public final class OfficialJoinService implements LinkJoinService {
             });
             case SignalingMessage.WebRtc.IceCandidate ice -> {
                 RTCIceCandidate candidate = ice.toRtcIceCandidate();
-                handshake.addRemoteIceCandidate(candidate).exceptionally(error -> null);
+                handshake.addRemoteIceCandidate(candidate).exceptionally(_ -> null);
             }
             case SignalingMessage.WebRtc.Offer ignored -> {
             }
@@ -219,7 +220,7 @@ public final class OfficialJoinService implements LinkJoinService {
                     null,
                     false,
                     null,
-                    component -> {
+                    _ -> {
                     },
                     tracker,
                     null
@@ -237,7 +238,7 @@ public final class OfficialJoinService implements LinkJoinService {
         channel.pipeline().addLast(new ChannelInitializer<>() {
             @Override
             protected void initChannel(Channel ch) {
-                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", (ChannelHandler)new ReadTimeoutHandler(30));
+                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", new ReadTimeoutHandler(30));
                 Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND, false, null);
                 connection.configurePacketHandler(pipeline);
             }

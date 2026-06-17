@@ -5,7 +5,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.link.*;
+import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
+import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
+import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
+import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
+import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 
