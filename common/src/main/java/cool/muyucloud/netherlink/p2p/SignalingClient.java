@@ -5,6 +5,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.link.LinkSignalingClient;
 import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.jsonrpc.JsonRPCErrors;
@@ -23,7 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-public final class SignalingClient {
+public final class SignalingClient implements LinkSignalingClient {
     private static final Codec<String> SIGNALING_URI_CODEC = Codec.STRING.fieldOf("signalingUri").codec().fieldOf("result").codec();
     private static final Duration PING_INTERVAL = Duration.ofSeconds(50L);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15L);
@@ -38,7 +39,7 @@ public final class SignalingClient {
     private final String accessToken;
     private final String sessionId = UUID.randomUUID().toString();
     private final ScheduledExecutorService executor;
-    private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
+    private final List<LinkSignalingClient.ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
     private @Nullable HttpClient httpClient;
     private @Nullable CompletableFuture<JsonRpcClient> websocketConnect;
     private @Nullable ScheduledFuture<?> pingTask;
@@ -57,32 +58,39 @@ public final class SignalingClient {
         });
     }
 
+    @Override
     public void setFriendJoinHandler(@Nullable FriendJoinHandler handler) {
         this.executor.execute(() -> this.friendJoinHandler = handler);
     }
 
+    @Override
     public void setWebRtcSignalingHandler(@Nullable WebRtcSignalingHandler handler) {
         this.executor.execute(() -> this.webRtcSignalingHandler = handler);
     }
 
-    public void addConnectionListener(ConnectionListener listener) {
+    @Override
+    public void addConnectionListener(LinkSignalingClient.ConnectionListener listener) {
         this.connectionListeners.add(listener);
     }
 
-    public void removeConnectionListener(ConnectionListener listener) {
+    @Override
+    public void removeConnectionListener(LinkSignalingClient.ConnectionListener listener) {
         this.connectionListeners.remove(listener);
     }
 
+    @Override
     public void connect() {
         NliConstants.LOG.info("[P2P][signaling] Connecting signaling session {}", this.sessionId);
         this.executor.execute(this::connectWebSocket);
     }
 
+    @Override
     public void disconnect() {
         NliConstants.LOG.info("[P2P][signaling] Disconnect requested for session {}", this.sessionId);
         this.executor.execute(() -> this.teardown("explicit disconnect"));
     }
 
+    @Override
     public void shutdown() {
         NliConstants.LOG.info("[P2P][signaling] Shutdown requested for session {}", this.sessionId);
         this.executor.execute(() -> {
@@ -93,6 +101,7 @@ public final class SignalingClient {
         });
     }
 
+    @Override
     public CompletableFuture<Void> sendClientMessage(UUID toPlayerId, SignalingMessage message) {
         NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), toPlayerId);
         String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message).getOrThrow(IllegalStateException::new).toString();
@@ -113,6 +122,7 @@ public final class SignalingClient {
             });
     }
 
+    @Override
     public CompletableFuture<RTCIceServer> requestTurnAuth() {
         return CompletableFuture.completedFuture(null).thenComposeAsync(ignored -> {
             CachedTurn cached = this.cachedTurn;
@@ -333,33 +343,9 @@ public final class SignalingClient {
         }
     }
 
-    private void fireListeners(Consumer<ConnectionListener> action) {
-        for (ConnectionListener listener : this.connectionListeners) {
+    private void fireListeners(Consumer<LinkSignalingClient.ConnectionListener> action) {
+        for (LinkSignalingClient.ConnectionListener listener : this.connectionListeners) {
             action.accept(listener);
-        }
-    }
-
-    @FunctionalInterface
-    public interface FriendJoinHandler {
-        void handle(UUID fromPmid, SignalingMessage.FriendJoin message);
-    }
-
-    @FunctionalInterface
-    public interface WebRtcSignalingHandler {
-        void handle(UUID fromPmid, SignalingMessage.WebRtc message);
-    }
-
-    public interface ConnectionListener {
-        default void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
-        }
-
-        default void onSignalingConnected() {
-        }
-
-        default void onSignalingDisconnected() {
-        }
-
-        default void onSignalingConnectFailed() {
         }
     }
 

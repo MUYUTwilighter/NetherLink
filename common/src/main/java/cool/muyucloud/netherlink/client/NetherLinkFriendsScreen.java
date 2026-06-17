@@ -117,7 +117,7 @@ public class NetherLinkFriendsScreen extends Screen {
             return;
         }
         this.status = Component.translatable("netherlink.friends.joining", entry.name()).withStyle(ChatFormatting.YELLOW);
-        ClientJoinController.join(this.minecraft, entry.pmid()).whenComplete((ignored, error) -> this.minecraft.execute(() -> {
+        ClientJoinController.join(this.minecraft, entry.profileId(), entry.pmid()).whenComplete((ignored, error) -> this.minecraft.execute(() -> {
             if (error != null) {
                 this.status = Component.translatable("netherlink.friends.join_failed", error.getMessage()).withStyle(ChatFormatting.RED);
             } else {

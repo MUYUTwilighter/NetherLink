@@ -2,6 +2,7 @@ package cool.muyucloud.netherlink.p2p;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
+import cool.muyucloud.netherlink.link.LinkSignalingClient;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
@@ -22,11 +23,11 @@ public final class ServerP2PManager {
     private final String accountName;
     private final MinecraftAccount account;
     private final MinecraftServer server;
-    private final SignalingClient signaling;
+    private final LinkSignalingClient signaling;
     private final ConcurrentHashMap<UUID, UUID> profileIdsByPmid = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, String> acceptedAwaitingOffer = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, RtcHandshake> handshakes = new ConcurrentHashMap<>();
-    private final SignalingClient.ConnectionListener connectionListener = new SignalingClient.ConnectionListener() {
+    private final LinkSignalingClient.ConnectionListener connectionListener = new LinkSignalingClient.ConnectionListener() {
         @Override
         public void onSignalingConnected() {
             ServerP2PManager.this.onSignalingConnected();
@@ -62,10 +63,14 @@ public final class ServerP2PManager {
     private volatile boolean shutdown;
 
     public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server) {
+        this(accountName, account, server, new SignalingClient(account.getMcToken(), "NetherLink Signaling-" + accountName));
+    }
+
+    public ServerP2PManager(String accountName, MinecraftAccount account, MinecraftServer server, LinkSignalingClient signaling) {
         this.accountName = accountName;
         this.account = account;
         this.server = server;
-        this.signaling = new SignalingClient(account.getMcToken(), "NetherLink Signaling-" + accountName);
+        this.signaling = signaling;
         this.signaling.setFriendJoinHandler(this::handleFriendJoin);
         this.signaling.setWebRtcSignalingHandler(this::handleWebRtc);
         this.signaling.addConnectionListener(this.connectionListener);
