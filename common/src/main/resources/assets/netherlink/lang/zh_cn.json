@@ -57,5 +57,10 @@
   "block.netherlink.teacon_sign": "Teacon 告示牌",
   "block.netherlink.teacon_wall_sign": "Teacon 墙挂告示牌",
   "item.netherlink.teacon_sign": "Teacon 告示牌",
-  "itemGroup.netherlink.teacon": "NetherLink Teacon"
+  "itemGroup.netherlink.teacon": "NetherLink Teacon",
+
+  "block.netherlink.standing_intro_card_rack": "站立介绍放置栏",
+  "block.netherlink.wall_intro_card_rack": "墙面介绍放置栏",
+  "block.netherlink.hanging_intro_card_rack": "悬挂介绍放置栏",
+  "item.netherlink.intro_card": "介绍牌"
 }

@@ -57,5 +57,10 @@
   "block.netherlink.teacon_sign": "Teacon Sign",
   "block.netherlink.teacon_wall_sign": "Teacon Wall Sign",
   "item.netherlink.teacon_sign": "Teacon Sign",
-  "itemGroup.netherlink.teacon": "NetherLink Teacon"
+  "itemGroup.netherlink.teacon": "NetherLink Teacon",
+
+  "block.netherlink.standing_intro_card_rack": "Standing Intro Card Rack",
+  "block.netherlink.wall_intro_card_rack": "Wall Intro Card Rack",
+  "block.netherlink.hanging_intro_card_rack": "Hanging Intro Card Rack",
+  "item.netherlink.intro_card": "Intro Card"
 }

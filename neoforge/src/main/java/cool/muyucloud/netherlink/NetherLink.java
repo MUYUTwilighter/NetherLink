@@ -21,6 +21,7 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
+import cool.muyucloud.netherlink.teacon.card.blockentity.IntroCardRackBlockEntity;
 
 import java.util.Set;
 
@@ -51,12 +52,21 @@ public class NetherLink {
     public void onRegister(RegisterEvent event) {
         Bootstrap.initFor(event.getRegistryKey());
         if (Registries.BLOCK_ENTITY_TYPE.equals(event.getRegistryKey())) {
-            var type = new BlockEntityType<>(
+            var signType = new BlockEntityType<>(
                 SignBlockEntity::new,
                 Set.of(ModBlocks.TEACON_STANDING_SIGN, ModBlocks.TEACON_WALL_SIGN));
             event.register(Registries.BLOCK_ENTITY_TYPE,
-                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"), () -> type);
-            CommonReg.SIGN_BLOCK_ENTITY = () -> type;
+                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"), () -> signType);
+            CommonReg.SIGN_BLOCK_ENTITY = () -> signType;
+
+            var rackType = new BlockEntityType<>(
+                IntroCardRackBlockEntity::new,
+                Set.of(ModBlocks.STANDING_INTRO_CARD_RACK,
+                       ModBlocks.WALL_INTRO_CARD_RACK,
+                       ModBlocks.HANGING_INTRO_CARD_RACK));
+            event.register(Registries.BLOCK_ENTITY_TYPE,
+                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "intro_card_rack"), () -> rackType);
+            CommonReg.RACK_BLOCK_ENTITY = () -> rackType;
         }
         if (Registries.CREATIVE_MODE_TAB.equals(event.getRegistryKey())) {
             event.register(Registries.CREATIVE_MODE_TAB,
@@ -64,7 +74,13 @@ public class NetherLink {
                 () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
                     .title(Component.translatable("itemGroup." + NliConstants.MOD_ID + ".teacon"))
                     .icon(() -> new ItemStack(ModItems.TEACON_SIGN))
-                    .displayItems((params, output) -> output.accept(ModItems.TEACON_SIGN))
+                    .displayItems((params, output) -> {
+                        output.accept(ModItems.TEACON_SIGN);
+                        output.accept(ModItems.INTRO_CARD);
+                        output.accept(ModBlocks.STANDING_INTRO_CARD_RACK);
+                        output.accept(ModBlocks.WALL_INTRO_CARD_RACK);
+                        output.accept(ModBlocks.HANGING_INTRO_CARD_RACK);
+                    })
                     .build());
         }
     }
