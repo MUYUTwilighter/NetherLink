@@ -1,11 +1,14 @@
 package cool.muyucloud.netherlink.link.model;
 
-import net.minecraft.server.MinecraftServer;
+/**
+ * Idempotently closeable handle for one account runtime publishing one local server.
+ * Implementations own Presence refresh and inbound signaling for the handle's lifetime.
+ */
+public interface LinkHostPublication extends AutoCloseable {
+    /** Returns the latest token-free state snapshot without performing network I/O. */
+    LinkPublicationSnapshot snapshot();
 
-public interface LinkHostPublication {
-    MinecraftServer server();
-
-    void refresh();
-
-    void revoke();
+    /** Stops refresh/signaling and revokes Presence; repeated calls have no effect. */
+    @Override
+    void close();
 }

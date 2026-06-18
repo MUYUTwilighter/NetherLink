@@ -1,11 +1,14 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.bridge.MinecraftServerConnectionBridge;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
-import cool.muyucloud.netherlink.link.hook.LinkHostHooks;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkHostPublication;
-import cool.muyucloud.netherlink.p2p.SignalingException;
+import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
+import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
@@ -49,14 +52,20 @@ public final class ClientP2PController {
                 LauncherSessionAccount sessionAccount = new LauncherSessionAccount(minecraft.getUser());
                 if (!sessionAccount.isUsable()) {
                     ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
-                    NliConstants.LOG.warn("Launcher account is missing Minecraft token or PMID; NetherLink friends access is unavailable");
+                    NliConstants.LOG.warn("Launcher account is missing a Minecraft access token or profile id; NetherLink friends access is unavailable");
                     message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
                     return;
                 }
                 stopPublication();
-                String hostKey = "launcher:" + sessionAccount.getMcProfileName();
-                LinkHostHooks.setHost(hostKey, sessionAccount, integratedServer);
-                publication = LinkServices.current().hosting().publish(hostKey, SIGNALING_READY_TIMEOUT);
+                String hostKey = LinkRuntimeService.CLIENT_KEY;
+                LinkContextHooks.setClientConnection(hostKey, sessionAccount, "Minecraft Java instance", new MinecraftClientConnectionBridge(minecraft));
+                LinkContextHooks.setServerConnection(hostKey, sessionAccount, "Minecraft Java instance", new MinecraftServerConnectionBridge(integratedServer));
+                LinkServices.current().runtime().open(hostKey).join();
+                publication = LinkServices.current().hosting().publish(
+                    hostKey,
+                    LinkPresenceUpdate.hosting("Minecraft Java integrated server"),
+                    SIGNALING_READY_TIMEOUT
+                );
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
                 message(minecraft, Component.translatable("netherlink.client.friends.opened"));
             } catch (RuntimeException e) {
@@ -79,12 +88,13 @@ public final class ClientP2PController {
         EXECUTOR.execute(() -> {
             try {
                 if (publication != null) {
-                    publication.revoke();
+                    publication.close();
                 }
             } catch (RuntimeException e) {
                 NliConstants.LOG.warn("Failed to revoke NetherLink client presence", e);
             } finally {
                 publication = null;
+                LinkContextHooks.removeServerConnection(LinkRuntimeService.CLIENT_KEY);
                 message(minecraft, Component.translatable("netherlink.client.friends.closed"));
             }
         });
@@ -94,12 +104,13 @@ public final class ClientP2PController {
         EXECUTOR.execute(() -> {
             try {
                 if (publication != null) {
-                    publication.revoke();
+                    publication.close();
                 }
             } catch (RuntimeException e) {
                 NliConstants.LOG.warn("Failed to revoke NetherLink client presence during shutdown", e);
             } finally {
                 publication = null;
+                LinkContextHooks.removeServerConnection(LinkRuntimeService.CLIENT_KEY);
             }
         });
     }
@@ -108,16 +119,12 @@ public final class ClientP2PController {
         return ((NetherLinkIntegratedServer)integratedServer).nli$isFriendsOpen();
     }
 
-    @SuppressWarnings({"resource", "unused"})
-    public static boolean isPublishedBy(IntegratedServer integratedServer) {
-        return publication != null && publication.server() == integratedServer;
-    }
-
     private static void stopPublication() {
         if (publication != null) {
-            publication.revoke();
+            publication.close();
             publication = null;
         }
+        LinkContextHooks.removeServerConnection(LinkRuntimeService.CLIENT_KEY);
     }
 
     private static void message(Minecraft minecraft, Component message) {

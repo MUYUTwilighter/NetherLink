@@ -1,14 +1,19 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.transport;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import net.minecraft.util.StringRepresentable;
+import org.jspecify.annotations.NonNull;
 
-import java.util.UUID;
 import java.util.function.Supplier;
 
+/**
+ * Backend-neutral join-control and WebRTC negotiation message payload.
+ * Concrete signaling adapters wrap this payload in their own routing envelope; source identity
+ * must always come from authenticated transport state rather than caller-supplied fields.
+ */
 public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, SignalingMessage.WebRtc {
     Codec<SignalingMessage> CODEC = Type.CODEC.dispatch(SignalingMessage::type, Type::codec);
 
@@ -32,6 +37,7 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
 
     String sessionId();
 
+    /** Join request lifecycle messages that precede or terminate SDP negotiation. */
     sealed interface FriendJoin extends SignalingMessage permits FriendJoin.Request, FriendJoin.Accepted, FriendJoin.Rejected, FriendJoin.InviteDeclined {
         record Request(String sessionId) implements FriendJoin {
             private static final MapCodec<Request> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -78,6 +84,7 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
         }
     }
 
+    /** SDP and ICE messages exchanged after a join request is accepted. */
     sealed interface WebRtc extends SignalingMessage permits WebRtc.Offer, WebRtc.Answer, WebRtc.IceCandidate {
         record Offer(String sessionId, String sdp) implements WebRtc {
             private static final MapCodec<Offer> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -122,6 +129,7 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
         }
     }
 
+    /** Stable message kinds shared by all signaling backend adapters. */
     enum Type implements StringRepresentable {
         JOIN_REQUEST(() -> FriendJoin.Request.CODEC),
         JOIN_ACCEPTED(() -> FriendJoin.Accepted.CODEC),
@@ -143,12 +151,12 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
         }
 
         @Override
-        public String getSerializedName() {
+        public @NonNull String getSerializedName() {
             return this.name();
         }
     }
 
-    static SignalingMessage inviteDeclined() {
-        return new FriendJoin.InviteDeclined(UUID.randomUUID().toString());
+    static SignalingMessage inviteDeclined(String sessionId) {
+        return new FriendJoin.InviteDeclined(sessionId);
     }
 }

@@ -6,8 +6,9 @@ import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
-import cool.muyucloud.netherlink.p2p.SignalingException;
-import cool.muyucloud.netherlink.p2p.SignalingMessage;
+import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
+import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.RTCIceServer;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.server.jsonrpc.JsonRPCErrors;
@@ -104,20 +105,21 @@ public final class OfficialSignalingClient implements LinkSignalingClient {
     }
 
     @Override
-    public CompletableFuture<Void> sendClientMessage(UUID toPlayerId, SignalingMessage message) {
-        NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), toPlayerId);
+    public CompletableFuture<Void> sendClientMessage(LinkPeerRoute target, SignalingMessage message) {
+        UUID targetPmid = UUID.fromString(target.presenceId());
+        NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), targetPmid);
         String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message).getOrThrow(IllegalStateException::new).toString();
         return CompletableFuture.completedFuture(null)
             .thenComposeAsync(_ -> this.sendRequest("Signaling_SendClientMessage_v1_0", List.of(
                 JsonNull.INSTANCE,
-                new JsonPrimitive(toPlayerId.toString()),
+                new JsonPrimitive(targetPmid.toString()),
                 new JsonPrimitive(encoded)
             )), this.executor)
             .thenApply(_ -> (Void)null)
             .exceptionallyCompose(error -> {
                 if (error.getCause() instanceof JsonRpcException rpcError) {
-                    SignalingException mapped = SignalingErrorMapper.fromJsonRpc(toPlayerId, rpcError);
-                    this.fireListeners(listener -> listener.onSignalingError(toPlayerId, mapped));
+                    SignalingException mapped = SignalingErrorMapper.fromJsonRpc(target, rpcError);
+                    this.fireListeners(listener -> listener.onSignalingError(target, mapped));
                     return CompletableFuture.failedFuture(mapped);
                 }
                 return CompletableFuture.failedFuture(error);
@@ -318,32 +320,36 @@ public final class OfficialSignalingClient implements LinkSignalingClient {
         JsonElement inner = JsonParser.parseString(envelope.message());
         SignalingException serviceError = SignalingErrorMapper.fromServiceEnvelope(inner);
         if (serviceError != null) {
-            UUID errorPmid = serviceError.peerPmid() != null ? serviceError.peerPmid() : UUID.fromString(envelope.from());
-            NliConstants.LOG.warn("[P2P][signaling] Service error from {}: {}", errorPmid, serviceError.getMessage());
-            this.fireListeners(listener -> listener.onSignalingError(errorPmid, serviceError));
+            LinkPeerRoute errorPeer = serviceError.peer();
+            if (errorPeer == null) {
+                errorPeer = new LinkPeerRoute(null, UUID.fromString(envelope.from()).toString());
+            }
+            NliConstants.LOG.warn("[P2P][signaling] Service error from {}: {}", errorPeer.presenceId(), serviceError.getMessage());
+            LinkPeerRoute resolvedErrorPeer = errorPeer;
+            this.fireListeners(listener -> listener.onSignalingError(resolvedErrorPeer, serviceError));
             return;
         }
         SignalingMessage parsed = SignalingMessage.CODEC.parse(JsonOps.INSTANCE, inner)
             .getOrThrow(error -> new IllegalStateException("Malformed signaling payload: " + error));
-        UUID fromPmid = UUID.fromString(envelope.from());
-        NliConstants.LOG.info("[P2P][signaling] Received {} session={} from {}", parsed.type(), parsed.sessionId(), fromPmid);
+        LinkPeerRoute source = new LinkPeerRoute(null, UUID.fromString(envelope.from()).toString());
+        NliConstants.LOG.info("[P2P][signaling] Received {} session={} from {}", parsed.type(), parsed.sessionId(), source.presenceId());
         switch (parsed) {
-            case SignalingMessage.FriendJoin friendJoin -> this.dispatchFriendJoinMessage(fromPmid, friendJoin);
-            case SignalingMessage.WebRtc webRtc -> this.dispatchWebRtcMessage(fromPmid, webRtc);
+            case SignalingMessage.FriendJoin friendJoin -> this.dispatchFriendJoinMessage(source, friendJoin);
+            case SignalingMessage.WebRtc webRtc -> this.dispatchWebRtcMessage(source, webRtc);
         }
     }
 
-    private void dispatchFriendJoinMessage(UUID fromPmid, SignalingMessage.FriendJoin message) {
+    private void dispatchFriendJoinMessage(LinkPeerRoute source, SignalingMessage.FriendJoin message) {
         FriendJoinHandler handler = this.friendJoinHandler;
         if (handler != null) {
-            handler.handle(fromPmid, message);
+            handler.handle(source, message);
         }
     }
 
-    private void dispatchWebRtcMessage(UUID fromPmid, SignalingMessage.WebRtc message) {
+    private void dispatchWebRtcMessage(LinkPeerRoute source, SignalingMessage.WebRtc message) {
         WebRtcSignalingHandler handler = this.webRtcSignalingHandler;
         if (handler != null) {
-            handler.handle(fromPmid, message);
+            handler.handle(source, message);
         }
     }
 

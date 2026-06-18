@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.transport;
 
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.*;
@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+/** Internal single-use WebRTC offer/answer and ICE negotiation state machine. */
 public final class RtcHandshake {
     private final String id;
     private final RTCPeerConnection peerConnection;

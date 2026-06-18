@@ -1,12 +1,19 @@
 package cool.muyucloud.netherlink.link.service;
 
-import cool.muyucloud.netherlink.account.MinecraftAccount;
+import cool.muyucloud.netherlink.link.model.LinkPresence;
+import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
 
-import java.util.Map;
-import java.util.UUID;
-
+/**
+ * Backend-internal Presence publishing SPI.
+ *
+ * <p>Game-facing code does not call this service directly. Runtime and hosting implementations
+ * own Presence creation, refresh cadence, and removal.</p>
+ */
 public interface LinkPresenceService {
-    Map<UUID, UUID> publish(MinecraftAccount account);
+    /** Publishes or refreshes Presence for exactly one account-level runtime. */
+    @SuppressWarnings("unused")
+    LinkPresence publish(String runtimeKey, LinkPresenceUpdate update);
 
-    void revoke(MinecraftAccount account);
+    /** Idempotently removes Presence for exactly one account-level runtime. */
+    void revoke(String runtimeKey);
 }

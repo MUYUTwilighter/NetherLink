@@ -2,16 +2,30 @@ package cool.muyucloud.netherlink.link.official;
 
 import cool.muyucloud.netherlink.link.LinkBackendId;
 import cool.muyucloud.netherlink.link.LinkService;
-import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
+import cool.muyucloud.netherlink.link.model.LinkBackendCapability;
+import cool.muyucloud.netherlink.link.model.LinkBackendDescriptor;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
-import cool.muyucloud.netherlink.link.service.LinkPresenceService;
+import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
+
+import java.util.Set;
 
 public final class OfficialLinkServiceProvider implements LinkService {
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
+    private static final LinkBackendDescriptor DESCRIPTOR = new LinkBackendDescriptor(
+        LinkBackendId.MOJ_26_2_S8,
+        Set.of(
+            LinkBackendCapability.FRIENDS,
+            LinkBackendCapability.HOSTING,
+            LinkBackendCapability.JOINING,
+            LinkBackendCapability.MULTI_ACCOUNT_RUNTIME
+        )
+    );
 
     private final OfficialPresenceService presence = new OfficialPresenceService();
+    private final LinkRuntimeService runtime = new OfficialRuntimeService();
     private final LinkHostingService hosting = new OfficialHostingService(this.presence);
     private final LinkJoinService joining = new OfficialJoinService();
 
@@ -19,18 +33,18 @@ public final class OfficialLinkServiceProvider implements LinkService {
     }
 
     @Override
-    public LinkBackendId id() {
-        return LinkBackendId.MOJ_26_2_S8;
+    public LinkBackendDescriptor descriptor() {
+        return DESCRIPTOR;
     }
 
     @Override
-    public LinkFriendService createFriendService() {
-        return new OfficialFriendService(LinkClientHooks.requireClient().minecraft());
+    public LinkFriendService createFriendService(String runtimeKey) {
+        return new OfficialFriendService(LinkContextHooks.require(runtimeKey).account());
     }
 
     @Override
-    public LinkPresenceService presence() {
-        return this.presence;
+    public LinkRuntimeService runtime() {
+        return this.runtime;
     }
 
     @Override

@@ -5,12 +5,19 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.account.MinecraftAccount;
+import cool.muyucloud.netherlink.account.NetherLinkAuthException;
 import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
+import cool.muyucloud.netherlink.link.model.LinkFriendActionOutcome;
+import cool.muyucloud.netherlink.link.model.LinkFailure;
+import cool.muyucloud.netherlink.link.model.LinkFailureCode;
 import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
 import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
 import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
+import cool.muyucloud.netherlink.link.model.LinkPresence;
+import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
+import cool.muyucloud.netherlink.link.model.LinkOfficialSyncStatus;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
-import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -39,8 +46,12 @@ public final class OfficialFriendService implements LinkFriendService {
     private FriendLists friendCache = new FriendLists(List.of(), List.of(), List.of());
     private LinkFriendSnapshot cache = new LinkFriendSnapshot(List.of(), List.of(), List.of());
 
-    public OfficialFriendService(Minecraft minecraft) {
-        this.accessToken = minecraft.getUser().getAccessToken();
+    public OfficialFriendService(MinecraftAccount account) {
+        String token = account.getMcToken();
+        if (token == null || token.isBlank()) {
+            throw new NetherLinkAuthException("Minecraft access token was not found");
+        }
+        this.accessToken = token;
     }
 
     @Override
@@ -58,27 +69,27 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     @Override
-    public CompletableFuture<LinkFriendActionResult> add(String name) {
+    public CompletableFuture<LinkFriendActionOutcome> add(String name) {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(name, null, "ADD"), EXECUTOR);
     }
 
     @Override
-    public CompletableFuture<LinkFriendActionResult> remove(UUID profileId) {
+    public CompletableFuture<LinkFriendActionOutcome> remove(UUID profileId) {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(null, profileId, "REMOVE"), EXECUTOR);
     }
 
     @Override
-    public CompletableFuture<LinkFriendActionResult> accept(UUID profileId) {
+    public CompletableFuture<LinkFriendActionOutcome> accept(UUID profileId) {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(null, profileId, "ADD"), EXECUTOR);
     }
 
     @Override
-    public CompletableFuture<LinkFriendActionResult> decline(UUID profileId) {
+    public CompletableFuture<LinkFriendActionOutcome> decline(UUID profileId) {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(null, profileId, "REMOVE"), EXECUTOR);
     }
 
     @Override
-    public CompletableFuture<LinkFriendActionResult> revoke(UUID profileId) {
+    public CompletableFuture<LinkFriendActionOutcome> revoke(UUID profileId) {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(null, profileId, "REMOVE"), EXECUTOR);
     }
 
@@ -118,7 +129,12 @@ public final class OfficialFriendService implements LinkFriendService {
             HttpResponse<String> response = this.http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 304) {
                 Map<UUID, Presence> cached = new HashMap<>();
-                this.cache.all().forEach(entry -> cached.put(entry.profileId(), new Presence(entry.presenceId(), entry.status(), entry.joinable())));
+                this.cache.all().forEach(entry -> {
+                    if (!entry.presences().isEmpty()) {
+                        LinkPresence presence = entry.presences().getFirst();
+                        cached.put(entry.profileId(), new Presence(presence.presenceId(), presence.status(), presence.joinable()));
+                    }
+                });
                 return cached;
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
@@ -136,7 +152,7 @@ public final class OfficialFriendService implements LinkFriendService {
         }
     }
 
-    private LinkFriendActionResult putFriendAction(@Nullable String name, @Nullable UUID profileId, String updateType) {
+    private LinkFriendActionOutcome putFriendAction(@Nullable String name, @Nullable UUID profileId, String updateType) {
         JsonObject body = new JsonObject();
         if (name != null) {
             body.addProperty("name", name);
@@ -158,14 +174,48 @@ public final class OfficialFriendService implements LinkFriendService {
                 this.friendCache = parseFriendLists(response.body());
                 this.cache = this.friendCache.snapshot(Map.of());
             }
-            return result;
+            return new LinkFriendActionOutcome(
+                result,
+                result == LinkFriendActionResult.SUCCESS ? this.relationshipAfterAction(name, profileId) : null,
+                result == LinkFriendActionResult.SUCCESS ? LinkOfficialSyncStatus.SUCCESS : LinkOfficialSyncStatus.FAILED,
+                failureFor(result)
+            );
         } catch (IOException e) {
             NliConstants.LOG.warn("Friend action failed: {}", e.toString());
-            return LinkFriendActionResult.ERROR;
+            return new LinkFriendActionOutcome(
+                LinkFriendActionResult.ERROR,
+                null,
+                LinkOfficialSyncStatus.FAILED,
+                new LinkFailure(LinkFailureCode.NETWORK, "Friend action network request failed", true)
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return LinkFriendActionResult.ERROR;
+            return new LinkFriendActionOutcome(
+                LinkFriendActionResult.ERROR,
+                null,
+                LinkOfficialSyncStatus.FAILED,
+                new LinkFailure(LinkFailureCode.CANCELLED, "Friend action was interrupted", true)
+            );
         }
+    }
+
+    private @Nullable LinkFriendRelationship relationshipAfterAction(@Nullable String name, @Nullable UUID profileId) {
+        if (contains(this.friendCache.friends(), name, profileId)) {
+            return LinkFriendRelationship.FRIEND;
+        }
+        if (contains(this.friendCache.incoming(), name, profileId)) {
+            return LinkFriendRelationship.INCOMING;
+        }
+        if (contains(this.friendCache.outgoing(), name, profileId)) {
+            return LinkFriendRelationship.OUTGOING;
+        }
+        return null;
+    }
+
+    private static boolean contains(List<Friend> friends, @Nullable String name, @Nullable UUID profileId) {
+        return friends.stream().anyMatch(friend ->
+            profileId != null ? profileId.equals(friend.profileId()) : name != null && name.equalsIgnoreCase(friend.name())
+        );
     }
 
     private HttpRequest.Builder authorized(URI uri) {
@@ -221,7 +271,11 @@ public final class OfficialFriendService implements LinkFriendService {
                 ? object.getAsJsonObject("joinInfo")
                 : null;
             String joinValue = joinInfo != null ? string(joinInfo, "value") : null;
-            statuses.put(profileId, new Presence(presenceId, status != null ? status : "OFFLINE", joinValue != null && !joinValue.isBlank()));
+            statuses.put(profileId, new Presence(
+                presenceId != null ? presenceId.toString() : null,
+                officialStatus(status != null ? status : "OFFLINE"),
+                joinValue != null && !joinValue.isBlank()
+            ));
         }
         return Map.copyOf(statuses);
     }
@@ -229,39 +283,31 @@ public final class OfficialFriendService implements LinkFriendService {
     private static List<LinkFriendEntry> entries(List<Friend> friends, LinkFriendRelationship relationship, Map<UUID, Presence> presenceByProfile) {
         return friends.stream().map(friend -> {
             Presence presence = presenceByProfile.get(friend.profileId());
-            return new LinkFriendEntry(
-                friend.profileId(),
-                friend.name(),
-                presence != null ? presence.presenceId() : null,
-                relationship,
-                presence != null ? presence.status() : "OFFLINE",
-                presence != null && presence.joinable()
-            );
-        }).sorted(ENTRY_ORDER).toList();
+            List<LinkPresence> presences = presence == null || presence.presenceId() == null
+                ? List.of()
+                : List.of(new LinkPresence(
+                    presence.presenceId(),
+                    presence.status(),
+                    presence.joinable(),
+                    friend.name(),
+                    null,
+                    null,
+                    null,
+                    null
+                ));
+            return new LinkFriendEntry(friend.profileId(), friend.name(), relationship, presences);
+        }).toList();
     }
 
-    private static final Comparator<LinkFriendEntry> ENTRY_ORDER = Comparator.<LinkFriendEntry>comparingInt(entry -> relationshipRank(entry.relationship()))
-        .thenComparingInt(entry -> presenceRank(entry.status()))
-        .thenComparing(LinkFriendEntry::name, String.CASE_INSENSITIVE_ORDER)
-        .thenComparing(entry -> entry.profileId().toString());
-
-    private static int relationshipRank(LinkFriendRelationship relationship) {
-        return switch (relationship) {
-            case INCOMING -> 0;
-            case OUTGOING -> 1;
-            case FRIEND -> 2;
-        };
-    }
-
-    private static int presenceRank(String status) {
+    private static LinkPresenceStatus officialStatus(String status) {
         return switch (status.toUpperCase(Locale.ROOT)) {
-            case "PLAYING_HOSTED_SERVER" -> 0;
-            case "PLAYING_REALMS" -> 1;
-            case "PLAYING_SERVER" -> 2;
-            case "PLAYING_OFFLINE" -> 3;
-            case "ONLINE" -> 4;
-            case "OFFLINE" -> 5;
-            default -> 6;
+            case "PLAYING_HOSTED_SERVER" -> LinkPresenceStatus.HOSTING;
+            case "PLAYING_REALMS" -> LinkPresenceStatus.PLAYING_REALMS;
+            case "PLAYING_SERVER" -> LinkPresenceStatus.PLAYING_SERVER;
+            case "PLAYING_OFFLINE" -> LinkPresenceStatus.PLAYING_OFFLINE;
+            case "ONLINE" -> LinkPresenceStatus.ONLINE;
+            case "OFFLINE" -> LinkPresenceStatus.OFFLINE;
+            default -> LinkPresenceStatus.UNKNOWN;
         };
     }
 
@@ -282,6 +328,17 @@ public final class OfficialFriendService implements LinkFriendService {
             return LinkFriendActionResult.SERVICE_NOT_AVAILABLE;
         }
         return LinkFriendActionResult.ERROR;
+    }
+
+    private static @Nullable LinkFailure failureFor(LinkFriendActionResult result) {
+        return switch (result) {
+            case SUCCESS -> null;
+            case SERVICE_NOT_AVAILABLE -> new LinkFailure(LinkFailureCode.SERVICE_UNAVAILABLE, "Friend service is unavailable", true);
+            case TOO_MANY_REQUESTS -> new LinkFailure(LinkFailureCode.RATE_LIMITED, "Friend action rate limit exceeded", true);
+            case FORBIDDEN -> new LinkFailure(LinkFailureCode.FORBIDDEN, "Friend action is forbidden", false);
+            case UNKNOWN_PROFILE -> new LinkFailure(LinkFailureCode.PROFILE_NOT_FOUND, "Minecraft profile was not found", false);
+            case ERROR -> new LinkFailure(LinkFailureCode.UNKNOWN, "Friend action failed", false);
+        };
     }
 
     private static @Nullable String string(JsonObject object, String key) {
@@ -327,6 +384,6 @@ public final class OfficialFriendService implements LinkFriendService {
     private record Friend(UUID profileId, String name) {
     }
 
-    private record Presence(@Nullable UUID presenceId, String status, boolean joinable) {
+    private record Presence(@Nullable String presenceId, LinkPresenceStatus status, boolean joinable) {
     }
 }

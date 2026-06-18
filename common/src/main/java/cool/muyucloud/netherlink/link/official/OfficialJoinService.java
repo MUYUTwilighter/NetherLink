@@ -2,36 +2,33 @@ package cool.muyucloud.netherlink.link.official;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
-import cool.muyucloud.netherlink.link.hook.LinkClientHooks;
-import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
+import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
+import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
+import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.exception.LinkException;
+import cool.muyucloud.netherlink.link.model.LinkFailure;
+import cool.muyucloud.netherlink.link.model.LinkFailureCode;
+import cool.muyucloud.netherlink.link.model.LinkJoinOperation;
+import cool.muyucloud.netherlink.link.model.LinkJoinSnapshot;
+import cool.muyucloud.netherlink.link.model.LinkJoinState;
+import cool.muyucloud.netherlink.link.model.LinkJoinTarget;
+import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
 import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
-import cool.muyucloud.netherlink.mixin.MinecraftAccessor;
-import cool.muyucloud.netherlink.p2p.RtcChannel;
-import cool.muyucloud.netherlink.p2p.RtcHandshake;
-import cool.muyucloud.netherlink.p2p.SignalingMessage;
+import cool.muyucloud.netherlink.link.transport.RtcChannel;
+import cool.muyucloud.netherlink.link.transport.RtcHandshake;
+import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.timeout.ReadTimeoutHandler;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ProgressScreen;
-import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
-import net.minecraft.client.multiplayer.LevelLoadTracker;
-import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.PacketFlow;
-import net.minecraft.network.protocol.login.LoginProtocols;
-import net.minecraft.network.protocol.login.ServerboundHelloPacket;
-import net.minecraft.server.network.EventLoopGroupHolder;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -40,98 +37,107 @@ public final class OfficialJoinService implements LinkJoinService {
     private static final long JOIN_TIMEOUT_SECONDS = 60L;
     private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
-    private final ConcurrentHashMap<UUID, OutgoingJoin> outgoing = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<JoinKey, OutgoingJoin> outgoing = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ClientSession> sessions = new ConcurrentHashMap<>();
     private @Nullable PeerConnectionFactory factory;
-    private @Nullable LinkSignalingClient signaling;
-    private @Nullable MinecraftAccount account;
 
     @Override
-    @SuppressWarnings("resource")
-    public CompletableFuture<Void> join(LinkFriendEntry target) {
-        UUID hostPresenceId = target.presenceId();
-        if (hostPresenceId == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Selected friend has no joinable presence"));
-        }
-        LinkClientHooks.Client clientHook = LinkClientHooks.requireClient();
-        Minecraft minecraft = clientHook.minecraft();
-        if (minecraft.level != null || minecraft.getSingleplayerServer() != null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Join requests are only available from the main menu"));
-        }
-        OutgoingJoin existing = this.outgoing.get(hostPresenceId);
+    public LinkJoinOperation join(String runtimeKey, LinkJoinTarget target) {
+        LinkPeerRoute host = target.route();
+        JoinKey key = new JoinKey(runtimeKey, host.presenceId());
+        OutgoingJoin existing = this.outgoing.get(key);
         if (existing != null) {
-            return existing.result();
+            return existing;
         }
-        this.ensureSignaling(clientHook);
-        LinkSignalingClient client = this.signaling;
-        if (client == null) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Signaling client was not created"));
-        }
-        String sessionId = UUID.randomUUID().toString();
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        OutgoingJoin join = new OutgoingJoin(sessionId, result);
-        OutgoingJoin raced = this.outgoing.putIfAbsent(hostPresenceId, join);
+
+        LinkRuntimeContext context = LinkContextHooks.require(runtimeKey);
+        LinkClientConnectionBridge connectionBridge = context.requireClientConnection();
+        ClientSession session = this.ensureSession(runtimeKey, context.account());
+        OutgoingJoin operation = new OutgoingJoin(
+            runtimeKey,
+            target,
+            UUID.randomUUID().toString(),
+            connectionBridge,
+            session.signaling()
+        );
+        OutgoingJoin raced = this.outgoing.putIfAbsent(key, operation);
         if (raced != null) {
-            return raced.result();
+            return raced;
         }
-        result.whenComplete((_, _) -> {
-            this.outgoing.remove(hostPresenceId, join);
-            this.maybeDisconnectSignaling();
+
+        operation.completion().whenComplete((_, _) -> {
+            this.outgoing.remove(key, operation);
+            this.maybeDisconnectSignaling(runtimeKey);
         });
-        client.connect();
+        session.signaling().connect();
         CompletableFuture.delayedExecutor(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
-            if (!join.sdpStarted() && result.completeExceptionally(new IllegalStateException("Join request timed out"))) {
-                NliConstants.LOG.warn("[P2P][client] Join request timed out session={}", sessionId);
+            if (!operation.sdpStarted()) {
+                operation.fail(new IllegalStateException("Join request timed out"));
             }
         });
-        client.sendClientMessage(hostPresenceId, new SignalingMessage.FriendJoin.Request(sessionId)).whenComplete((_, error) -> {
-            if (error != null) {
-                result.completeExceptionally(error);
-            }
-        });
-        return result;
+        session.signaling().sendClientMessage(host, new SignalingMessage.FriendJoin.Request(operation.sessionId()))
+            .whenComplete((_, error) -> {
+                if (error != null) {
+                    operation.fail(error);
+                }
+            });
+        return operation;
     }
 
     @Override
-    public boolean hasOutgoingJoin() {
-        return !this.outgoing.isEmpty();
+    public boolean hasOutgoingJoin(String runtimeKey) {
+        return this.outgoing.keySet().stream().anyMatch(key -> key.runtimeKey().equals(runtimeKey));
     }
 
     @Override
-    public void shutdown() {
-        this.outgoing.values().forEach(join -> join.result().completeExceptionally(new IllegalStateException("shutdown")));
-        this.outgoing.clear();
-        if (this.signaling != null) {
-            this.signaling.shutdown();
-            this.signaling = null;
+    public synchronized void shutdown(String runtimeKey) {
+        this.outgoing.forEach((key, operation) -> {
+            if (key.runtimeKey().equals(runtimeKey)) {
+                operation.abort();
+            }
+        });
+        ClientSession session = this.sessions.remove(runtimeKey);
+        if (session != null) {
+            session.signaling().shutdown();
         }
+    }
+
+    @Override
+    public synchronized void shutdown() {
+        new ArrayList<>(this.sessions.keySet()).forEach(this::shutdown);
+        this.outgoing.values().forEach(OutgoingJoin::abort);
+        this.outgoing.clear();
         if (this.factory != null) {
             this.factory.dispose();
             this.factory = null;
         }
-        this.account = null;
     }
 
-    private void ensureSignaling(LinkClientHooks.Client clientHook) {
-        MinecraftAccount current = clientHook.account();
-        MinecraftAccount existing = this.account;
-        String currentToken = current.getMcToken();
-        if (this.signaling != null && existing != null && currentToken != null && currentToken.equals(existing.getMcToken())) {
-            return;
+    private synchronized ClientSession ensureSession(String runtimeKey, MinecraftAccount account) {
+        String token = account.getMcToken();
+        ClientSession existing = this.sessions.get(runtimeKey);
+        if (existing != null && token != null && token.equals(existing.token())) {
+            return existing;
         }
-        this.shutdown();
-        this.account = current;
-        this.signaling = new OfficialSignalingClient(clientHook.account().getMcToken(), "NetherLink Client Signaling");
-        this.signaling.setFriendJoinHandler((fromPresenceId, message) -> this.handleFriendJoin(clientHook.minecraft(), fromPresenceId, message));
-        this.signaling.setWebRtcSignalingHandler(this::handleWebRtc);
+        if (existing != null) {
+            this.shutdown(runtimeKey);
+        }
+        LinkSignalingClient signaling = new OfficialSignalingClient(token, "NetherLink Client Signaling-" + runtimeKey);
+        signaling.setFriendJoinHandler((source, message) -> this.handleFriendJoin(runtimeKey, source, message));
+        signaling.setWebRtcSignalingHandler((source, message) -> this.handleWebRtc(runtimeKey, source, message));
+        ClientSession created = new ClientSession(token, signaling);
+        this.sessions.put(runtimeKey, created);
+        return created;
     }
 
-    private void handleFriendJoin(Minecraft minecraft, UUID fromPresenceId, SignalingMessage.FriendJoin message) {
+    private void handleFriendJoin(String runtimeKey, LinkPeerRoute source, SignalingMessage.FriendJoin message) {
+        JoinKey key = new JoinKey(runtimeKey, source.presenceId());
         switch (message) {
-            case SignalingMessage.FriendJoin.Accepted accepted -> this.handleAccepted(minecraft, fromPresenceId, accepted.sessionId());
+            case SignalingMessage.FriendJoin.Accepted accepted -> this.handleAccepted(key, source, accepted.sessionId());
             case SignalingMessage.FriendJoin.Rejected rejected -> {
-                OutgoingJoin join = this.outgoing.get(fromPresenceId);
-                if (join != null && join.sessionId().equals(rejected.sessionId())) {
-                    join.result().completeExceptionally(new IllegalStateException("Join request rejected"));
+                OutgoingJoin operation = this.outgoing.get(key);
+                if (operation != null && operation.sessionId().equals(rejected.sessionId())) {
+                    operation.reject();
                 }
             }
             case SignalingMessage.FriendJoin.Request ignored -> {
@@ -141,51 +147,65 @@ public final class OfficialJoinService implements LinkJoinService {
         }
     }
 
-    private void handleAccepted(Minecraft minecraft, UUID hostPresenceId, String sessionId) {
-        OutgoingJoin join = this.outgoing.get(hostPresenceId);
-        if (join == null || !join.sessionId().equals(sessionId) || !join.startSdp()) {
+    private void handleAccepted(JoinKey key, LinkPeerRoute host, String sessionId) {
+        OutgoingJoin operation = this.outgoing.get(key);
+        if (operation == null || !operation.sessionId().equals(sessionId) || !operation.startSdp()) {
             return;
         }
-        LinkSignalingClient client = this.signaling;
-        if (client == null) {
-            join.result().completeExceptionally(new IllegalStateException("Signaling client is not connected"));
+        ClientSession session = this.sessions.get(key.runtimeKey());
+        if (session == null) {
+            operation.fail(new IllegalStateException("Signaling client is not connected"));
             return;
         }
-        client.requestTurnAuth().thenCompose(turn -> this.startHandshake(minecraft, client, hostPresenceId, sessionId, turn, join))
+        operation.transition(LinkJoinState.NEGOTIATING);
+        session.signaling().requestTurnAuth()
+            .thenCompose(turn -> this.startHandshake(session.signaling(), host, sessionId, turn, operation))
             .whenComplete((_, error) -> {
                 if (error != null) {
-                    join.result().completeExceptionally(error);
+                    operation.fail(error);
                 }
             });
     }
 
-    private CompletableFuture<Void> startHandshake(Minecraft minecraft, LinkSignalingClient client, UUID hostPresenceId, String sessionId, RTCIceServer turn, OutgoingJoin join) {
+    private CompletableFuture<Void> startHandshake(
+        LinkSignalingClient signaling,
+        LinkPeerRoute host,
+        String sessionId,
+        RTCIceServer turn,
+        OutgoingJoin operation
+    ) {
         RTCConfiguration config = new RTCConfiguration();
         config.iceServers.add(turn);
         config.portAllocatorConfig.setEnableIpv6(true).setEnableIpv6OnWifi(true);
         RtcHandshake handshake = new RtcHandshake(this.factory(), config, sessionId, true,
-            candidate -> client.sendClientMessage(hostPresenceId, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null));
-        join.setHandshake(handshake);
+            candidate -> signaling.sendClientMessage(host, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null));
+        operation.setHandshake(handshake);
         CompletableFuture.delayedExecutor(HANDSHAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
-            if (!join.result().isDone()) {
+            if (!operation.completion().isDone()) {
                 handshake.abort("timeout");
             }
         });
         handshake.future().whenComplete((handshakeResult, error) -> {
             if (error != null) {
-                join.result().completeExceptionally(error);
-            } else {
-                joinHost(minecraft, handshakeResult);
-                join.result().complete(null);
+                operation.fail(error);
+                return;
+            }
+            try {
+                operation.transition(LinkJoinState.CONNECTING);
+                operation.connectionBridge().join(new RtcChannel(handshakeResult));
+                operation.complete();
+            } catch (RuntimeException bridgeError) {
+                RtcChannel.dispose(handshakeResult);
+                operation.fail(bridgeError);
             }
         });
         return handshake.createOffer()
-            .thenCompose(offer -> client.sendClientMessage(hostPresenceId, new SignalingMessage.WebRtc.Offer(sessionId, offer)));
+            .thenCompose(offer -> signaling.sendClientMessage(host, new SignalingMessage.WebRtc.Offer(sessionId, offer)));
     }
 
-    private void handleWebRtc(UUID fromPresenceId, SignalingMessage.WebRtc message) {
-        OutgoingJoin join = this.outgoing.get(fromPresenceId);
-        RtcHandshake handshake = join != null ? join.handshake() : null;
+    private void handleWebRtc(String runtimeKey, LinkPeerRoute source, SignalingMessage.WebRtc message) {
+        OutgoingJoin operation = this.outgoing.get(new JoinKey(runtimeKey, source.presenceId()));
+        RtcHandshake handshake = operation != null ? operation.handshake() : null;
         if (handshake == null || !handshake.id().equals(message.sessionId())) {
             return;
         }
@@ -203,80 +223,89 @@ public final class OfficialJoinService implements LinkJoinService {
         }
     }
 
-    private static void joinHost(Minecraft minecraft, RtcHandshake.HandshakeResult handshakeResult) {
-        minecraft.execute(() -> {
-            minecraft.disconnect(new ProgressScreen(true), false);
-            Connection connection = connectionFromRtc(handshakeResult);
-            LevelLoadTracker tracker = new LevelLoadTracker(0L);
-            connection.initiateServerboundPlayConnection(
-                "rtc-peer",
-                0,
-                LoginProtocols.SERVERBOUND,
-                LoginProtocols.CLIENTBOUND,
-                new ClientHandshakePacketListenerImpl(
-                    connection,
-                    minecraft,
-                    new ServerData("NetherLink", "rtc-peer", ServerData.Type.OTHER),
-                    null,
-                    false,
-                    null,
-                    _ -> {
-                    },
-                    tracker,
-                    null
-                ),
-                false
-            );
-            connection.send(new ServerboundHelloPacket(minecraft.getUser().getName(), minecraft.getUser().getProfileId()));
-            ((MinecraftAccessor)minecraft).nli$setPendingConnection(connection);
-        });
-    }
-
-    private static Connection connectionFromRtc(RtcHandshake.HandshakeResult handshakeResult) {
-        Connection connection = new Connection(PacketFlow.CLIENTBOUND);
-        Channel channel = new RtcChannel(handshakeResult);
-        channel.pipeline().addLast(new ChannelInitializer<>() {
-            @Override
-            protected void initChannel(Channel ch) {
-                ChannelPipeline pipeline = ch.pipeline().addLast("timeout", new ReadTimeoutHandler(30));
-                Connection.configureSerialization(pipeline, PacketFlow.CLIENTBOUND, false, null);
-                connection.configurePacketHandler(pipeline);
-            }
-        });
-        EventLoopGroupHolder.local().eventLoopGroup().register(channel).syncUninterruptibly();
-        return connection;
-    }
-
-    private PeerConnectionFactory factory() {
+    private synchronized PeerConnectionFactory factory() {
         if (this.factory == null) {
             this.factory = new PeerConnectionFactory();
         }
         return this.factory;
     }
 
-    private void maybeDisconnectSignaling() {
-        if (this.outgoing.isEmpty() && this.signaling != null) {
-            this.signaling.disconnect();
+    private void maybeDisconnectSignaling(String runtimeKey) {
+        if (this.hasOutgoingJoin(runtimeKey)) {
+            return;
+        }
+        ClientSession session = this.sessions.get(runtimeKey);
+        if (session != null) {
+            session.signaling().disconnect();
         }
     }
 
-    private static final class OutgoingJoin {
+    private record JoinKey(String runtimeKey, String hostPresenceId) {
+    }
+
+    private record ClientSession(@Nullable String token, LinkSignalingClient signaling) {
+    }
+
+    private static final class OutgoingJoin implements LinkJoinOperation {
+        private final String runtimeKey;
+        private final LinkJoinTarget target;
         private final String sessionId;
-        private final CompletableFuture<Void> result;
+        private final LinkClientConnectionBridge connectionBridge;
+        private final LinkSignalingClient signaling;
+        private final CompletableFuture<Void> completion = new CompletableFuture<>();
+        private volatile LinkJoinSnapshot snapshot;
         private volatile boolean sdpStarted;
         private volatile RtcHandshake handshake;
 
-        private OutgoingJoin(String sessionId, CompletableFuture<Void> result) {
+        private OutgoingJoin(
+            String runtimeKey,
+            LinkJoinTarget target,
+            String sessionId,
+            LinkClientConnectionBridge connectionBridge,
+            LinkSignalingClient signaling
+        ) {
+            this.runtimeKey = runtimeKey;
+            this.target = target;
             this.sessionId = sessionId;
-            this.result = result;
+            this.connectionBridge = connectionBridge;
+            this.signaling = signaling;
+            this.snapshot = new LinkJoinSnapshot(runtimeKey, target, LinkJoinState.REQUESTING, null);
+        }
+
+        @Override
+        public LinkJoinSnapshot snapshot() {
+            return this.snapshot;
+        }
+
+        @Override
+        public CompletableFuture<Void> completion() {
+            return this.completion;
+        }
+
+        @Override
+        public boolean cancel() {
+            synchronized (this) {
+                if (this.completion.isDone()) {
+                    return false;
+                }
+                if (this.sdpStarted && this.handshake == null) {
+                    this.signaling.sendClientMessage(this.target.route(), SignalingMessage.inviteDeclined(this.sessionId)).exceptionally(_ -> null);
+                }
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.CANCELLED, null);
+                if (this.handshake != null) {
+                    this.handshake.abort("cancelled");
+                }
+                this.completion.completeExceptionally(new CancellationException("Join cancelled"));
+            }
+            return true;
         }
 
         private String sessionId() {
             return this.sessionId;
         }
 
-        private CompletableFuture<Void> result() {
-            return this.result;
+        private LinkClientConnectionBridge connectionBridge() {
+            return this.connectionBridge;
         }
 
         private boolean sdpStarted() {
@@ -284,10 +313,11 @@ public final class OfficialJoinService implements LinkJoinService {
         }
 
         private synchronized boolean startSdp() {
-            if (this.sdpStarted) {
+            if (this.sdpStarted || this.completion.isDone()) {
                 return false;
             }
             this.sdpStarted = true;
+            this.transition(LinkJoinState.ACCEPTED);
             return true;
         }
 
@@ -297,6 +327,48 @@ public final class OfficialJoinService implements LinkJoinService {
 
         private void setHandshake(RtcHandshake handshake) {
             this.handshake = handshake;
+        }
+
+        private synchronized void transition(LinkJoinState state) {
+            if (!this.completion.isDone()) {
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, state, null);
+            }
+        }
+
+        private synchronized void complete() {
+            if (!this.completion.isDone()) {
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.CONNECTED, null);
+                this.completion.complete(null);
+            }
+        }
+
+        private synchronized void reject() {
+            if (!this.completion.isDone()) {
+                LinkException error = new LinkException(new LinkFailure(LinkFailureCode.FORBIDDEN, "Join request rejected", false));
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.REJECTED, LinkFailures.from(error));
+                this.completion.completeExceptionally(error);
+            }
+        }
+
+        private synchronized void fail(Throwable error) {
+            if (!this.completion.isDone()) {
+                var failure = LinkFailures.from(error);
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.FAILED, failure);
+                this.completion.completeExceptionally(error);
+                NliConstants.LOG.warn("[P2P][{}] Join failed session={}: {}", this.runtimeKey, this.sessionId, failure.message());
+            }
+        }
+
+        private synchronized void abort() {
+            String reason = "shutdown";
+            if (this.handshake != null) {
+                this.handshake.abort(reason);
+            }
+            if (!this.completion.isDone()) {
+                LinkFailure failure = new LinkFailure(LinkFailureCode.CANCELLED, reason, false);
+                this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.CANCELLED, failure);
+                this.completion.completeExceptionally(new CancellationException(reason));
+            }
         }
     }
 }

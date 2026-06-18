@@ -1,12 +1,13 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.transport;
 
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.link.bridge.LinkServerConnectionBridge;
+import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import net.minecraft.server.MinecraftServer;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -15,16 +16,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Internal host-side coordinator that accepts authorized join signaling, negotiates WebRTC, and
+ * hands established channels to a server bridge. One manager belongs to exactly one account
+ * runtime and signaling identity.
+ */
 public final class ServerP2PManager {
     private static final long SIGNALING_RECONNECT_DELAY_SECONDS = 1L;
     private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
     private final String accountName;
-    private final MinecraftServer server;
+    private final LinkServerConnectionBridge connectionBridge;
     private final LinkSignalingClient signaling;
-    private final ConcurrentHashMap<UUID, UUID> profileIdsByPmid = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, String> acceptedAwaitingOffer = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, RtcHandshake> handshakes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, UUID> profileIdsByPresence = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> acceptedAwaitingOffer = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RtcHandshake> handshakes = new ConcurrentHashMap<>();
     private final LinkSignalingClient.ConnectionListener connectionListener = new LinkSignalingClient.ConnectionListener() {
         @Override
         public void onSignalingConnected() {
@@ -32,13 +38,13 @@ public final class ServerP2PManager {
         }
 
         @Override
-        public void onSignalingError(@Nullable UUID peerPmid, SignalingException cause) {
+        public void onSignalingError(@Nullable LinkPeerRoute peer, SignalingException cause) {
             if (cause instanceof SignalingException.SignalingAuthException) {
                 ServerP2PManager.this.onSignalingAuthFailed(cause);
                 return;
             }
-            if (peerPmid != null) {
-                RtcHandshake handshake = ServerP2PManager.this.handshakes.get(peerPmid);
+            if (peer != null) {
+                RtcHandshake handshake = ServerP2PManager.this.handshakes.get(peer.presenceId());
                 if (handshake != null) {
                     handshake.abort("signaling error: " + cause.getClass().getSimpleName());
                 }
@@ -60,9 +66,9 @@ public final class ServerP2PManager {
     private volatile SignalingException.SignalingAuthException signalingAuthFailure;
     private volatile boolean shutdown;
 
-    public ServerP2PManager(String accountName, MinecraftServer server, LinkSignalingClient signaling) {
+    public ServerP2PManager(String accountName, LinkServerConnectionBridge connectionBridge, LinkSignalingClient signaling) {
         this.accountName = accountName;
-        this.server = server;
+        this.connectionBridge = connectionBridge;
         this.signaling = signaling;
         this.signaling.setFriendJoinHandler(this::handleFriendJoin);
         this.signaling.setWebRtcSignalingHandler(this::handleWebRtc);
@@ -94,10 +100,10 @@ public final class ServerP2PManager {
         return result;
     }
 
-    public void updatePresence(java.util.Map<UUID, UUID> profileIdsByPmid) {
-        this.profileIdsByPmid.clear();
-        this.profileIdsByPmid.putAll(profileIdsByPmid);
-        NliConstants.LOG.info("[P2P][{}] Updated presence peer map: {} entries", this.accountName, profileIdsByPmid.size());
+    public void updatePresence(java.util.Map<String, UUID> profileIdsByPresence) {
+        this.profileIdsByPresence.clear();
+        this.profileIdsByPresence.putAll(profileIdsByPresence);
+        NliConstants.LOG.info("[P2P][{}] Updated presence peer map: {} entries", this.accountName, profileIdsByPresence.size());
     }
 
     public synchronized void shutdown() {
@@ -162,11 +168,11 @@ public final class ServerP2PManager {
         });
     }
 
-    private void handleFriendJoin(UUID fromPmid, SignalingMessage.FriendJoin message) {
-        NliConstants.LOG.info("[P2P][{}] Received friend join message {} from {}", this.accountName, message.getClass().getSimpleName(), fromPmid);
+    private void handleFriendJoin(LinkPeerRoute source, SignalingMessage.FriendJoin message) {
+        NliConstants.LOG.info("[P2P][{}] Received friend join message {} from {}", this.accountName, message.getClass().getSimpleName(), source.presenceId());
         switch (message) {
-            case SignalingMessage.FriendJoin.Request request -> this.acceptJoinRequest(fromPmid, request.sessionId());
-            case SignalingMessage.FriendJoin.InviteDeclined ignored -> this.acceptedAwaitingOffer.remove(fromPmid);
+            case SignalingMessage.FriendJoin.Request request -> this.acceptJoinRequest(source, request.sessionId());
+            case SignalingMessage.FriendJoin.InviteDeclined ignored -> this.acceptedAwaitingOffer.remove(source.presenceId());
             case SignalingMessage.FriendJoin.Accepted ignored -> {
             }
             case SignalingMessage.FriendJoin.Rejected ignored -> {
@@ -174,65 +180,65 @@ public final class ServerP2PManager {
         }
     }
 
-    private void acceptJoinRequest(UUID fromPmid, String sessionId) {
-        UUID profileId = this.profileIdForPmid(fromPmid);
+    private void acceptJoinRequest(LinkPeerRoute source, String sessionId) {
+        UUID profileId = this.profileIdFor(source);
         if (profileId == null) {
             NliConstants.LOG.warn(
                 "[P2P][{}] Accepting join request from unknown PMID {}; server login authentication will verify the player",
                 this.accountName,
-                fromPmid
+                source.presenceId()
             );
         } else {
-            NliConstants.LOG.info("[P2P][{}] Accepting join request session={} pmid={} profile={}", this.accountName, sessionId, fromPmid, profileId);
+            NliConstants.LOG.info("[P2P][{}] Accepting join request session={} presence={} profile={}", this.accountName, sessionId, source.presenceId(), profileId);
         }
-        this.acceptedAwaitingOffer.put(fromPmid, sessionId);
-        this.signaling.sendClientMessage(fromPmid, SignalingMessage.joinAccepted(sessionId)).exceptionally(error -> {
-            this.acceptedAwaitingOffer.remove(fromPmid, sessionId);
+        this.acceptedAwaitingOffer.put(source.presenceId(), sessionId);
+        this.signaling.sendClientMessage(source, SignalingMessage.joinAccepted(sessionId)).exceptionally(error -> {
+            this.acceptedAwaitingOffer.remove(source.presenceId(), sessionId);
             NliConstants.LOG.warn("[P2P][{}] Failed to accept join request {}: {}", this.accountName, sessionId, error.getMessage());
             return null;
         });
     }
 
-    private void handleWebRtc(UUID fromPmid, SignalingMessage.WebRtc message) {
-        NliConstants.LOG.info("[P2P][{}] Received WebRTC message {} session={} from {}", this.accountName, message.getClass().getSimpleName(), message.sessionId(), fromPmid);
+    private void handleWebRtc(LinkPeerRoute source, SignalingMessage.WebRtc message) {
+        NliConstants.LOG.info("[P2P][{}] Received WebRTC message {} session={} from {}", this.accountName, message.getClass().getSimpleName(), message.sessionId(), source.presenceId());
         switch (message) {
-            case SignalingMessage.WebRtc.Offer offer -> this.handleOffer(fromPmid, offer);
-            case SignalingMessage.WebRtc.IceCandidate ice -> this.handleIceCandidate(fromPmid, ice);
+            case SignalingMessage.WebRtc.Offer offer -> this.handleOffer(source, offer);
+            case SignalingMessage.WebRtc.IceCandidate ice -> this.handleIceCandidate(source, ice);
             case SignalingMessage.WebRtc.Answer ignored -> {
             }
         }
     }
 
-    private void handleOffer(UUID fromPmid, SignalingMessage.WebRtc.Offer offer) {
-        String acceptedSession = this.acceptedAwaitingOffer.remove(fromPmid);
+    private void handleOffer(LinkPeerRoute source, SignalingMessage.WebRtc.Offer offer) {
+        String acceptedSession = this.acceptedAwaitingOffer.remove(source.presenceId());
         if (!offer.sessionId().equals(acceptedSession)) {
             NliConstants.LOG.warn("[P2P][{}] Ignoring offer for unaccepted session {}; accepted={}", this.accountName, offer.sessionId(), acceptedSession);
             return;
         }
-        UUID profileId = this.profileIdForPmid(fromPmid);
+        UUID profileId = this.profileIdFor(source);
         if (profileId == null) {
             NliConstants.LOG.warn(
                 "[P2P][{}] Continuing offer from unknown PMID {}; intended profile check will be skipped",
                 this.accountName,
-                fromPmid
+                source.presenceId()
             );
         }
-        NliConstants.LOG.info("[P2P][{}] Starting answer handshake session={} pmid={} profile={}", this.accountName, offer.sessionId(), fromPmid, profileId);
-        this.startAnswerHandshake(fromPmid, profileId, offer.sessionId(), offer.sdp()).exceptionally(error -> {
+        NliConstants.LOG.info("[P2P][{}] Starting answer handshake session={} presence={} profile={}", this.accountName, offer.sessionId(), source.presenceId(), profileId);
+        this.startAnswerHandshake(source, profileId, offer.sessionId(), offer.sdp()).exceptionally(error -> {
             NliConstants.LOG.warn("[P2P][{}] Failed to start handshake {}: {}", this.accountName, offer.sessionId(), error.toString());
             return null;
         });
     }
 
-    private CompletableFuture<Void> startAnswerHandshake(UUID peerPmid, @Nullable UUID profileId, String sessionId, String offerSdp) {
-        if (this.handshakes.containsKey(peerPmid)) {
+    private CompletableFuture<Void> startAnswerHandshake(LinkPeerRoute peer, @Nullable UUID profileId, String sessionId, String offerSdp) {
+        if (this.handshakes.containsKey(peer.presenceId())) {
             return CompletableFuture.failedFuture(new IllegalStateException("Handshake already in progress"));
         }
         CompletableFuture<Void> result = new CompletableFuture<>();
         NliConstants.LOG.info("[P2P][{}] Requesting TURN auth for session={}", this.accountName, sessionId);
         this.signaling.requestTurnAuth().thenCompose(turnAuth -> {
             NliConstants.LOG.info("[P2P][{}] TURN auth ready for session={}", this.accountName, sessionId);
-            RtcHandshake handshake = this.createHandshake(peerPmid, profileId, sessionId, turnAuth, result);
+            RtcHandshake handshake = this.createHandshake(peer, profileId, sessionId, turnAuth, result);
             if (handshake == null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Failed to create handshake"));
             }
@@ -242,7 +248,7 @@ public final class ServerP2PManager {
                         NliConstants.LOG.info("[P2P][{}] Created answer SDP for session={}", this.accountName, sessionId);
                     }
                 })
-                .thenCompose(answer -> this.signaling.sendClientMessage(peerPmid, SignalingMessage.answer(sessionId, answer)));
+                .thenCompose(answer -> this.signaling.sendClientMessage(peer, SignalingMessage.answer(sessionId, answer)));
         }).whenComplete((_, error) -> {
             if (error != null) {
                 result.completeExceptionally(error);
@@ -251,7 +257,7 @@ public final class ServerP2PManager {
         return result;
     }
 
-    private @Nullable RtcHandshake createHandshake(UUID peerPmid, @Nullable UUID profileId, String sessionId, RTCIceServer turnAuth, CompletableFuture<Void> result) {
+    private @Nullable RtcHandshake createHandshake(LinkPeerRoute peer, @Nullable UUID profileId, String sessionId, RTCIceServer turnAuth, CompletableFuture<Void> result) {
         RTCConfiguration config = new RTCConfiguration();
         config.iceServers.add(turnAuth);
         config.portAllocatorConfig.setEnableIpv6(true).setEnableIpv6OnWifi(true);
@@ -262,14 +268,14 @@ public final class ServerP2PManager {
                 config,
                 sessionId,
                 false,
-                candidate -> this.signaling.sendClientMessage(peerPmid, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null)
+                candidate -> this.signaling.sendClientMessage(peer, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(_ -> null)
             );
-            if (this.handshakes.putIfAbsent(peerPmid, handshake) != null) {
+            if (this.handshakes.putIfAbsent(peer.presenceId(), handshake) != null) {
                 handshake.abort("duplicate");
                 return null;
             }
         }
-        NliConstants.LOG.info("[P2P][{}] Created WebRTC handshake session={} pmid={}", this.accountName, sessionId, peerPmid);
+        NliConstants.LOG.info("[P2P][{}] Created WebRTC handshake session={} presence={}", this.accountName, sessionId, peer.presenceId());
         CompletableFuture.delayedExecutor(HANDSHAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
             if (!result.isDone()) {
                 NliConstants.LOG.warn("[P2P][{}] Handshake timed out session={}", this.accountName, sessionId);
@@ -277,7 +283,7 @@ public final class ServerP2PManager {
             }
         });
         handshake.future().whenComplete((handshakeResult, error) -> {
-            this.handshakes.remove(peerPmid, handshake);
+            this.handshakes.remove(peer.presenceId(), handshake);
             if (error != null) {
                 NliConstants.LOG.warn("[P2P][{}] Handshake failed session={}: {}", this.accountName, sessionId, error.toString());
                 result.completeExceptionally(error);
@@ -291,8 +297,8 @@ public final class ServerP2PManager {
         return handshake;
     }
 
-    private void handleIceCandidate(UUID fromPmid, SignalingMessage.WebRtc.IceCandidate ice) {
-        RtcHandshake handshake = this.handshakes.get(fromPmid);
+    private void handleIceCandidate(LinkPeerRoute source, SignalingMessage.WebRtc.IceCandidate ice) {
+        RtcHandshake handshake = this.handshakes.get(source.presenceId());
         if (handshake == null || !handshake.id().equals(ice.sessionId())) {
             NliConstants.LOG.debug("[P2P][{}] Dropping ICE candidate for stale/missing session={}", this.accountName, ice.sessionId());
             return;
@@ -306,14 +312,12 @@ public final class ServerP2PManager {
     }
 
     private void acceptGuest(RtcHandshake.HandshakeResult handshakeResult, @Nullable UUID profileId) {
-        this.server.execute(() -> {
-            NliConstants.LOG.info("[P2P][{}] Registering RTC channel with server profile={}", this.accountName, profileId);
-            ServerChannelAcceptor.accept(this.server, new RtcChannel(handshakeResult), profileId);
-        });
+        NliConstants.LOG.info("[P2P][{}] Registering RTC channel with server profile={}", this.accountName, profileId);
+        this.connectionBridge.accept(new RtcChannel(handshakeResult), profileId);
     }
 
-    private @Nullable UUID profileIdForPmid(UUID pmid) {
-        return this.profileIdsByPmid.get(pmid);
+    private @Nullable UUID profileIdFor(LinkPeerRoute peer) {
+        return peer.profileId() != null ? peer.profileId() : this.profileIdsByPresence.get(peer.presenceId());
     }
 
     private PeerConnectionFactory getPeerConnectionFactory() {

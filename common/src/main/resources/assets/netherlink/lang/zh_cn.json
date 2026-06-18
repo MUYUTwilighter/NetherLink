@@ -9,6 +9,8 @@
   "netherlink.client.friends.failed": "NetherLink 好友访问开放失败。",
   "netherlink.client.friends.unavailable": "启动器账号缺少所需的在线会话。",
   "netherlink.client.friends.token_rejected": "启动器 Minecraft token 已被拒绝，请重启游戏后重试。",
+  "netherlink.backend.moj_26_2_s8": "官方 26.2 快照 8",
+  "netherlink.backend.nli_v1": "NetherLink API v1",
   "netherlink.friends.title": "好友",
   "netherlink.friends.short": "友",
   "netherlink.friends.tooltip": "好友列表，支持 NetherLink 加入",

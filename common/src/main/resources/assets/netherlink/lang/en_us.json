@@ -9,6 +9,8 @@
   "netherlink.client.friends.failed": "Failed to open NetherLink friends access.",
   "netherlink.client.friends.unavailable": "Launcher account is missing the required online session.",
   "netherlink.client.friends.token_rejected": "Launcher Minecraft token was rejected. Restart the game and try again.",
+  "netherlink.backend.moj_26_2_s8": "Official 26.2 Snapshot 8",
+  "netherlink.backend.nli_v1": "NetherLink API v1",
   "netherlink.friends.title": "Friends",
   "netherlink.friends.short": "F",
   "netherlink.friends.tooltip": "Friends, with NetherLink join support",

@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.p2p;
+package cool.muyucloud.netherlink.link.transport;
 
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.*;
@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 
+/** Internal Netty channel adapter backed by a connected WebRTC data channel. */
 @SuppressWarnings("deprecation")
 public final class RtcChannel extends AbstractChannel {
     private static final ChannelMetadata METADATA = new ChannelMetadata(false);

@@ -2,28 +2,27 @@ package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import cool.muyucloud.netherlink.p2p.SignalingException;
+import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
 import org.jspecify.annotations.Nullable;
-
-import java.util.UUID;
 
 public final class SignalingErrorMapper {
     private SignalingErrorMapper() {
     }
 
-    public static SignalingException fromJsonRpc(@Nullable UUID peerPmid, JsonRpcException error) {
+    public static SignalingException fromJsonRpc(@Nullable LinkPeerRoute peer, JsonRpcException error) {
         String dataCode = error.dataCode();
         String message = serviceMessage(error);
         if (dataCode != null) {
             return switch (dataCode) {
                 case "MissingOrExpiredIdentity" -> new SignalingException.SignalingAuthException(message);
-                case "UnknownPlayer" -> new SignalingException.UnknownPlayerException(peerPmid, message);
-                default -> new SignalingException.SignalingRejectedException(peerPmid, message);
+                case "UnknownPlayer" -> new SignalingException.UnknownPlayerException(peer, message);
+                default -> new SignalingException.SignalingRejectedException(peer, message);
             };
         }
         return message.contains("not registered")
-            ? new SignalingException.UnknownPlayerException(peerPmid, message)
-            : new SignalingException.SignalingRejectedException(peerPmid, message);
+            ? new SignalingException.UnknownPlayerException(peer, message)
+            : new SignalingException.SignalingRejectedException(peer, message);
     }
 
     public static @Nullable SignalingException fromServiceEnvelope(@Nullable JsonElement body) {

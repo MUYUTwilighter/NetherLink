@@ -8,6 +8,10 @@ import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
+import cool.muyucloud.netherlink.link.model.LinkPresence;
+import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
+import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
 import cool.muyucloud.netherlink.link.service.LinkPresenceService;
 import org.jspecify.annotations.Nullable;
 
@@ -26,18 +30,27 @@ public final class OfficialPresenceService implements LinkPresenceService {
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Override
-    public Map<UUID, UUID> publish(MinecraftAccount account) {
+    public LinkPresence publish(String runtimeKey, LinkPresenceUpdate update) {
+        MinecraftAccount account = LinkContextHooks.require(runtimeKey).account();
         NliConstants.LOG.info("Publishing NetherLink presence as PLAYING_HOSTED_SERVER for {}", account.getMcProfileName());
-        return presence(account, PresenceStatus.PLAYING_HOSTED_SERVER, true);
+        return publishHosting(account, update).presence();
     }
 
     @Override
-    public void revoke(MinecraftAccount account) {
+    public void revoke(String runtimeKey) {
+        MinecraftAccount account = LinkContextHooks.require(runtimeKey).account();
         NliConstants.LOG.info("Revoking NetherLink presence for {}", account.getMcProfileName());
         presence(account, PresenceStatus.OFFLINE, false);
     }
 
-    private Map<UUID, UUID> presence(MinecraftAccount account, PresenceStatus status, boolean includeJoinInfo) {
+    OfficialPresenceResult publishHosting(MinecraftAccount account, LinkPresenceUpdate update) {
+        NliConstants.LOG.debug("Official Presence ignores display text: {}", update.displayText());
+        Map<String, UUID> peers = presence(account, PresenceStatus.PLAYING_HOSTED_SERVER, true);
+        LinkPresence published = new LinkPresence(null, LinkPresenceStatus.HOSTING, true, update.displayText(), null, null, null, null);
+        return new OfficialPresenceResult(peers, published);
+    }
+
+    private Map<String, UUID> presence(MinecraftAccount account, PresenceStatus status, boolean includeJoinInfo) {
         String token = account.getMcToken();
         if (token == null || token.isBlank()) {
             throw new NetherLinkAuthException("Minecraft access token was not found");
@@ -66,7 +79,7 @@ public final class OfficialPresenceService implements LinkPresenceService {
                 NliConstants.LOG.warn("Presence {} failed: HTTP {}", status, response.statusCode());
                 return Map.of();
             }
-            Map<UUID, UUID> peers = parsePresence(response.body());
+            Map<String, UUID> peers = parsePresence(response.body());
             NliConstants.LOG.info("Presence {} returned {} peer mappings", status, peers.size());
             return peers;
         } catch (IOException e) {
@@ -79,12 +92,12 @@ public final class OfficialPresenceService implements LinkPresenceService {
         }
     }
 
-    private static Map<UUID, UUID> parsePresence(String body) {
+    private static Map<String, UUID> parsePresence(String body) {
         JsonObject root = JsonParser.parseString(body).getAsJsonObject();
         JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
             ? root.getAsJsonArray("presence")
             : new JsonArray();
-        Map<UUID, UUID> peers = new ConcurrentHashMap<>();
+        Map<String, UUID> peers = new ConcurrentHashMap<>();
         presence.forEach(element -> {
             if (!element.isJsonObject()) {
                 return;
@@ -93,7 +106,7 @@ public final class OfficialPresenceService implements LinkPresenceService {
             UUID pmid = parseUuid(entry, "pmid");
             UUID profileId = parseUuid(entry, "profileId");
             if (pmid != null && profileId != null) {
-                peers.putIfAbsent(pmid, profileId);
+                peers.putIfAbsent(pmid.toString(), profileId);
             }
         });
         return Map.copyOf(peers);
@@ -113,5 +126,8 @@ public final class OfficialPresenceService implements LinkPresenceService {
     private enum PresenceStatus {
         PLAYING_HOSTED_SERVER,
         OFFLINE
+    }
+
+    record OfficialPresenceResult(Map<String, UUID> profileIdsByPresence, LinkPresence presence) {
     }
 }

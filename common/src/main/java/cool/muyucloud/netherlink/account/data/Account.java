@@ -13,23 +13,22 @@ import java.util.function.Function;
 public class Account implements MinecraftAccount {
     public static final MapCodec<Account> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
         Codec.BOOL.optionalFieldOf("enabled", true).forGetter(Account::isEnabled),
-        optionalFieldOf(Codec.STRING, "msRefreshToken", Account::getMsRefreshToken),
-        optionalFieldOf(Codec.STRING, "msToken", Account::getMsToken),
+        optionalStringFieldOf("msRefreshToken", Account::getMsRefreshToken),
+        optionalStringFieldOf("msToken", Account::getMsToken),
         Codec.LONG.optionalFieldOf("msExpireAt", 0L).forGetter(Account::getMsExpireAt),
-        optionalFieldOf(Codec.STRING, "xboxToken", Account::getXboxToken),
-        optionalFieldOf(Codec.STRING, "xboxUserHash", Account::getXboxUserHash),
+        optionalStringFieldOf("xboxToken", Account::getXboxToken),
+        optionalStringFieldOf("xboxUserHash", Account::getXboxUserHash),
         Codec.LONG.optionalFieldOf("xboxExpireAt", 0L).forGetter(Account::getXboxExpireAt),
-        optionalFieldOf(Codec.STRING, "xstsToken", Account::getXstsToken),
-        optionalFieldOf(Codec.STRING, "xstsUserHash", Account::getXstsUserHash),
+        optionalStringFieldOf("xstsToken", Account::getXstsToken),
+        optionalStringFieldOf("xstsUserHash", Account::getXstsUserHash),
         Codec.LONG.optionalFieldOf("xstsExpireAt", 0L).forGetter(Account::getXstsExpireAt),
-        optionalFieldOf(Codec.STRING, "mcToken", Account::getMcToken),
+        optionalStringFieldOf("mcToken", Account::getMcToken),
         Codec.LONG.optionalFieldOf("mcExpireAt", 0L).forGetter(Account::getMcExpireAt),
-        optionalFieldOf(Codec.STRING, "mcProfileId", Account::getMcProfileId),
-        optionalFieldOf(Codec.STRING, "mcProfileName", Account::getMcProfileName),
-        optionalFieldOf(Codec.STRING, "mcPmid", Account::getMcPmid)
+        optionalStringFieldOf("mcProfileId", Account::getMcProfileId),
+        optionalStringFieldOf("mcProfileName", Account::getMcProfileName)
     ).apply(instance, (enabled, msRefreshToken, msToken, msExpireAt,
                        xboxToken, xboxUserHash, xboxExpireAt, xstsToken, xstsUserHash, xstsExpireAt,
-                       mcToken, mcExpireAt, mcProfileId, mcProfileName, mcPmid) -> {
+                       mcToken, mcExpireAt, mcProfileId, mcProfileName) -> {
         Account account = new Account();
         account.setEnabled(enabled);
         account.setMsRefreshToken(msRefreshToken.orElse(null));
@@ -45,12 +44,11 @@ public class Account implements MinecraftAccount {
         account.setMcExpireAt(mcExpireAt);
         account.setMcProfileId(mcProfileId.orElse(null));
         account.setMcProfileName(mcProfileName.orElse(null));
-        account.setMcPmid(mcPmid.orElse(null));
         return account;
     }));
 
-    private static <T, F> RecordCodecBuilder<T, Optional<F>> optionalFieldOf(Codec<F> codec, String key, Function<T, F> getter) {
-        MapCodec<Optional<F>> field = codec.optionalFieldOf(key);
+    private static <T> RecordCodecBuilder<T, Optional<String>> optionalStringFieldOf(String key, Function<T, String> getter) {
+        MapCodec<Optional<String>> field = Codec.STRING.optionalFieldOf(key);
         return field.forGetter(t -> Optional.ofNullable(getter.apply(t)));
     }
 
@@ -72,7 +70,6 @@ public class Account implements MinecraftAccount {
     private Long mcExpireAt = 0L;
     private String mcProfileId;
     private String mcProfileName;
-    private String mcPmid;
 
     public synchronized boolean isEnabled() {
         return enabled;
@@ -202,11 +199,4 @@ public class Account implements MinecraftAccount {
         this.mcProfileName = mcProfileName;
     }
 
-    public synchronized String getMcPmid() {
-        return mcPmid;
-    }
-
-    public synchronized void setMcPmid(String mcPmid) {
-        this.mcPmid = mcPmid;
-    }
 }
