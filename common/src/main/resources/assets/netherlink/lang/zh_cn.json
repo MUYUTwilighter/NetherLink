@@ -52,5 +52,10 @@
   "netherlink.friends.status.playing_server": "服务器",
   "netherlink.friends.status.playing_hosted_server": "正在开放世界",
   "netherlink.friends.status.offline": "离线",
-  "netherlink.friends.status.joinable": "可加入"
+  "netherlink.friends.status.joinable": "可加入",
+
+  "block.netherlink.teacon_sign": "Teacon 告示牌",
+  "block.netherlink.teacon_wall_sign": "Teacon 墙挂告示牌",
+  "item.netherlink.teacon_sign": "Teacon 告示牌",
+  "itemGroup.netherlink.teacon": "NetherLink Teacon"
 }
