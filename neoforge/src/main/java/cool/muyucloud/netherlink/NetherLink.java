@@ -12,16 +12,24 @@ import net.neoforged.neoforge.registries.RegisterEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
+import cool.muyucloud.netherlink.teacon.network.IntroCardActionPayload;
 
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
@@ -30,6 +38,7 @@ public class NetherLink {
         NeoForge.EVENT_BUS.register(this);
         eventBus.addListener(this::onRegister);
         eventBus.addListener(this::onRegisterRenderers);
+        eventBus.addListener(this::onRegisterPayloads);
     }
 
     @SubscribeEvent
@@ -80,6 +89,33 @@ public class NetherLink {
                     })
                     .build());
         }
+    }
+
+    @SuppressWarnings("unused")
+    public void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        event.registrar("1")
+            .playToServer(IntroCardActionPayload.TYPE, IntroCardActionPayload.STREAM_CODEC, this::handleIntroCardAction);
+    }
+
+    private void handleIntroCardAction(IntroCardActionPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            ServerPlayer player = (ServerPlayer) context.player();
+            var level = player.level();
+            var ds = level.getBlockEntity(payload.pos()) instanceof DoubleSidedSignBlockEntity d ? d : null;
+            if (ds == null) return;
+
+            if ("clear".equals(payload.action())) {
+                ds.setText(new SignText(), true);
+                ds.setEditor(null);
+                var card = new ItemStack(ModItems.INTRO_CARD);
+                if (!player.getInventory().add(card)) player.drop(card, false);
+                level.playSound(null, payload.pos(), SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
+                    SoundSource.BLOCKS, 1.0F, 1.0F);
+            } else if ("edit".equals(payload.action())) {
+                ds.setAllowedPlayerEditor(player.getUUID());
+                player.openTextEdit(ds, true);
+            }
+        });
     }
 
     @SuppressWarnings("unused")

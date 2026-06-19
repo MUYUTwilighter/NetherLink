@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.SignText;
 import cool.muyucloud.netherlink.teacon.client.FriendCardFriendScreen;
+import cool.muyucloud.netherlink.teacon.client.IntroCardOwnerScreen;
 import cool.muyucloud.netherlink.teacon.ModItems;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import cool.muyucloud.netherlink.teacon.item.FriendCardItem;
@@ -96,16 +97,11 @@ public final class IntroCardSignLogic {
                 }
                 return InteractionResult.SUCCESS;
             }
-//            LOGGER.info("[IntroCardSign] => CLEARING text + returning card");
-            if (!level.isClientSide()) {
-                ds.setText(new SignText(), true); // also clears recordedEditor via setText override
-                ds.setEditor(null); // explicit safeguard
-                var card = new ItemStack(ModItems.INTRO_CARD);
-                if (!player.getInventory().add(card)) player.drop(card, false);
-                level.playSound(null, pos, SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
-                    SoundSource.BLOCKS, 1.0F, 1.0F);
+            // Owner + has text → open menu screen (client), server waits for packet
+            if (level.isClientSide()) {
+                Minecraft.getInstance().setScreen(new IntroCardOwnerScreen(pos));
             }
-            return InteractionResult.SUCCESS;
+            return InteractionResult.CONSUME;
         }
 
 //        LOGGER.info("[IntroCardSign] => PASS (no action)");

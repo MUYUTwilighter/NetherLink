@@ -60,6 +60,9 @@
   "block.netherlink.friend_card.self_prompt": "You cannot friend your own sign",
   "screen.netherlink.friend_card": "Friend Request",
   "screen.netherlink.friend_card.message": "Send friend request to %s?",
+  "screen.netherlink.owner.message": "What would you like to do?",
+  "screen.netherlink.owner.edit": "Edit",
+  "screen.netherlink.owner.clear": "Clear",
 
   "block.netherlink.intro_card_oak_standing_sign": "Oak Intro Card Standing Sign",
   "block.netherlink.intro_card_oak_wall_sign": "Oak Intro Card Wall Sign",
