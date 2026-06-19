@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 
 /** Confirmation dialog before sending a friend request via FriendCard. */
 public class FriendCardFriendScreen extends ConfirmScreen {
-    private static final Component TITLE = Component.empty();
+    private static final Component TITLE = Component.literal("NetherLink");
     private static final Component CONFIRM = Component.translatable("gui.yes");
     private static final Component CANCEL = Component.translatable("gui.no");
 
@@ -28,7 +28,6 @@ public class FriendCardFriendScreen extends ConfirmScreen {
         this.clickedFace = clickedFace;
     }
 
-    /** Allow ESC to close this screen. */
     @Override
     public boolean shouldCloseOnEsc() {
         return true;
@@ -47,24 +46,6 @@ public class FriendCardFriendScreen extends ConfirmScreen {
                 this.onClose();
             }).width(80).build());
     }
-
-    @Override
-    protected void init() {
-        this.closeButton = Button.builder(Component.literal("×"), button -> this.onClose())
-            .bounds(this.width - 24, 6, 20, 20).build();
-        super.init();
-        addRenderableWidget(this.closeButton);
-    }
-
-    @Override
-    protected void repositionElements() {
-        super.repositionElements();
-        if (this.closeButton != null) {
-            this.closeButton.setPosition(this.width - 24, 6);
-        }
-    }
-
-    private net.minecraft.client.gui.components.Button closeButton;
 
     private static void onConfirmed(boolean confirmed, BlockPos pos, Direction face) {
         if (confirmed) {
