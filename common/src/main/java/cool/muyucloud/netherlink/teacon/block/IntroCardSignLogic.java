@@ -1,16 +1,18 @@
 package cool.muyucloud.netherlink.teacon.block;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.SignText;
+import cool.muyucloud.netherlink.teacon.client.FriendCardFriendScreen;
 import cool.muyucloud.netherlink.teacon.ModItems;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import cool.muyucloud.netherlink.teacon.item.FriendCardItem;
@@ -59,27 +61,24 @@ public final class IntroCardSignLogic {
             return InteractionResult.SUCCESS;
         }
 
-        // FriendCard + has text -> check editor identity
+        // FriendCard + has text -> open confirmation screen (client), process request (server)
         if (isFriendCard && hasText) {
             UUID editor = ds.getEditor();
-            boolean isEditor = editor != null && player.getUUID().equals(editor);
-            if (!level.isClientSide()) {
-                // Server: send overlay message and play sound for everyone nearby
-                if (isEditor) {
-                    player.sendOverlayMessage(
-                        Component.translatable("block.netherlink.friend_card.self_prompt"));
-                } else {
-                    player.sendOverlayMessage(
-                        Component.translatable("block.netherlink.friend_card.other_prompt"));
-                }
+            if (editor != null && player.getUUID().equals(editor)) {
+                // Own sign -> rejected
+//                if (!level.isClientSide()) {
+//                    player.sendOverlayMessage(
+//                        Component.translatable("block.netherlink.friend_card.self_prompt"));
+//                }
+//                if (level.isClientSide()) {
+//                    player.playSound(ds.getSignInteractionFailedSoundEvent(), 1.0F, 1.0F);
+//                }
+//                return InteractionResult.CONSUME;
             }
+            // Another player's sign
             if (level.isClientSide()) {
-                // Client: play sound locally
-                if (isEditor) {
-                    player.playSound(ds.getSignInteractionFailedSoundEvent(), 1.0F, 1.0F);
-                } else {
-                    player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
-                }
+                Minecraft.getInstance().setScreen(
+                    new FriendCardFriendScreen(player.getName(), pos, Direction.UP));
             }
             return InteractionResult.CONSUME;
         }

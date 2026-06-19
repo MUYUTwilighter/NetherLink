@@ -58,7 +58,8 @@
   "item.netherlink.intro_card": "Intro Card",
   "item.netherlink.friend_card": "Friend Card",
   "block.netherlink.friend_card.self_prompt": "You cannot friend your own sign",
-  "block.netherlink.friend_card.other_prompt": "Success, friend relationship created",
+  "screen.netherlink.friend_card": "Friend Request",
+  "screen.netherlink.friend_card.message": "Send friend request to %s?",
 
   "block.netherlink.intro_card_oak_standing_sign": "Oak Intro Card Standing Sign",
   "block.netherlink.intro_card_oak_wall_sign": "Oak Intro Card Wall Sign",
