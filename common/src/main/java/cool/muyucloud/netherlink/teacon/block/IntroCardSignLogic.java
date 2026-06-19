@@ -70,14 +70,14 @@ public final class IntroCardSignLogic {
             UUID editor = ds.getEditor();
             if (editor != null && player.getUUID().equals(editor)) {
                 // Own sign -> rejected
-//                if (!level.isClientSide()) {
-//                    player.sendOverlayMessage(
-//                        Component.translatable("block.netherlink.friend_card.self_prompt"));
-//                }
-//                if (level.isClientSide()) {
-//                    player.playSound(ds.getSignInteractionFailedSoundEvent(), 1.0F, 1.0F);
-//                }
-//                return InteractionResult.CONSUME;
+                if (!level.isClientSide()) {
+                    player.sendOverlayMessage(
+                        Component.translatable("block.netherlink.friend_card.self_prompt"));
+                }
+                if (level.isClientSide()) {
+                    player.playSound(ds.getSignInteractionFailedSoundEvent(), 1.0F, 1.0F);
+                }
+                return InteractionResult.CONSUME;
             }
             // Another player's sign
             if (level.isClientSide()) {

@@ -39,6 +39,15 @@ public class FriendCardFriendScreen extends ConfirmScreen {
     public boolean shouldCloseOnEsc() { return true; }
 
     @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (event.isEscape()) {
+            this.onClose();
+            return true;
+        }
+        return super.keyPressed(event);
+    }
+
+    @Override
     protected void addButtons(LinearLayout buttonLayout) {
         this.yesButton = buttonLayout.addChild(
             Button.builder(this.yesButtonComponent, button -> {
