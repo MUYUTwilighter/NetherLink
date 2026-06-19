@@ -74,7 +74,7 @@ public class FriendCardFriendScreen extends ConfirmScreen {
                 }));
         } catch (Exception e) {
             minecraft.gui.setOverlayMessage(
-                Component.translatable("block.netherlink.friend_card.auth_failed"), false);
+                Component.translatable("block.netherlink.friend_card.failed"), false);
         }
     }
 }
