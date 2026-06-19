@@ -4,6 +4,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.CeilingHangingSignBlock;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.world.level.block.WallHangingSignBlock;
+import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
@@ -85,6 +89,15 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
     public void setEditor(@Nullable UUID editor) {
         this.recordedEditor = editor;
         this.setChanged();
+    }
+
+    @Override
+    public boolean isValidBlockState(BlockState state) {
+        var block = state.getBlock();
+        return block instanceof CeilingHangingSignBlock
+            || block instanceof WallHangingSignBlock
+            || block instanceof StandingSignBlock
+            || block instanceof WallSignBlock;
     }
 
     @SuppressWarnings("unchecked")
