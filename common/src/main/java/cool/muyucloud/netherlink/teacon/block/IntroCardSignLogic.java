@@ -2,6 +2,7 @@ package cool.muyucloud.netherlink.teacon.block;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -42,7 +43,6 @@ public final class IntroCardSignLogic {
 
         // IntroCard + has text -> rejected, consume to prevent vanilla fallthrough
         if (isIntroCard && hasText) {
-//            LOGGER.info("[IntroCardSign] => REJECT (card + has text)");
             return InteractionResult.CONSUME;
         }
 
@@ -59,8 +59,28 @@ public final class IntroCardSignLogic {
             return InteractionResult.SUCCESS;
         }
 
-        // FriendCard -> TODO: implement friend card logic
-        if (isFriendCard) {
+        // FriendCard + has text -> check editor identity
+        if (isFriendCard && hasText) {
+            UUID editor = ds.getEditor();
+            boolean isEditor = editor != null && player.getUUID().equals(editor);
+            if (!level.isClientSide()) {
+                // Server: send overlay message and play sound for everyone nearby
+                if (isEditor) {
+                    player.sendOverlayMessage(
+                        Component.translatable("block.netherlink.friend_card.self_prompt"));
+                } else {
+                    player.sendOverlayMessage(
+                        Component.translatable("block.netherlink.friend_card.other_prompt"));
+                }
+            }
+            if (level.isClientSide()) {
+                // Client: play sound locally
+                if (isEditor) {
+                    player.playSound(ds.getSignInteractionFailedSoundEvent(), 1.0F, 1.0F);
+                } else {
+                    player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F, 1.0F);
+                }
+            }
             return InteractionResult.CONSUME;
         }
 
