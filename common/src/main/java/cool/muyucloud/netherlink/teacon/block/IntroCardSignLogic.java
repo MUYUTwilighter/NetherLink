@@ -34,6 +34,8 @@ public final class IntroCardSignLogic {
         DoubleSidedSignBlockEntity ds = level.getBlockEntity(pos) instanceof DoubleSidedSignBlockEntity d ? d : null;
         boolean hasText = ds != null && ds.getEditor() != null;
 
+        //事实上，现在不是hasText而是hasOwner，懒得改了
+
 //        LOGGER.info("[IntroCardSign] {} side={} handItem={} isIntroCard={} hasBE={} hasEditor={} editor={} player={}",
 //            player.getName().getString(),
 //            level.isClientSide() ? "CLIENT" : "SERVER",
@@ -79,8 +81,11 @@ public final class IntroCardSignLogic {
             }
             // Another player's sign
             if (level.isClientSide()) {
+                Component targetName = editor != null
+                    ? Component.literal(editor.toString().substring(0, 8) + "...")
+                    : Component.literal("?");
                 Minecraft.getInstance().setScreen(
-                    new FriendCardFriendScreen(player.getName(), pos, Direction.UP));
+                    new FriendCardFriendScreen(targetName, pos, editor, Direction.UP));
             }
             return InteractionResult.CONSUME;
         }
