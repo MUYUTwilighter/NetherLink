@@ -20,17 +20,26 @@ public class IntroCardOwnerScreen extends ConfirmScreen {
 
     public IntroCardOwnerScreen(BlockPos clickedPos) {
         super(
-            result -> { /* unused — we override buttons */ },
+            result -> { /* ESC pressed — close handled by keyPressed override */ },
             TITLE,
             Component.translatable("screen.netherlink.owner.message"),
-            CLEAR, // placeholder for yesButtonComponent
-            CANCEL // placeholder for noButtonComponent
+            CLEAR,
+            CANCEL
         );
         this.clickedPos = clickedPos;
     }
 
     @Override
     public boolean shouldCloseOnEsc() { return true; }
+
+    @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (event.isEscape()) {
+            this.onClose();
+            return true;
+        }
+        return super.keyPressed(event);
+    }
 
     @Override
     protected void addButtons(LinearLayout buttonLayout) {
