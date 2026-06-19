@@ -56,6 +56,7 @@ public final class IntroCardSignLogic {
                 stack.consume(1, player);
                 if (ds != null) {
                     ds.setAllowedPlayerEditor(player.getUUID());
+                    ds.setEditor(player.getUUID()); // assign ownership at card consumption
                     player.openTextEdit(ds, true); // sends ClientboundOpenSignEditorPacket
                 }
             }

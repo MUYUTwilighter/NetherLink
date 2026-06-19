@@ -46,23 +46,12 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
         recordedEditor = input.read("editor", UUIDUtil.CODEC).orElse(null);
     }
 
-    /** Doubles front text to the back face. Also records the editor when text is written. */
+    /** Doubles front text to the back face. Editor recording is handled by IntroCardSignLogic. */
     @Override
     public boolean setText(SignText text, boolean isFrontText) {
         boolean result = super.setText(text, isFrontText);
         if (isFrontText) {
-            // Update recordedEditor BEFORE mirroring to back (back markUpdated will sync correct value)
-            if (hasAnyText()) {
-                UUID whoMayEdit = this.getPlayerWhoMayEdit();
-                if (whoMayEdit != null) {
-                    this.recordedEditor = whoMayEdit;
-                }
-            }
-            // Do NOT clear recordedEditor when text is empty —
-            // owner may have just deleted text during editing.
-            // Ownership is only released by the explicit Clear action.
             super.setText(text, false);
-            // Force resync so clients see the updated editor
             if (this.level != null && !this.level.isClientSide()) {
                 this.level.sendBlockUpdated(this.getBlockPos(), this.getBlockState(), this.getBlockState(), 3);
             }
@@ -79,13 +68,6 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
     public void setEditor(@Nullable UUID editor) {
         this.recordedEditor = editor;
         this.setChanged();
-    }
-
-    private boolean hasAnyText() {
-        for (int i = 0; i < 4; i++) {
-            if (!this.getFrontText().getMessage(i, false).getString().isEmpty()) return true;
-        }
-        return false;
     }
 
     @SuppressWarnings("unchecked")
