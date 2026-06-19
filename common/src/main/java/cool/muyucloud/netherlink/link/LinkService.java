@@ -1,11 +1,12 @@
 package cool.muyucloud.netherlink.link;
 
-import cool.muyucloud.netherlink.link.model.LinkBackendDescriptor;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
+import net.minecraft.network.chat.Component;
 
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -18,12 +19,42 @@ import java.util.concurrent.CompletionException;
  * process; a dedicated server may publish the same world through several accounts.</p>
  */
 public interface LinkService {
-    /** Returns stable metadata and optional capabilities for presentation and feature gating. */
-    LinkBackendDescriptor descriptor();
+    /** Stable identifiers for selectable Link protocol/backend versions. */
+    enum Id {
+        MOJ_26_2_S8(Component.translatable("netherlink.backend.moj_26_2_s8")),
+        NLI_V1(Component.translatable("netherlink.backend.nli_v1"));
 
-    /** Returns the stable backend identifier. */
-    default LinkBackendId id() {
-        return this.descriptor().id();
+        private final Component component;
+
+        Id(Component component) {
+            this.component = component;
+        }
+
+        /** Returns the localized backend label. */
+        public Component component() {
+            return this.component;
+        }
+    }
+
+    /** Optional backend features used for presentation and feature gating. */
+    enum Capability {
+        FRIENDS,
+        HOSTING,
+        JOINING,
+        MULTI_ACCOUNT_RUNTIME,
+        MULTI_PRESENCE
+    }
+
+    /** Returns the stable protocol/backend identifier. */
+    Id id();
+
+    /** Returns the immutable set of optional features supported by this backend. */
+    Set<Capability> capabilities();
+
+    /** Returns whether this backend supports an optional feature. */
+    @SuppressWarnings("unused")
+    default boolean supports(Capability capability) {
+        return this.capabilities().contains(capability);
     }
 
     /**

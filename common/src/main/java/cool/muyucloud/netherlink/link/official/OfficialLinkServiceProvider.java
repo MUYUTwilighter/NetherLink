@@ -1,9 +1,6 @@
 package cool.muyucloud.netherlink.link.official;
 
-import cool.muyucloud.netherlink.link.LinkBackendId;
 import cool.muyucloud.netherlink.link.LinkService;
-import cool.muyucloud.netherlink.link.model.LinkBackendCapability;
-import cool.muyucloud.netherlink.link.model.LinkBackendDescriptor;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
@@ -14,14 +11,11 @@ import java.util.Set;
 
 public final class OfficialLinkServiceProvider implements LinkService {
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
-    private static final LinkBackendDescriptor DESCRIPTOR = new LinkBackendDescriptor(
-        LinkBackendId.MOJ_26_2_S8,
-        Set.of(
-            LinkBackendCapability.FRIENDS,
-            LinkBackendCapability.HOSTING,
-            LinkBackendCapability.JOINING,
-            LinkBackendCapability.MULTI_ACCOUNT_RUNTIME
-        )
+    private static final Set<Capability> CAPABILITIES = Set.of(
+        Capability.FRIENDS,
+        Capability.HOSTING,
+        Capability.JOINING,
+        Capability.MULTI_ACCOUNT_RUNTIME
     );
 
     private final OfficialPresenceService presence = new OfficialPresenceService();
@@ -33,8 +27,13 @@ public final class OfficialLinkServiceProvider implements LinkService {
     }
 
     @Override
-    public LinkBackendDescriptor descriptor() {
-        return DESCRIPTOR;
+    public Id id() {
+        return Id.MOJ_26_2_S8;
+    }
+
+    @Override
+    public Set<Capability> capabilities() {
+        return CAPABILITIES;
     }
 
     @Override

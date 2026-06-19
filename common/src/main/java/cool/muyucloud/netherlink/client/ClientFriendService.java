@@ -13,7 +13,6 @@ import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -61,62 +60,66 @@ public final class ClientFriendService {
 
     private static Snapshot snapshot(LinkFriendSnapshot snapshot) {
         return new Snapshot(
-            entries(snapshot.friends()),
-            entries(snapshot.incoming()),
-            entries(snapshot.outgoing())
+            friends(snapshot.friends()),
+            requests(snapshot.incoming()),
+            requests(snapshot.outgoing())
         );
     }
 
-    private static List<Entry> entries(List<LinkFriendEntry> entries) {
-        List<Entry> result = new ArrayList<>();
-        for (LinkFriendEntry entry : entries) {
-            LinkFriendRelationship relationship = entry.relationship();
-            String displayName = entry.name() != null && !entry.name().isBlank() ? entry.name() : entry.profileId().toString();
-            if (entry.presences().isEmpty()) {
-                result.add(new Entry(entry.profileId(), displayName, null, relationship, LinkPresenceStatus.OFFLINE, false, ""));
-                continue;
-            }
-            for (LinkPresence presence : entry.presences()) {
-                result.add(new Entry(
-                    entry.profileId(),
-                    displayName,
-                    presence.presenceId(),
-                    relationship,
-                    presence.status(),
-                    presence.joinable(),
-                    presence.displayText()
-                ));
-            }
+    private static List<Friend> friends(List<LinkFriendEntry> entries) {
+        return entries.stream()
+            .map(entry -> new Friend(
+                entry.profileId(),
+                displayName(entry),
+                entry.presences().stream().map(ClientFriendService::instance).sorted(INSTANCE_ORDER).toList()
+            ))
+            .sorted(Comparator.comparing(Friend::name, String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    }
+
+    private static List<Request> requests(List<LinkFriendEntry> entries) {
+        return entries.stream()
+            .map(entry -> new Request(entry.profileId(), displayName(entry), entry.relationship()))
+            .sorted(Comparator.comparing(Request::name, String.CASE_INSENSITIVE_ORDER))
+            .toList();
+    }
+
+    private static String displayName(LinkFriendEntry entry) {
+        return entry.name() != null && !entry.name().isBlank() ? entry.name() : entry.profileId().toString();
+    }
+
+    private static Instance instance(LinkPresence presence) {
+        return new Instance(
+            presence.presenceId(),
+            presence.status(),
+            presence.joinable(),
+            presence.displayText()
+        );
+    }
+
+    public record Snapshot(List<Friend> friends, List<Request> incoming, List<Request> outgoing) {
+        public Snapshot {
+            friends = List.copyOf(friends);
+            incoming = List.copyOf(incoming);
+            outgoing = List.copyOf(outgoing);
         }
-        result.sort(ENTRY_ORDER);
-        return List.copyOf(result);
     }
 
-    public record Snapshot(List<Entry> friends, List<Entry> incoming, List<Entry> outgoing) {
-        public List<Entry> all() {
-            List<Entry> entries = new ArrayList<>();
-            entries.addAll(this.friends);
-            entries.addAll(this.incoming);
-            entries.addAll(this.outgoing);
-            return entries;
+    public record Friend(UUID profileId, String name, List<Instance> instances) {
+        public Friend {
+            instances = List.copyOf(instances);
         }
     }
 
-    public record Entry(UUID profileId, String name, @Nullable String presenceId, LinkFriendRelationship relationship, LinkPresenceStatus status, boolean joinable, String displayText) {
+    public record Instance(@Nullable String presenceId, LinkPresenceStatus status, boolean joinable, String displayText) {
     }
 
-    private static final Comparator<Entry> ENTRY_ORDER = Comparator.<Entry>comparingInt(entry -> relationshipRank(entry.relationship()))
-        .thenComparingInt(entry -> presenceRank(entry.status()))
-        .thenComparing(Entry::name, String.CASE_INSENSITIVE_ORDER)
-        .thenComparing(entry -> entry.presenceId() != null ? entry.presenceId() : "");
-
-    private static int relationshipRank(LinkFriendRelationship relationship) {
-        return switch (relationship) {
-            case INCOMING -> 0;
-            case OUTGOING -> 1;
-            case FRIEND -> 2;
-        };
+    public record Request(UUID profileId, String name, LinkFriendRelationship relationship) {
     }
+
+    private static final Comparator<Instance> INSTANCE_ORDER = Comparator
+        .comparingInt((Instance instance) -> presenceRank(instance.status()))
+        .thenComparing(instance -> instance.presenceId() != null ? instance.presenceId() : "");
 
     private static int presenceRank(LinkPresenceStatus status) {
         return switch (status) {
