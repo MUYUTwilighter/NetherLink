@@ -13,6 +13,7 @@ public final class ModItems {
     public static final Map<WoodType, Item> INTRO_CARD_HANGING_SIGN_ITEMS = new LinkedHashMap<>();
 
     public static Item INTRO_CARD;
+    public static Item FRIEND_CARD;
 
     private ModItems() {}
 }

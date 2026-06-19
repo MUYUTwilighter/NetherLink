@@ -74,6 +74,7 @@ public class NetherLink {
                     .icon(() -> new ItemStack(ModItems.INTRO_CARD))
                     .displayItems((params, output) -> {
                         output.accept(ModItems.INTRO_CARD);
+                        output.accept(ModItems.FRIEND_CARD);
                         ModItems.INTRO_CARD_SIGN_ITEMS.values().forEach(output::accept);
                         ModItems.INTRO_CARD_HANGING_SIGN_ITEMS.values().forEach(output::accept);
                     })

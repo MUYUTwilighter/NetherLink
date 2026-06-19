@@ -12,6 +12,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.SignText;
 import cool.muyucloud.netherlink.teacon.ModItems;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
+import cool.muyucloud.netherlink.teacon.item.FriendCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
 import org.slf4j.Logger;
 
@@ -25,6 +26,7 @@ public final class IntroCardSignLogic {
 
     public static InteractionResult handle(ItemStack stack, Level level, BlockPos pos, Player player) {
         boolean isIntroCard = stack.getItem() instanceof IntroCardItem;
+        boolean isFriendCard = stack.getItem() instanceof FriendCardItem;
         DoubleSidedSignBlockEntity ds = level.getBlockEntity(pos) instanceof DoubleSidedSignBlockEntity d ? d : null;
         boolean hasText = ds != null && ds.getEditor() != null;
 
@@ -55,6 +57,11 @@ public final class IntroCardSignLogic {
                 }
             }
             return InteractionResult.SUCCESS;
+        }
+
+        // FriendCard -> TODO: implement friend card logic
+        if (isFriendCard) {
+            return InteractionResult.CONSUME;
         }
 
         // Empty hand + has text -> check ownership, clear, return card

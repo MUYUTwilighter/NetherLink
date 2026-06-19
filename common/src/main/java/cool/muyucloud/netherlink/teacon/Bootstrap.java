@@ -19,6 +19,7 @@ import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardWallSignBlock;
+import cool.muyucloud.netherlink.teacon.item.FriendCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardHangingSignItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardSignItem;
@@ -106,6 +107,11 @@ public final class Bootstrap {
         ModItems.INTRO_CARD = Registry.register(
             BuiltInRegistries.ITEM, cardKey,
             new IntroCardItem(new Item.Properties().setId(cardKey)));
+
+        var friendCardKey = itemKey("friend_card");
+        ModItems.FRIEND_CARD = Registry.register(
+            BuiltInRegistries.ITEM, friendCardKey,
+            new FriendCardItem(new Item.Properties().setId(friendCardKey)));
 
         // Register sign items for every wood type
         WoodType.values().forEach(wood -> {
