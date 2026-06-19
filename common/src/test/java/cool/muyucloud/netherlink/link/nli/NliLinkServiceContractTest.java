@@ -24,6 +24,8 @@ class NliLinkServiceContractTest {
         AtomicReference<String> registrationAuth = new AtomicReference<>();
         AtomicReference<String> renewalAuth = new AtomicReference<>();
         AtomicReference<String> friendsAuth = new AtomicReference<>();
+        AtomicReference<String> acceptedRequestPath = new AtomicReference<>();
+        AtomicReference<String> deletedRequestPath = new AtomicReference<>();
         AtomicReference<String> closeAuth = new AtomicReference<>();
         AtomicBoolean closed = new AtomicBoolean();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -58,6 +60,18 @@ class NliLinkServiceContractTest {
                 }
                 """);
         });
+        server.createContext("/v1/friends/requests", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            if ("POST".equals(exchange.getRequestMethod())) {
+                acceptedRequestPath.set(path);
+                respond(exchange, 200, """
+                    {"result":"SUCCESS","relationship":"ACCEPTED","officialSync":"SKIPPED"}
+                    """);
+            } else {
+                deletedRequestPath.set(path);
+                respond(exchange, 204, "");
+            }
+        });
         server.createContext("/v1/instances/current", exchange -> {
             closeAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
             closed.set(true);
@@ -71,7 +85,11 @@ class NliLinkServiceContractTest {
             LinkContextHooks.setClientConnection(runtimeKey, new TestAccount(), "Test client", _ -> {});
             var identity = service.runtime().open(runtimeKey).join();
             service.runtime().renew(runtimeKey).join();
-            var snapshot = service.createFriendService(runtimeKey).refresh().join();
+            var friends = service.createFriendService(runtimeKey);
+            var snapshot = friends.refresh().join();
+            UUID incomingId = UUID.fromString("00000000-0000-0000-0000-000000000003");
+            friends.accept(incomingId).join();
+            friends.decline(incomingId).join();
 
             assertEquals("Bearer minecraft-secret", registrationAuth.get());
             assertEquals("Bearer instance-secret", renewalAuth.get());
@@ -81,6 +99,8 @@ class NliLinkServiceContractTest {
             assertEquals(2, snapshot.friends().getFirst().presences().size());
             assertEquals(LinkPresenceStatus.HOSTING, snapshot.friends().getFirst().presences().getFirst().status());
             assertEquals(LinkFriendRelationship.INCOMING, snapshot.incoming().getFirst().relationship());
+            assertEquals("/v1/friends/requests/" + incomingId, acceptedRequestPath.get());
+            assertEquals("/v1/friends/requests/" + incomingId, deletedRequestPath.get());
 
             service.runtime().close(runtimeKey).join();
             assertTrue(closed.get());
