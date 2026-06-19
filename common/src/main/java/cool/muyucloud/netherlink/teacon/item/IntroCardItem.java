@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.teacon.card.item;
+package cool.muyucloud.netherlink.teacon.item;
 
 import net.minecraft.world.item.Item;
 

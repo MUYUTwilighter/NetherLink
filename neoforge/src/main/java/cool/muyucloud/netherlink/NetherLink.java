@@ -21,7 +21,7 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
-import cool.muyucloud.netherlink.teacon.card.blockentity.IntroCardRackBlockEntity;
+import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 
 import java.util.Set;
 
@@ -52,21 +52,23 @@ public class NetherLink {
     public void onRegister(RegisterEvent event) {
         Bootstrap.initFor(event.getRegistryKey());
         if (Registries.BLOCK_ENTITY_TYPE.equals(event.getRegistryKey())) {
-            var signType = new BlockEntityType<>(
-                SignBlockEntity::new,
-                Set.of(ModBlocks.TEACON_STANDING_SIGN, ModBlocks.TEACON_WALL_SIGN));
+            @SuppressWarnings("unchecked")
+            var signType = (BlockEntityType<SignBlockEntity>) (Object) new BlockEntityType<>(
+                DoubleSidedSignBlockEntity::new,
+                Set.of(ModBlocks.TEACON_STANDING_SIGN, ModBlocks.TEACON_WALL_SIGN,
+                       ModBlocks.INTRO_CARD_STANDING_SIGN,
+                       ModBlocks.INTRO_CARD_WALL_SIGN));
             event.register(Registries.BLOCK_ENTITY_TYPE,
                 Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"), () -> signType);
             CommonReg.SIGN_BLOCK_ENTITY = () -> signType;
 
-            var rackType = new BlockEntityType<>(
-                IntroCardRackBlockEntity::new,
-                Set.of(ModBlocks.STANDING_INTRO_CARD_RACK,
-                       ModBlocks.WALL_INTRO_CARD_RACK,
-                       ModBlocks.HANGING_INTRO_CARD_RACK));
+            @SuppressWarnings("unchecked")
+            var hangingSignType = (BlockEntityType<SignBlockEntity>) (Object) new BlockEntityType<>(
+                DoubleSidedSignBlockEntity::new,
+                Set.of(ModBlocks.INTRO_CARD_WALL_HANGING_SIGN, ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN));
             event.register(Registries.BLOCK_ENTITY_TYPE,
-                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "intro_card_rack"), () -> rackType);
-            CommonReg.RACK_BLOCK_ENTITY = () -> rackType;
+                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "intro_card_hanging_sign"), () -> hangingSignType);
+            CommonReg.HANGING_SIGN_BLOCK_ENTITY = () -> hangingSignType;
         }
         if (Registries.CREATIVE_MODE_TAB.equals(event.getRegistryKey())) {
             event.register(Registries.CREATIVE_MODE_TAB,
@@ -77,9 +79,8 @@ public class NetherLink {
                     .displayItems((params, output) -> {
                         output.accept(ModItems.TEACON_SIGN);
                         output.accept(ModItems.INTRO_CARD);
-                        output.accept(ModBlocks.STANDING_INTRO_CARD_RACK);
-                        output.accept(ModBlocks.WALL_INTRO_CARD_RACK);
-                        output.accept(ModBlocks.HANGING_INTRO_CARD_RACK);
+                                output.accept(ModItems.INTRO_CARD_STANDING_SIGN);
+                        output.accept(ModItems.INTRO_CARD_HANGING_SIGN);
                     })
                     .build());
         }
@@ -90,5 +91,8 @@ public class NetherLink {
         event.registerBlockEntityRenderer(
             CommonReg.SIGN_BLOCK_ENTITY.get(),
             context -> new net.minecraft.client.renderer.blockentity.StandingSignRenderer(context));
+        event.registerBlockEntityRenderer(
+            CommonReg.HANGING_SIGN_BLOCK_ENTITY.get(),
+            context -> new net.minecraft.client.renderer.blockentity.HangingSignRenderer(context));
     }
 }

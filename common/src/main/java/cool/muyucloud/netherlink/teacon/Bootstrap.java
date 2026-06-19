@@ -18,10 +18,13 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
 import cool.muyucloud.netherlink.teacon.block.TeaconStandingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.TeaconWallSignBlock;
-import cool.muyucloud.netherlink.teacon.card.item.IntroCardItem;
-import cool.muyucloud.netherlink.teacon.card.block.StandingIntroCardRackBlock;
-import cool.muyucloud.netherlink.teacon.card.block.WallIntroCardRackBlock;
-import cool.muyucloud.netherlink.teacon.card.block.HangingIntroCardRackBlock;
+import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
+import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardWallSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
+import cool.muyucloud.netherlink.teacon.item.IntroCardHangingSignItem;
+import cool.muyucloud.netherlink.teacon.item.IntroCardSignItem;
 import cool.muyucloud.netherlink.teacon.item.TeaconSignItem;
 
 /**
@@ -73,24 +76,35 @@ public final class Bootstrap {
             BuiltInRegistries.BLOCK, wallKey,
             new TeaconWallSignBlock(WoodType.OAK, wallProps));
 
-        // Rack blocks
-        var standingRackKey = blockKey("standing_intro_card_rack");
-        ModBlocks.STANDING_INTRO_CARD_RACK = Registry.register(
-            BuiltInRegistries.BLOCK, standingRackKey,
-            new StandingIntroCardRackBlock(
-                StandingIntroCardRackBlock.props().setId(standingRackKey)));
+        var standingSignKey = blockKey("intro_card_standing_sign");
+        ModBlocks.INTRO_CARD_STANDING_SIGN = Registry.register(
+            BuiltInRegistries.BLOCK, standingSignKey,
+            new IntroCardStandingSignBlock(WoodType.BAMBOO,
+                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
+                    .sound(net.minecraft.world.level.block.SoundType.BAMBOO_WOOD).setId(standingSignKey)));
 
-        var wallRackKey = blockKey("wall_intro_card_rack");
-        ModBlocks.WALL_INTRO_CARD_RACK = Registry.register(
-            BuiltInRegistries.BLOCK, wallRackKey,
-            new WallIntroCardRackBlock(
-                WallIntroCardRackBlock.props().setId(wallRackKey)));
+        var wallHangingSignKey = blockKey("intro_card_wall_hanging_sign");
+        ModBlocks.INTRO_CARD_WALL_HANGING_SIGN = Registry.register(
+            BuiltInRegistries.BLOCK, wallHangingSignKey,
+            new IntroCardWallHangingSignBlock(WoodType.BAMBOO,
+                BlockBehaviour.Properties.of().mapColor(MapColor.WOOD)
+                    .forceSolidOn().noCollision().strength(1.0F).ignitedByLava()
+                    .sound(net.minecraft.world.level.block.SoundType.HANGING_SIGN).setId(wallHangingSignKey)));
 
-        var hangingRackKey = blockKey("hanging_intro_card_rack");
-        ModBlocks.HANGING_INTRO_CARD_RACK = Registry.register(
-            BuiltInRegistries.BLOCK, hangingRackKey,
-            new HangingIntroCardRackBlock(
-                HangingIntroCardRackBlock.props().setId(hangingRackKey)));
+        var ceilingHangingSignKey = blockKey("intro_card_ceiling_hanging_sign");
+        ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN = Registry.register(
+            BuiltInRegistries.BLOCK, ceilingHangingSignKey,
+            new IntroCardCeilingHangingSignBlock(WoodType.BAMBOO,
+                BlockBehaviour.Properties.of().mapColor(MapColor.WOOD)
+                    .forceSolidOn().noCollision().strength(1.0F).ignitedByLava()
+                    .sound(net.minecraft.world.level.block.SoundType.HANGING_SIGN).setId(ceilingHangingSignKey)));
+
+        var introwallSignKey = blockKey("intro_card_wall_sign");
+        ModBlocks.INTRO_CARD_WALL_SIGN = Registry.register(
+            BuiltInRegistries.BLOCK, introwallSignKey,
+            new IntroCardWallSignBlock(WoodType.BAMBOO,
+                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
+                    .sound(net.minecraft.world.level.block.SoundType.BAMBOO_WOOD).setId(introwallSignKey)));
 
         registeredBlocks = true;
     }
@@ -110,6 +124,15 @@ public final class Bootstrap {
         ModItems.INTRO_CARD = Registry.register(
             BuiltInRegistries.ITEM, cardKey,
             new IntroCardItem(new Item.Properties().setId(cardKey)));
+
+        ModItems.INTRO_CARD_STANDING_SIGN = Registry.register(
+            BuiltInRegistries.ITEM, itemKey("intro_card_standing_sign"),
+            new IntroCardSignItem(new Item.Properties().setId(itemKey("intro_card_standing_sign"))));
+        ModItems.INTRO_CARD_HANGING_SIGN = Registry.register(
+            BuiltInRegistries.ITEM, itemKey("intro_card_hanging_sign"),
+            new IntroCardHangingSignItem(ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN,
+                ModBlocks.INTRO_CARD_WALL_HANGING_SIGN,
+                new Item.Properties().setId(itemKey("intro_card_hanging_sign"))));
 
         registeredItems = true;
     }

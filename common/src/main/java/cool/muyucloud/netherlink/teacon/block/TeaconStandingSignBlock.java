@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.WoodType;
@@ -33,6 +34,6 @@ public class TeaconStandingSignBlock extends StandingSignBlock {
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         @SuppressWarnings("unchecked")
         var type = (BlockEntityType<SignBlockEntity>) (Object) CommonReg.SIGN_BLOCK_ENTITY.get();
-        return new SignBlockEntity(type, pos, state);
+        return new DoubleSidedSignBlockEntity(type, pos, state);
     }
 }
