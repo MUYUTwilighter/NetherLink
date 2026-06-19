@@ -20,7 +20,7 @@ public class IntroCardOwnerScreen extends ConfirmScreen {
 
     public IntroCardOwnerScreen(BlockPos clickedPos) {
         super(
-            result -> { /* ESC pressed — close handled by keyPressed override */ },
+            result -> {},
             TITLE,
             Component.translatable("screen.netherlink.owner.message"),
             CLEAR,
