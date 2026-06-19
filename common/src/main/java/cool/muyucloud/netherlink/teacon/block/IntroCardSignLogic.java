@@ -81,11 +81,8 @@ public final class IntroCardSignLogic {
             }
             // Another player's sign
             if (level.isClientSide()) {
-                Component targetName = editor != null
-                    ? Component.literal(editor.toString().substring(0, 8) + "...")
-                    : Component.literal("?");
                 Minecraft.getInstance().setScreen(
-                    new FriendCardFriendScreen(targetName, pos, editor, Direction.UP));
+                    new FriendCardFriendScreen(player.getName(), pos, editor, Direction.UP));
             }
             return InteractionResult.CONSUME;
         }
