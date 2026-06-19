@@ -57,7 +57,7 @@ public class FriendCardFriendScreen extends ConfirmScreen {
             new ClientFriendService(minecraft)
                 .add(targetId.toString().substring(0, 8) + "...")
                 .whenComplete((outcome, err) -> minecraft.execute(() -> {
-                    if (err != null) {
+                    if (err != null || outcome == null) {
                         minecraft.gui.setOverlayMessage(
                             Component.translatable("block.netherlink.friend_card.auth_failed"), false);
                         return;
