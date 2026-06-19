@@ -53,15 +53,20 @@ public class FriendCardFriendScreen extends ConfirmScreen {
         if (!confirmed || targetId == null) return;
         var minecraft = Minecraft.getInstance();
         if (minecraft.player == null) return;
-        String targetName = targetId.toString().substring(0, 8) + "...";
         try {
-            var service = new ClientFriendService(minecraft);
-            service.add(targetName).thenAccept(outcome -> {
-                var msg = outcome.result() == cool.muyucloud.netherlink.link.model.LinkFriendActionResult.SUCCESS
-                    ? Component.translatable("block.netherlink.friend_card.confirmed")
-                    : Component.translatable("block.netherlink.friend_card.failed");
-                minecraft.player.sendOverlayMessage(msg);
-            });
+            new ClientFriendService(minecraft)
+                .add(targetId.toString().substring(0, 8) + "...")
+                .thenAccept(outcome -> minecraft.execute(() -> {
+                    var msg = switch (outcome.result()) {
+                        case SUCCESS -> Component.translatable("block.netherlink.friend_card.confirmed");
+                        case UNKNOWN_PROFILE -> Component.translatable("block.netherlink.friend_card.unknown");
+                        case SERVICE_NOT_AVAILABLE -> Component.translatable("block.netherlink.friend_card.unavailable");
+                        case TOO_MANY_REQUESTS -> Component.translatable("block.netherlink.friend_card.too_many");
+                        case FORBIDDEN -> Component.translatable("block.netherlink.friend_card.forbidden");
+                        default -> Component.translatable("block.netherlink.friend_card.failed");
+                    };
+                    minecraft.player.sendOverlayMessage(msg);
+                }));
         } catch (Exception e) {
             minecraft.player.sendOverlayMessage(
                 Component.translatable("block.netherlink.friend_card.failed"));
