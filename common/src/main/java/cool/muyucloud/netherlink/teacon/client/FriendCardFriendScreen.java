@@ -56,7 +56,12 @@ public class FriendCardFriendScreen extends ConfirmScreen {
         try {
             new ClientFriendService(minecraft)
                 .add(targetId.toString().substring(0, 8) + "...")
-                .thenAccept(outcome -> minecraft.execute(() -> {
+                .whenComplete((outcome, err) -> minecraft.execute(() -> {
+                    if (err != null) {
+                        minecraft.player.sendSystemMessage(
+                            Component.translatable("block.netherlink.friend_card.auth_failed"));
+                        return;
+                    }
                     var msg = switch (outcome.result()) {
                         case SUCCESS -> Component.translatable("block.netherlink.friend_card.confirmed");
                         case UNKNOWN_PROFILE -> Component.translatable("block.netherlink.friend_card.unknown");
@@ -65,11 +70,11 @@ public class FriendCardFriendScreen extends ConfirmScreen {
                         case FORBIDDEN -> Component.translatable("block.netherlink.friend_card.forbidden");
                         default -> Component.translatable("block.netherlink.friend_card.failed");
                     };
-                    minecraft.gui.setOverlayMessage(msg, false);
+                    minecraft.player.sendSystemMessage(msg);
                 }));
         } catch (Exception e) {
-            minecraft.gui.setOverlayMessage(
-                Component.translatable("block.netherlink.friend_card.failed"), false);
+            minecraft.player.sendSystemMessage(
+                Component.translatable("block.netherlink.friend_card.auth_failed"));
         }
     }
 }

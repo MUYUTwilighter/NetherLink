@@ -64,6 +64,7 @@
     "block.netherlink.friend_card.unavailable":  "好友服务不可用",
     "block.netherlink.friend_card.too_many":  "请求过于频繁",
     "block.netherlink.friend_card.forbidden":  "好友服务不可用",
+    "block.netherlink.friend_card.auth_failed":  "需要登录 - 请重启游戏并通过 Microsoft 账号登录",
     "screen.netherlink.friend_card":  "好友申请",
     "screen.netherlink.friend_card.message":  "是否向 %s 发送好友申请？",
     "screen.netherlink.owner.message":  "你想进行什么操作？",

@@ -65,6 +65,7 @@
   "block.netherlink.friend_card.unavailable": "Friend service unavailable",
   "block.netherlink.friend_card.too_many": "Too many requests",
   "block.netherlink.friend_card.forbidden": "Friend service unavailable",
+  "block.netherlink.friend_card.auth_failed": "Login required - restart and sign in with Microsoft account",
   "screen.netherlink.friend_card": "Friend Request",
   "screen.netherlink.friend_card.message": "Send friend request to %s?",
   "screen.netherlink.owner.message": "What would you like to do?",
