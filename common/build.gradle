@@ -41,6 +41,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'io.netty:netty-transport:4.2.7.Final'
+    testRuntimeOnly 'com.google.code.gson:gson:2.11.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
