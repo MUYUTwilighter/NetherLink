@@ -28,25 +28,25 @@ public final class IntroCardSignLogic {
         DoubleSidedSignBlockEntity ds = level.getBlockEntity(pos) instanceof DoubleSidedSignBlockEntity d ? d : null;
         boolean hasText = ds != null && ds.getEditor() != null;
 
-        LOGGER.info("[IntroCardSign] {} side={} handItem={} isIntroCard={} hasBE={} hasEditor={} editor={} player={}",
-            player.getName().getString(),
-            level.isClientSide() ? "CLIENT" : "SERVER",
-            player.getItemInHand(InteractionHand.MAIN_HAND).getItem(),
-            isIntroCard,
-            ds != null,
-            hasText,
-            ds != null ? ds.getEditor() : "null",
-            player.getUUID());
+//        LOGGER.info("[IntroCardSign] {} side={} handItem={} isIntroCard={} hasBE={} hasEditor={} editor={} player={}",
+//            player.getName().getString(),
+//            level.isClientSide() ? "CLIENT" : "SERVER",
+//            player.getItemInHand(InteractionHand.MAIN_HAND).getItem(),
+//            isIntroCard,
+//            ds != null,
+//            hasText,
+//            ds != null ? ds.getEditor() : "null",
+//            player.getUUID());
 
         // IntroCard + has text -> rejected, consume to prevent vanilla fallthrough
         if (isIntroCard && hasText) {
-            LOGGER.info("[IntroCardSign] => REJECT (card + has text)");
+//            LOGGER.info("[IntroCardSign] => REJECT (card + has text)");
             return InteractionResult.CONSUME;
         }
 
         // IntroCard + empty -> consume, edit (server-side: auth + send open packet)
         if (isIntroCard) {
-            LOGGER.info("[IntroCardSign] => EDIT (card + empty)");
+//            LOGGER.info("[IntroCardSign] => EDIT (card + empty)");
             if (!level.isClientSide()) {
                 stack.consume(1, player);
                 if (ds != null) {
@@ -58,19 +58,19 @@ public final class IntroCardSignLogic {
         }
 
         // Empty hand + has text -> check ownership, clear, return card
-        if (!isIntroCard && hasText) {
+        if (stack.isEmpty() && hasText) {
             UUID editor = ds.getEditor();
             boolean isOwner = editor != null && player.getUUID().equals(editor);
-            LOGGER.info("[IntroCardSign] => CLEAR check isOwner={}", isOwner);
+//            LOGGER.info("[IntroCardSign] => CLEAR check isOwner={}", isOwner);
             if (!isOwner) {
-                LOGGER.info("[IntroCardSign] => BLOCKED (not editor) expected={} actual={}", editor, player.getUUID());
+//                LOGGER.info("[IntroCardSign] => BLOCKED (not editor) expected={} actual={}", editor, player.getUUID());
                 if (!level.isClientSide()) {
                     level.playSound(null, pos, ds.getSignInteractionFailedSoundEvent(),
                         SoundSource.BLOCKS, 1.0F, 1.0F);
                 }
                 return InteractionResult.SUCCESS;
             }
-            LOGGER.info("[IntroCardSign] => CLEARING text + returning card");
+//            LOGGER.info("[IntroCardSign] => CLEARING text + returning card");
             if (!level.isClientSide()) {
                 ds.setText(new SignText(), true); // also clears recordedEditor via setText override
                 ds.setEditor(null); // explicit safeguard
@@ -82,7 +82,7 @@ public final class IntroCardSignLogic {
             return InteractionResult.SUCCESS;
         }
 
-        LOGGER.info("[IntroCardSign] => PASS (no action)");
-        return InteractionResult.PASS;
+//        LOGGER.info("[IntroCardSign] => PASS (no action)");
+        return ds != null ? InteractionResult.CONSUME : InteractionResult.PASS;
     }
 }
