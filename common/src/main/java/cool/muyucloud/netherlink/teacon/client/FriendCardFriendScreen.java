@@ -65,11 +65,11 @@ public class FriendCardFriendScreen extends ConfirmScreen {
                         case FORBIDDEN -> Component.translatable("block.netherlink.friend_card.forbidden");
                         default -> Component.translatable("block.netherlink.friend_card.failed");
                     };
-                    minecraft.player.sendOverlayMessage(msg);
+                    minecraft.gui.setOverlayMessage(msg, false);
                 }));
         } catch (Exception e) {
-            minecraft.player.sendOverlayMessage(
-                Component.translatable("block.netherlink.friend_card.failed"));
+            minecraft.gui.setOverlayMessage(
+                Component.translatable("block.netherlink.friend_card.failed"), false);
         }
     }
 }
