@@ -24,6 +24,8 @@ import net.minecraft.world.level.block.entity.SignText;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+import java.util.UUID;
+
 import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
@@ -103,6 +105,11 @@ public class NetherLink {
             var level = player.level();
             var ds = level.getBlockEntity(payload.pos()) instanceof DoubleSidedSignBlockEntity d ? d : null;
             if (ds == null) return;
+            // Verify chunk is loaded and player is within interaction range
+            if (!payload.pos().closerThan(player.blockPosition(), 6.0D)) return;
+            // Ownership check: only the recorded editor may perform these actions
+            UUID editor = ds.getEditor();
+            if (editor == null || !player.getUUID().equals(editor)) return;
 
             if ("clear".equals(payload.action())) {
                 ds.setText(new SignText(), true);
