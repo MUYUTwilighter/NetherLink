@@ -52,7 +52,7 @@ final class NliFriendService implements LinkFriendService {
 
     @Override
     public CompletableFuture<LinkFriendActionOutcome> accept(UUID profileId) {
-        return this.mutate(path("v1/friends/request/", profileId), null);
+        return this.mutate(path("v1/friends/requests/", profileId), null);
     }
 
     @Override
@@ -67,7 +67,7 @@ final class NliFriendService implements LinkFriendService {
 
     private CompletableFuture<LinkFriendActionOutcome> deleteRequest(UUID profileId) {
         return this.runtimes.session(this.runtimeKey)
-            .thenCompose(session -> this.api.delete(path("v1/friends/request/", profileId), session.token(), null))
+            .thenCompose(session -> this.api.delete(path("v1/friends/requests/", profileId), session.token(), null))
             .thenApply(_ -> success(null, LinkOfficialSyncStatus.SKIPPED));
     }
 
