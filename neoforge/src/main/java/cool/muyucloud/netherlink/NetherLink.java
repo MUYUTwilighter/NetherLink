@@ -21,7 +21,6 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
-import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
@@ -51,13 +50,11 @@ public class NetherLink {
         Bootstrap.initFor(event.getRegistryKey());
         if (Registries.BLOCK_ENTITY_TYPE.equals(event.getRegistryKey())) {
             @SuppressWarnings("unchecked")
-            var signValidBlocks = new java.util.HashSet<>(ModBlocks.getAllIntroSignBlocks());
-            signValidBlocks.add(ModBlocks.TEACON_STANDING_SIGN);
-            signValidBlocks.add(ModBlocks.TEACON_WALL_SIGN);
             var signType = (BlockEntityType<SignBlockEntity>) (Object) new BlockEntityType<>(
-                DoubleSidedSignBlockEntity::new, signValidBlocks);
+                DoubleSidedSignBlockEntity::new,
+                new java.util.HashSet<>(ModBlocks.getAllIntroSignBlocks()));
             event.register(Registries.BLOCK_ENTITY_TYPE,
-                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"), () -> signType);
+                Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "intro_card_sign"), () -> signType);
             CommonReg.SIGN_BLOCK_ENTITY = () -> signType;
 
             @SuppressWarnings("unchecked")
@@ -73,9 +70,8 @@ public class NetherLink {
                 Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon"),
                 () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
                     .title(Component.translatable("itemGroup." + NliConstants.MOD_ID + ".teacon"))
-                    .icon(() -> new ItemStack(ModItems.TEACON_SIGN))
+                    .icon(() -> new ItemStack(ModItems.INTRO_CARD))
                     .displayItems((params, output) -> {
-                        output.accept(ModItems.TEACON_SIGN);
                         output.accept(ModItems.INTRO_CARD);
                         ModItems.INTRO_CARD_SIGN_ITEMS.values().forEach(output::accept);
                         ModItems.INTRO_CARD_HANGING_SIGN_ITEMS.values().forEach(output::accept);

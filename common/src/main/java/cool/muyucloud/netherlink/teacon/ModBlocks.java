@@ -16,9 +16,6 @@ public final class ModBlocks {
     /** Ceiling hanging sign blocks keyed by wood type. */
     public static final Map<WoodType, Block> INTRO_CARD_CEILING_HANGING_SIGNS = new LinkedHashMap<>();
 
-    public static Block TEACON_STANDING_SIGN;
-    public static Block TEACON_WALL_SIGN;
-
     private ModBlocks() {}
 
     /** @return all standing + wall IntroCard sign blocks (for SIGN_BLOCK_ENTITY valid set). */

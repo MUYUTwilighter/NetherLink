@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=east":  { "model": "netherlink:block/teacon_wall_sign" },
-    "facing=north": { "model": "netherlink:block/teacon_wall_sign", "y": 270 },
-    "facing=south": { "model": "netherlink:block/teacon_wall_sign", "y": 90 },
-    "facing=west":  { "model": "netherlink:block/teacon_wall_sign", "y": 180 }
-  }
-}

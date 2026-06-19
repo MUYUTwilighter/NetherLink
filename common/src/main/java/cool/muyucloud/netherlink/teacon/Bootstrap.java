@@ -15,17 +15,13 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraft.world.level.material.PushReaction;
 import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardWallSignBlock;
-import cool.muyucloud.netherlink.teacon.block.TeaconStandingSignBlock;
-import cool.muyucloud.netherlink.teacon.block.TeaconWallSignBlock;
 import cool.muyucloud.netherlink.teacon.item.IntroCardHangingSignItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardSignItem;
-import cool.muyucloud.netherlink.teacon.item.TeaconSignItem;
 
 /**
  * Common registration — blocks, items, creative tab via vanilla {@link Registry#register}.
@@ -58,24 +54,6 @@ public final class Bootstrap {
     @SuppressWarnings("unchecked")
     private static void registerBlocks() {
         if (registeredBlocks) return;
-        var signKey = blockKey("teacon_sign");
-        var wallKey = blockKey("teacon_wall_sign");
-
-        var signProps = BlockBehaviour.Properties.of()
-            .mapColor(MapColor.WOOD).sound(SoundType.WOOD).noCollision()
-            .strength(1.0F).ignitedByLava().pushReaction(PushReaction.DESTROY)
-            .setId(signKey);
-        var wallProps = BlockBehaviour.Properties.of()
-            .mapColor(MapColor.WOOD).sound(SoundType.WOOD).noCollision()
-            .strength(1.0F).ignitedByLava().pushReaction(PushReaction.DESTROY)
-            .setId(wallKey);
-
-        ModBlocks.TEACON_STANDING_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, signKey,
-            new TeaconStandingSignBlock(WoodType.OAK, signProps));
-        ModBlocks.TEACON_WALL_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, wallKey,
-            new TeaconWallSignBlock(WoodType.OAK, wallProps));
 
         // Register IntroCard sign blocks for every vanilla wood type
         WoodType.values().forEach(wood -> {
@@ -124,13 +102,6 @@ public final class Bootstrap {
 
     private static void registerItems() {
         if (registeredItems) return;
-        var itemKey = ResourceKey.create(Registries.ITEM,
-            Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"));
-        ModItems.TEACON_SIGN = Registry.register(
-            BuiltInRegistries.ITEM, itemKey,
-            new TeaconSignItem(ModBlocks.TEACON_STANDING_SIGN, ModBlocks.TEACON_WALL_SIGN,
-                new Item.Properties().setId(itemKey)));
-
         var cardKey = itemKey("intro_card");
         ModItems.INTRO_CARD = Registry.register(
             BuiltInRegistries.ITEM, cardKey,

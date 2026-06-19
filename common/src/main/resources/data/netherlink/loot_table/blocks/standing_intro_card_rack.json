@@ -1,1 +1,0 @@
-{"type":"minecraft:block","pools":[{"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"netherlink:standing_intro_card_rack"}],"rolls":1.0}]}

@@ -12,7 +12,6 @@ public final class ModItems {
     /** Hanging sign items keyed by wood type. */
     public static final Map<WoodType, Item> INTRO_CARD_HANGING_SIGN_ITEMS = new LinkedHashMap<>();
 
-    public static Item TEACON_SIGN;
     public static Item INTRO_CARD;
 
     private ModItems() {}
