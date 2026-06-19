@@ -16,14 +16,14 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
+import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
+import cool.muyucloud.netherlink.teacon.block.IntroCardWallSignBlock;
 import cool.muyucloud.netherlink.teacon.block.TeaconStandingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.TeaconWallSignBlock;
-import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
-import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
-import cool.muyucloud.netherlink.teacon.block.IntroCardWallSignBlock;
-import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
-import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.item.IntroCardHangingSignItem;
+import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardSignItem;
 import cool.muyucloud.netherlink.teacon.item.TeaconSignItem;
 
@@ -55,6 +55,7 @@ public final class Bootstrap {
 
     // ---- Blocks ----
 
+    @SuppressWarnings("unchecked")
     private static void registerBlocks() {
         if (registeredBlocks) return;
         var signKey = blockKey("teacon_sign");
@@ -76,35 +77,45 @@ public final class Bootstrap {
             BuiltInRegistries.BLOCK, wallKey,
             new TeaconWallSignBlock(WoodType.OAK, wallProps));
 
-        var standingSignKey = blockKey("intro_card_standing_sign");
-        ModBlocks.INTRO_CARD_STANDING_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, standingSignKey,
-            new IntroCardStandingSignBlock(WoodType.BAMBOO,
-                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
-                    .sound(net.minecraft.world.level.block.SoundType.BAMBOO_WOOD).setId(standingSignKey)));
+        // Register IntroCard sign blocks for every vanilla wood type
+        WoodType.values().forEach(wood -> {
+            String name = wood.name().toLowerCase(java.util.Locale.ROOT);
+            SoundType woodSound = woodSound(wood);
 
-        var wallHangingSignKey = blockKey("intro_card_wall_hanging_sign");
-        ModBlocks.INTRO_CARD_WALL_HANGING_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, wallHangingSignKey,
-            new IntroCardWallHangingSignBlock(WoodType.BAMBOO,
+            // Standing sign
+            var standingKey = blockKey("intro_card_" + name + "_standing_sign");
+            var standing = new IntroCardStandingSignBlock(wood,
+                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
+                    .sound(woodSound).setId(standingKey));
+            ModBlocks.INTRO_CARD_STANDING_SIGNS.put(wood, Registry.register(
+                BuiltInRegistries.BLOCK, standingKey, standing));
+
+            // Wall sign
+            var wallSignKey = blockKey("intro_card_" + name + "_wall_sign");
+            var wallSign = new IntroCardWallSignBlock(wood,
+                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
+                    .sound(woodSound).setId(wallSignKey));
+            ModBlocks.INTRO_CARD_WALL_SIGNS.put(wood, Registry.register(
+                BuiltInRegistries.BLOCK, wallSignKey, wallSign));
+
+            // Wall hanging sign
+            var wallHangingKey = blockKey("intro_card_" + name + "_wall_hanging_sign");
+            var wallHanging = new IntroCardWallHangingSignBlock(wood,
                 BlockBehaviour.Properties.of().mapColor(MapColor.WOOD)
                     .forceSolidOn().noCollision().strength(1.0F).ignitedByLava()
-                    .sound(net.minecraft.world.level.block.SoundType.HANGING_SIGN).setId(wallHangingSignKey)));
+                    .sound(SoundType.HANGING_SIGN).setId(wallHangingKey));
+            ModBlocks.INTRO_CARD_WALL_HANGING_SIGNS.put(wood, Registry.register(
+                BuiltInRegistries.BLOCK, wallHangingKey, wallHanging));
 
-        var ceilingHangingSignKey = blockKey("intro_card_ceiling_hanging_sign");
-        ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, ceilingHangingSignKey,
-            new IntroCardCeilingHangingSignBlock(WoodType.BAMBOO,
+            // Ceiling hanging sign
+            var ceilingKey = blockKey("intro_card_" + name + "_ceiling_hanging_sign");
+            var ceiling = new IntroCardCeilingHangingSignBlock(wood,
                 BlockBehaviour.Properties.of().mapColor(MapColor.WOOD)
                     .forceSolidOn().noCollision().strength(1.0F).ignitedByLava()
-                    .sound(net.minecraft.world.level.block.SoundType.HANGING_SIGN).setId(ceilingHangingSignKey)));
-
-        var introwallSignKey = blockKey("intro_card_wall_sign");
-        ModBlocks.INTRO_CARD_WALL_SIGN = Registry.register(
-            BuiltInRegistries.BLOCK, introwallSignKey,
-            new IntroCardWallSignBlock(WoodType.BAMBOO,
-                BlockBehaviour.Properties.of().noCollision().strength(1.0F)
-                    .sound(net.minecraft.world.level.block.SoundType.BAMBOO_WOOD).setId(introwallSignKey)));
+                    .sound(SoundType.HANGING_SIGN).setId(ceilingKey));
+            ModBlocks.INTRO_CARD_CEILING_HANGING_SIGNS.put(wood, Registry.register(
+                BuiltInRegistries.BLOCK, ceilingKey, ceiling));
+        });
 
         registeredBlocks = true;
     }
@@ -125,16 +136,38 @@ public final class Bootstrap {
             BuiltInRegistries.ITEM, cardKey,
             new IntroCardItem(new Item.Properties().setId(cardKey)));
 
-        ModItems.INTRO_CARD_STANDING_SIGN = Registry.register(
-            BuiltInRegistries.ITEM, itemKey("intro_card_standing_sign"),
-            new IntroCardSignItem(new Item.Properties().setId(itemKey("intro_card_standing_sign"))));
-        ModItems.INTRO_CARD_HANGING_SIGN = Registry.register(
-            BuiltInRegistries.ITEM, itemKey("intro_card_hanging_sign"),
-            new IntroCardHangingSignItem(ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN,
-                ModBlocks.INTRO_CARD_WALL_HANGING_SIGN,
-                new Item.Properties().setId(itemKey("intro_card_hanging_sign"))));
+        // Register sign items for every wood type
+        WoodType.values().forEach(wood -> {
+            String name = wood.name().toLowerCase(java.util.Locale.ROOT);
+            var standing = ModBlocks.INTRO_CARD_STANDING_SIGNS.get(wood);
+            var wall = ModBlocks.INTRO_CARD_WALL_SIGNS.get(wood);
+            var ceiling = ModBlocks.INTRO_CARD_CEILING_HANGING_SIGNS.get(wood);
+            var wallHanging = ModBlocks.INTRO_CARD_WALL_HANGING_SIGNS.get(wood);
+
+            // Standing+wall sign item
+            ModItems.INTRO_CARD_SIGN_ITEMS.put(wood, Registry.register(
+                BuiltInRegistries.ITEM, itemKey("intro_card_" + name + "_sign"),
+                new IntroCardSignItem(standing, wall, new Item.Properties().setId(itemKey("intro_card_" + name + "_sign")))));
+
+            // Hanging sign item
+            ModItems.INTRO_CARD_HANGING_SIGN_ITEMS.put(wood, Registry.register(
+                BuiltInRegistries.ITEM, itemKey("intro_card_" + name + "_hanging_sign"),
+                new IntroCardHangingSignItem(ceiling, wallHanging,
+                    new Item.Properties().setId(itemKey("intro_card_" + name + "_hanging_sign")))));
+        });
 
         registeredItems = true;
+    }
+
+    // ---- Wood Type Helpers ----
+
+    /** Map wood type to the appropriate SoundType for standing/wall signs. */
+    private static SoundType woodSound(WoodType wood) {
+        String name = wood.name();
+        if (name.equals("CHERRY")) return SoundType.CHERRY_WOOD;
+        if (name.equals("BAMBOO")) return SoundType.BAMBOO_WOOD;
+        if (name.equals("CRIMSON") || name.equals("WARPED")) return SoundType.NETHER_WOOD;
+        return SoundType.WOOD;
     }
 
     // ---- Helpers ----

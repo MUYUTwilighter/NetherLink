@@ -23,8 +23,6 @@ import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 
-import java.util.Set;
-
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
     public NetherLink(IEventBus eventBus) {
@@ -53,11 +51,11 @@ public class NetherLink {
         Bootstrap.initFor(event.getRegistryKey());
         if (Registries.BLOCK_ENTITY_TYPE.equals(event.getRegistryKey())) {
             @SuppressWarnings("unchecked")
+            var signValidBlocks = new java.util.HashSet<>(ModBlocks.getAllIntroSignBlocks());
+            signValidBlocks.add(ModBlocks.TEACON_STANDING_SIGN);
+            signValidBlocks.add(ModBlocks.TEACON_WALL_SIGN);
             var signType = (BlockEntityType<SignBlockEntity>) (Object) new BlockEntityType<>(
-                DoubleSidedSignBlockEntity::new,
-                Set.of(ModBlocks.TEACON_STANDING_SIGN, ModBlocks.TEACON_WALL_SIGN,
-                       ModBlocks.INTRO_CARD_STANDING_SIGN,
-                       ModBlocks.INTRO_CARD_WALL_SIGN));
+                DoubleSidedSignBlockEntity::new, signValidBlocks);
             event.register(Registries.BLOCK_ENTITY_TYPE,
                 Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "teacon_sign"), () -> signType);
             CommonReg.SIGN_BLOCK_ENTITY = () -> signType;
@@ -65,7 +63,7 @@ public class NetherLink {
             @SuppressWarnings("unchecked")
             var hangingSignType = (BlockEntityType<SignBlockEntity>) (Object) new BlockEntityType<>(
                 DoubleSidedSignBlockEntity::new,
-                Set.of(ModBlocks.INTRO_CARD_WALL_HANGING_SIGN, ModBlocks.INTRO_CARD_CEILING_HANGING_SIGN));
+                ModBlocks.getAllIntroHangingSignBlocks());
             event.register(Registries.BLOCK_ENTITY_TYPE,
                 Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "intro_card_hanging_sign"), () -> hangingSignType);
             CommonReg.HANGING_SIGN_BLOCK_ENTITY = () -> hangingSignType;
@@ -79,8 +77,8 @@ public class NetherLink {
                     .displayItems((params, output) -> {
                         output.accept(ModItems.TEACON_SIGN);
                         output.accept(ModItems.INTRO_CARD);
-                                output.accept(ModItems.INTRO_CARD_STANDING_SIGN);
-                        output.accept(ModItems.INTRO_CARD_HANGING_SIGN);
+                        ModItems.INTRO_CARD_SIGN_ITEMS.values().forEach(output::accept);
+                        ModItems.INTRO_CARD_HANGING_SIGN_ITEMS.values().forEach(output::accept);
                     })
                     .build());
         }
