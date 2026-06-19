@@ -5,9 +5,7 @@ import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.CeilingHangingSignBlock;
-import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.WallHangingSignBlock;
-import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
@@ -30,7 +28,7 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
 
     /** Used by {@link BlockEntityType.BlockEntitySupplier}. */
     public DoubleSidedSignBlockEntity(BlockPos pos, BlockState state) {
-        super(fallbackSignType(), pos, state);
+        super(determineType(state), pos, state);
     }
 
     @SuppressWarnings("unchecked")
@@ -93,18 +91,18 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
 
     @Override
     public boolean isValidBlockState(BlockState state) {
-        var block = state.getBlock();
-        return block instanceof CeilingHangingSignBlock
-            || block instanceof WallHangingSignBlock
-            || block instanceof StandingSignBlock
-            || block instanceof WallSignBlock;
+        return true; // handled by determineType above
     }
 
     @SuppressWarnings("unchecked")
-    private static BlockEntityType<SignBlockEntity> fallbackSignType() {
-        var type = cool.muyucloud.netherlink.teacon.CommonReg.SIGN_BLOCK_ENTITY;
-        if (type != null && type.get() != null) {
-            return type.get();
+    private static BlockEntityType<SignBlockEntity> determineType(BlockState state) {
+        var block = state.getBlock();
+        if (block instanceof CeilingHangingSignBlock || block instanceof WallHangingSignBlock) {
+            var type = cool.muyucloud.netherlink.teacon.CommonReg.HANGING_SIGN_BLOCK_ENTITY;
+            if (type != null && type.get() != null) return type.get();
+        } else {
+            var type = cool.muyucloud.netherlink.teacon.CommonReg.SIGN_BLOCK_ENTITY;
+            if (type != null && type.get() != null) return type.get();
         }
         return (BlockEntityType<SignBlockEntity>) (Object)
             BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
