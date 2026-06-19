@@ -1,12 +1,12 @@
 package cool.muyucloud.netherlink.link;
 
-import cool.muyucloud.netherlink.link.official.OfficialLinkServiceProvider;
+import cool.muyucloud.netherlink.link.nli.NliLinkService;
 
 import java.util.concurrent.CompletableFuture;
 
 /** Global backend selection point used by game-facing code. */
 public final class LinkServices {
-    private static volatile LinkService service = OfficialLinkServiceProvider.INSTANCE;
+    private static volatile LinkService service = NliLinkService.INSTANCE;
     private static volatile CompletableFuture<Void> transition = CompletableFuture.completedFuture(null);
 
     private LinkServices() {

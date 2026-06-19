@@ -5,13 +5,7 @@ import cool.muyucloud.netherlink.link.exception.LinkException;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
-import cool.muyucloud.netherlink.link.model.LinkFailure;
-import cool.muyucloud.netherlink.link.model.LinkFailureCode;
-import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
-import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
-import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
-import cool.muyucloud.netherlink.link.model.LinkJoinTarget;
-import cool.muyucloud.netherlink.link.model.LinkRuntimeIdentity;
+import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.official.OfficialRuntimeService;
 import org.junit.jupiter.api.Test;
 

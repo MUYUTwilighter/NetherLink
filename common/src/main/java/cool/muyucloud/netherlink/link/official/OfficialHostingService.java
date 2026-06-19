@@ -1,28 +1,20 @@
 package cool.muyucloud.netherlink.link.official;
 
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
-import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
-import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
-import cool.muyucloud.netherlink.link.exception.LinkFailures;
-import cool.muyucloud.netherlink.link.model.LinkHostPublication;
-import cool.muyucloud.netherlink.link.model.LinkPresence;
-import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
-import cool.muyucloud.netherlink.link.model.LinkPublicationSnapshot;
-import cool.muyucloud.netherlink.link.model.LinkPublicationState;
+import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.transport.ServerP2PManager;
+
 import java.time.Duration;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class OfficialHostingService implements LinkHostingService {
     private static final long PRESENCE_REFRESH_SECONDS = 10L;

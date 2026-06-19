@@ -2,12 +2,7 @@ package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
-import cool.muyucloud.netherlink.link.model.LinkFriendActionOutcome;
-import cool.muyucloud.netherlink.link.model.LinkFriendEntry;
-import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
-import cool.muyucloud.netherlink.link.model.LinkFriendSnapshot;
-import cool.muyucloud.netherlink.link.model.LinkPresence;
-import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
+import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
 import net.minecraft.client.Minecraft;

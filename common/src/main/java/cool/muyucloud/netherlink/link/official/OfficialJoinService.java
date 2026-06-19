@@ -1,19 +1,12 @@
 package cool.muyucloud.netherlink.link.official;
 
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
+import cool.muyucloud.netherlink.link.exception.LinkException;
+import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
-import cool.muyucloud.netherlink.link.exception.LinkFailures;
-import cool.muyucloud.netherlink.link.exception.LinkException;
-import cool.muyucloud.netherlink.link.model.LinkFailure;
-import cool.muyucloud.netherlink.link.model.LinkFailureCode;
-import cool.muyucloud.netherlink.link.model.LinkJoinOperation;
-import cool.muyucloud.netherlink.link.model.LinkJoinSnapshot;
-import cool.muyucloud.netherlink.link.model.LinkJoinState;
-import cool.muyucloud.netherlink.link.model.LinkJoinTarget;
-import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
+import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
@@ -27,11 +20,13 @@ import dev.onvoid.webrtc.RTCIceServer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 public final class OfficialJoinService implements LinkJoinService {
     private static final long JOIN_TIMEOUT_SECONDS = 60L;
@@ -39,7 +34,31 @@ public final class OfficialJoinService implements LinkJoinService {
 
     private final ConcurrentHashMap<JoinKey, OutgoingJoin> outgoing = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ClientSession> sessions = new ConcurrentHashMap<>();
+    private final Function<String, Object> signalingIdentity;
+    private final Function<String, LinkSignalingClient> signalingFactory;
     private @Nullable PeerConnectionFactory factory;
+
+    public OfficialJoinService() {
+        this(
+            runtimeKey -> LinkContextHooks.require(runtimeKey).account().getMcToken(),
+            runtimeKey -> new OfficialSignalingClient(
+                LinkContextHooks.require(runtimeKey).account().getMcToken(),
+                "NetherLink Client Signaling-" + runtimeKey
+            )
+        );
+    }
+
+    public OfficialJoinService(Function<String, LinkSignalingClient> signalingFactory) {
+        this(runtimeKey -> runtimeKey, signalingFactory);
+    }
+
+    private OfficialJoinService(
+        Function<String, Object> signalingIdentity,
+        Function<String, LinkSignalingClient> signalingFactory
+    ) {
+        this.signalingIdentity = signalingIdentity;
+        this.signalingFactory = signalingFactory;
+    }
 
     @Override
     public LinkJoinOperation join(String runtimeKey, LinkJoinTarget target) {
@@ -52,7 +71,7 @@ public final class OfficialJoinService implements LinkJoinService {
 
         LinkRuntimeContext context = LinkContextHooks.require(runtimeKey);
         LinkClientConnectionBridge connectionBridge = context.requireClientConnection();
-        ClientSession session = this.ensureSession(runtimeKey, context.account());
+        ClientSession session = this.ensureSession(runtimeKey);
         OutgoingJoin operation = new OutgoingJoin(
             runtimeKey,
             target,
@@ -113,19 +132,32 @@ public final class OfficialJoinService implements LinkJoinService {
         }
     }
 
-    private synchronized ClientSession ensureSession(String runtimeKey, MinecraftAccount account) {
-        String token = account.getMcToken();
+    private synchronized ClientSession ensureSession(String runtimeKey) {
+        Object identity = this.signalingIdentity.apply(runtimeKey);
         ClientSession existing = this.sessions.get(runtimeKey);
-        if (existing != null && token != null && token.equals(existing.token())) {
+        if (existing != null && Objects.equals(existing.identity(), identity)) {
             return existing;
         }
         if (existing != null) {
             this.shutdown(runtimeKey);
         }
-        LinkSignalingClient signaling = new OfficialSignalingClient(token, "NetherLink Client Signaling-" + runtimeKey);
+        LinkSignalingClient signaling = this.signalingFactory.apply(runtimeKey);
         signaling.setFriendJoinHandler((source, message) -> this.handleFriendJoin(runtimeKey, source, message));
         signaling.setWebRtcSignalingHandler((source, message) -> this.handleWebRtc(runtimeKey, source, message));
-        ClientSession created = new ClientSession(token, signaling);
+        signaling.addConnectionListener(new LinkSignalingClient.ConnectionListener() {
+            @Override
+            public void onSignalingError(@Nullable LinkPeerRoute peer, cool.muyucloud.netherlink.link.transport.SignalingException cause) {
+                if (peer == null) {
+                    OfficialJoinService.this.outgoing.forEach((key, operation) -> {
+                        if (key.runtimeKey().equals(runtimeKey)) operation.fail(cause);
+                    });
+                    return;
+                }
+                OutgoingJoin operation = OfficialJoinService.this.outgoing.get(new JoinKey(runtimeKey, peer.presenceId()));
+                if (operation != null) operation.fail(cause);
+            }
+        });
+        ClientSession created = new ClientSession(identity, signaling);
         this.sessions.put(runtimeKey, created);
         return created;
     }
@@ -243,7 +275,7 @@ public final class OfficialJoinService implements LinkJoinService {
     private record JoinKey(String runtimeKey, String hostPresenceId) {
     }
 
-    private record ClientSession(@Nullable String token, LinkSignalingClient signaling) {
+    private record ClientSession(Object identity, LinkSignalingClient signaling) {
     }
 
     private static final class OutgoingJoin implements LinkJoinOperation {
