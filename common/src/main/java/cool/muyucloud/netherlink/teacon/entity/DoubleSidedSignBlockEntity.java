@@ -57,9 +57,10 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
                 if (whoMayEdit != null) {
                     this.recordedEditor = whoMayEdit;
                 }
-            } else {
-                this.recordedEditor = null;
             }
+            // Do NOT clear recordedEditor when text is empty —
+            // owner may have just deleted text during editing.
+            // Ownership is only released by the explicit Clear action.
             super.setText(text, false);
             // Force resync so clients see the updated editor
             if (this.level != null && !this.level.isClientSide()) {
