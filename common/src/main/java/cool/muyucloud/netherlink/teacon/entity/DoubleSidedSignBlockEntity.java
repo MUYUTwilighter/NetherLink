@@ -59,6 +59,18 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
         return result;
     }
 
+    /** Max width per text line in pixels. Doubled to fit more text. */
+    @Override
+    public int getMaxTextLineWidth() {
+        return 115;
+    }
+
+    /** Vertical spacing between text lines. */
+    @Override
+    public int getTextLineHeight() {
+        return 13;
+    }
+
     /** @return UUID of the player who last edited this sign, or null. */
     public @Nullable UUID getEditor() {
         return recordedEditor;

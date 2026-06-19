@@ -30,6 +30,8 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
+import cool.muyucloud.netherlink.teacon.client.renderer.IntroCardStandingSignRenderer;
+import cool.muyucloud.netherlink.teacon.client.renderer.IntroCardHangingSignRenderer;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import cool.muyucloud.netherlink.teacon.network.IntroCardActionPayload;
 
@@ -129,9 +131,9 @@ public class NetherLink {
     public void onRegisterRenderers(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(
             CommonReg.SIGN_BLOCK_ENTITY.get(),
-            context -> new net.minecraft.client.renderer.blockentity.StandingSignRenderer(context));
+            context -> new IntroCardStandingSignRenderer(context));
         event.registerBlockEntityRenderer(
             CommonReg.HANGING_SIGN_BLOCK_ENTITY.get(),
-            context -> new net.minecraft.client.renderer.blockentity.HangingSignRenderer(context));
+            context -> new IntroCardHangingSignRenderer(context));
     }
 }
