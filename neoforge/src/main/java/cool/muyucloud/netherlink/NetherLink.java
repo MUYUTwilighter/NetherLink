@@ -21,6 +21,7 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
+import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
