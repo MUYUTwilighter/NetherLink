@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
 public class IntroCardHangingSignRenderer extends HangingSignRenderer {
 
     private static final Transformation TEXT_SHRINK = new Transformation(
-        new Matrix4f().scale(0.8F, 0.8F, 0.8F));
+        new Matrix4f().scale(0.54F, 0.54F, 0.54F));
 
     public IntroCardHangingSignRenderer(BlockEntityRendererProvider.Context context) {
         super(context);

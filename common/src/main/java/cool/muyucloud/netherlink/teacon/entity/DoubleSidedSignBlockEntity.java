@@ -65,9 +65,14 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
         return 115;
     }
 
-    /** Vertical spacing between text lines. */
+    /** Vertical spacing between text lines. Larger for hanging signs due to wider layout. */
     @Override
     public int getTextLineHeight() {
+        var block = this.getBlockState().getBlock();
+        if (block instanceof net.minecraft.world.level.block.CeilingHangingSignBlock
+            || block instanceof net.minecraft.world.level.block.WallHangingSignBlock) {
+            return 16;
+        }
         return 13;
     }
 
