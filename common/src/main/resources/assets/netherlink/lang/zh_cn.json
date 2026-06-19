@@ -54,7 +54,7 @@
     "netherlink.friends.status.offline":  "离线",
     "netherlink.friends.status.joinable":  "可加入",
     "itemGroup.netherlink.teacon":  "NetherLink Teacon",
-    "item.netherlink.intro_card":  "介绍牌",
+    "item.netherlink.intro_card":  "介绍卡",
     "item.netherlink.friend_card":  "交友卡",
     "block.netherlink.friend_card.self_prompt":  "你不能向自己发送交友申请",
     "block.netherlink.friend_card.confirmed":  "已发送好友申请",
