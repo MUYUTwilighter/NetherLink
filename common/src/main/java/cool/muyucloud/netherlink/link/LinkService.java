@@ -5,6 +5,7 @@ import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -19,23 +20,6 @@ import java.util.concurrent.CompletionException;
  * process; a dedicated server may publish the same world through several accounts.</p>
  */
 public interface LinkService {
-    /** Stable identifiers for selectable Link protocol/backend versions. */
-    enum Id {
-        MOJ_26_2_S8(Component.translatable("netherlink.backend.moj_26_2_s8")),
-        NLI_V1(Component.translatable("netherlink.backend.nli_v1"));
-
-        private final Component component;
-
-        Id(Component component) {
-            this.component = component;
-        }
-
-        /** Returns the localized backend label. */
-        public Component component() {
-            return this.component;
-        }
-    }
-
     /** Optional backend features used for presentation and feature gating. */
     enum Capability {
         FRIENDS,
@@ -46,7 +30,17 @@ public interface LinkService {
     }
 
     /** Returns the stable protocol/backend identifier. */
-    Id id();
+    Identifier id();
+
+    /**
+     * Returns the localized backend name. By default, {@code namespace:path} resolves to the
+     * translation key {@code namespace.link.path}; implementations may override this for a
+     * custom component.
+     */
+    default Component name() {
+        Identifier id = this.id();
+        return Component.translatable(id.getNamespace() + ".link." + id.getPath());
+    }
 
     /** Returns the immutable set of optional features supported by this backend. */
     Set<Capability> capabilities();

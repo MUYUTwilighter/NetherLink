@@ -1,16 +1,19 @@
 package cool.muyucloud.netherlink.link.nli;
 
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
+import net.minecraft.resources.Identifier;
 
 import java.net.URI;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public final class NliLinkService implements LinkService {
+    private static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "nli_v1");
     public static final NliLinkService INSTANCE = new NliLinkService(defaultUri());
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,
@@ -33,8 +36,8 @@ public final class NliLinkService implements LinkService {
     }
 
     @Override
-    public Id id() {
-        return Id.NLI_V1;
+    public Identifier id() {
+        return ID;
     }
 
     @Override

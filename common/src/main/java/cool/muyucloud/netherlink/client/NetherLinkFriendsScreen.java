@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.model.LinkFailure;
 import cool.muyucloud.netherlink.link.model.LinkFriendActionOutcome;
 import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
 import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
@@ -85,7 +86,7 @@ public class NetherLinkFriendsScreen extends Screen {
         this.service.refresh().whenComplete((result, error) -> this.minecraft.execute(() -> {
             this.setRefreshActive(true);
             if (error != null) {
-                this.status = Component.translatable("netherlink.friends.error", LinkFailures.from(error).message()).withStyle(ChatFormatting.RED);
+                this.status = Component.translatable("netherlink.friends.error", failureText(LinkFailures.from(error))).withStyle(ChatFormatting.RED);
                 return;
             }
             this.snapshot = result;
@@ -109,12 +110,12 @@ public class NetherLinkFriendsScreen extends Screen {
         this.status = Component.translatable("netherlink.friends.working").withStyle(ChatFormatting.GRAY);
         action.whenComplete((outcome, error) -> this.minecraft.execute(() -> {
             if (error != null) {
-                this.status = Component.translatable("netherlink.friends.error", LinkFailures.from(error).message()).withStyle(ChatFormatting.RED);
+                this.status = Component.translatable("netherlink.friends.error", failureText(LinkFailures.from(error))).withStyle(ChatFormatting.RED);
             } else if (outcome.result() == LinkFriendActionResult.SUCCESS) {
                 this.status = Component.translatable(successKey).withStyle(ChatFormatting.GREEN);
                 this.refresh();
             } else {
-                String detail = outcome.failure() != null ? outcome.failure().message() : outcome.result().name();
+                Component detail = outcome.failure() != null ? failureText(outcome.failure()) : actionResultText(outcome.result());
                 this.status = Component.translatable("netherlink.friends.result", detail).withStyle(ChatFormatting.RED);
             }
         }));
@@ -128,7 +129,7 @@ public class NetherLinkFriendsScreen extends Screen {
         this.status = Component.translatable("netherlink.friends.joining", friend.name()).withStyle(ChatFormatting.YELLOW);
         ClientJoinController.join(this.minecraft, friend.profileId(), presenceId).whenComplete((_, error) -> this.minecraft.execute(() -> {
             if (error != null) {
-                this.status = Component.translatable("netherlink.friends.join_failed", LinkFailures.from(error).message()).withStyle(ChatFormatting.RED);
+                this.status = Component.translatable("netherlink.friends.join_failed", failureText(LinkFailures.from(error))).withStyle(ChatFormatting.RED);
             } else {
                 this.status = Component.translatable("netherlink.friends.join_sent", friend.name()).withStyle(ChatFormatting.GRAY);
             }
@@ -537,7 +538,43 @@ public class NetherLinkFriendsScreen extends Screen {
             case PLAYING_REALMS -> Component.translatable("netherlink.friends.status.playing_realms");
             case PLAYING_SERVER -> Component.translatable("netherlink.friends.status.playing_server");
             case HOSTING -> Component.translatable("netherlink.friends.status.playing_hosted_server");
-            case OFFLINE, UNKNOWN -> Component.translatable("netherlink.friends.status.offline");
+            case OFFLINE -> Component.translatable("netherlink.friends.status.offline");
+            case UNKNOWN -> Component.translatable("netherlink.friends.status.unknown");
         };
+    }
+
+    private static Component actionResultText(LinkFriendActionResult result) {
+        return switch (result) {
+            case SERVICE_NOT_AVAILABLE -> Component.translatable("netherlink.failure.service_unavailable");
+            case TOO_MANY_REQUESTS -> Component.translatable("netherlink.failure.rate_limited");
+            case FORBIDDEN -> Component.translatable("netherlink.failure.forbidden");
+            case UNKNOWN_PROFILE -> Component.translatable("netherlink.failure.profile_not_found");
+            case ERROR, SUCCESS -> Component.translatable("netherlink.failure.unknown", result.name());
+        };
+    }
+
+    private static Component failureText(LinkFailure failure) {
+        String key = switch (failure.code()) {
+            case UNAUTHORIZED -> "netherlink.failure.unauthorized";
+            case SERVICE_UNAVAILABLE -> "netherlink.failure.service_unavailable";
+            case RATE_LIMITED -> "netherlink.failure.rate_limited";
+            case FORBIDDEN -> "netherlink.failure.forbidden";
+            case PROFILE_NOT_FOUND -> "netherlink.failure.profile_not_found";
+            case ALREADY_FRIENDS -> "netherlink.failure.already_friends";
+            case REQUEST_NOT_FOUND -> "netherlink.failure.request_not_found";
+            case TARGET_UNAVAILABLE -> "netherlink.failure.target_unavailable";
+            case TARGET_NOT_JOINABLE -> "netherlink.failure.target_not_joinable";
+            case NOT_FRIENDS -> "netherlink.failure.not_friends";
+            case INVALID_SESSION -> "netherlink.failure.invalid_session";
+            case CONNECTION_LIMIT -> "netherlink.failure.connection_limit";
+            case NETWORK -> "netherlink.failure.network";
+            case TIMEOUT -> "netherlink.failure.timeout";
+            case CANCELLED -> "netherlink.failure.cancelled";
+            case INTERNAL -> "netherlink.failure.internal";
+            case UNKNOWN -> null;
+        };
+        return key != null
+            ? Component.translatable(key)
+            : Component.translatable("netherlink.failure.unknown", failure.message());
     }
 }

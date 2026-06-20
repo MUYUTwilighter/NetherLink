@@ -6,6 +6,7 @@ import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
 import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NliLinkServiceContractTest {
@@ -82,6 +84,11 @@ class NliLinkServiceContractTest {
         String runtimeKey = "test:nli:" + UUID.randomUUID();
         NliLinkService service = new NliLinkService(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort()));
         try {
+            assertEquals("netherlink:nli_v1", service.id().toString());
+            assertEquals(
+                "netherlink.link.nli_v1",
+                assertInstanceOf(TranslatableContents.class, service.name().getContents()).getKey()
+            );
             LinkContextHooks.setClientConnection(runtimeKey, new TestAccount(), "Test client", _ -> {});
             var identity = service.runtime().open(runtimeKey).join();
             service.runtime().renew(runtimeKey).join();

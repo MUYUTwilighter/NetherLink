@@ -1,15 +1,18 @@
 package cool.muyucloud.netherlink.link.official;
 
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
+import net.minecraft.resources.Identifier;
 
 import java.util.Set;
 
 public final class OfficialLinkServiceProvider implements LinkService {
+    private static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,
@@ -27,8 +30,8 @@ public final class OfficialLinkServiceProvider implements LinkService {
     }
 
     @Override
-    public Id id() {
-        return Id.MOJ_26_2_S8;
+    public Identifier id() {
+        return ID;
     }
 
     @Override
