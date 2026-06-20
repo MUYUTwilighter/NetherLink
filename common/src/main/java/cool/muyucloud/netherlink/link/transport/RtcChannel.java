@@ -121,7 +121,11 @@ public final class RtcChannel extends AbstractChannel {
         if (!closed) {
             NliConstants.LOG.info("[P2P-Netty] Closing RtcChannel");
             closed = true;
-            dispose(this.handshakeResult);
+            RtcHandshake.HandshakeResult result = this.handshakeResult;
+            Thread.ofPlatform().daemon().name("NetherLink RTC Disposal").start(() -> {
+                dispose(result);
+                NliConstants.LOG.info("[P2P-Netty] Native RTC resources disposed");
+            });
         }
     }
 

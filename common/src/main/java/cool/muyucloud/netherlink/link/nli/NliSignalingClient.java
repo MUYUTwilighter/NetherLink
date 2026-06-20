@@ -103,8 +103,11 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
         if (profileId == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("NLI signaling target requires a profile id"));
         }
-        WebSocket socket = this.webSocket;
-        if (socket == null) {
+        CompletableFuture<WebSocket> pending;
+        synchronized (this) {
+            pending = this.connection;
+        }
+        if (pending == null) {
             return CompletableFuture.failedFuture(new IOException("NLI signaling is not connected"));
         }
         JsonObject envelope = new JsonObject();
@@ -116,9 +119,16 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
         envelope.addProperty("sessionId", message.sessionId());
         envelope.add("payload", SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message)
             .getOrThrow(error -> new IllegalStateException("Cannot encode signaling message: " + error)));
-        this.pendingRoutes.put(messageId, target);
-        this.executor.schedule(() -> this.pendingRoutes.remove(messageId), 30L, TimeUnit.SECONDS);
-        return socket.sendText(envelope.toString(), true).handle((_, error) -> {
+        return pending.thenCompose(socket -> {
+            synchronized (this) {
+                if (this.connection != pending || this.webSocket != socket) {
+                    return CompletableFuture.failedFuture(new IOException("NLI signaling disconnected before sending"));
+                }
+            }
+            this.pendingRoutes.put(messageId, target);
+            this.executor.schedule(() -> this.pendingRoutes.remove(messageId), 30L, TimeUnit.SECONDS);
+            return socket.sendText(envelope.toString(), true);
+        }).handle((_, error) -> {
             if (error != null) {
                 this.pendingRoutes.remove(messageId);
                 throw new CompletionException(error);
