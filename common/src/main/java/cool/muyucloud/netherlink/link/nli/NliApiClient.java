@@ -45,6 +45,16 @@ final class NliApiClient implements AutoCloseable {
         return this.parseJson(this.sendRaw(HttpRequest.newBuilder(this.resolve(path)).GET(), bearer));
     }
 
+    CompletableFuture<String> getPublicText(String path, String language) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path))
+            .GET()
+            .header("Accept", "text/plain");
+        if (language != null && !language.isBlank()) {
+            builder.header("Accept-Language", language);
+        }
+        return this.sendRaw(builder).thenApply(HttpResponse::body);
+    }
+
     CompletableFuture<JsonObject> post(String path, String bearer, @Nullable JsonObject body) {
         return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, false);
     }
@@ -96,11 +106,13 @@ final class NliApiClient implements AutoCloseable {
         if (bearer == null || bearer.isBlank()) {
             return CompletableFuture.failedFuture(new LinkUnauthorizedException("NLI credential is missing"));
         }
-        HttpRequest request = builder
-            .timeout(REQUEST_TIMEOUT)
+        return this.sendRaw(builder
             .header("Accept", "application/json")
-            .header("Authorization", "Bearer " + bearer)
-            .build();
+            .header("Authorization", "Bearer " + bearer));
+    }
+
+    private CompletableFuture<HttpResponse<String>> sendRaw(HttpRequest.Builder builder) {
+        HttpRequest request = builder.timeout(REQUEST_TIMEOUT).build();
         return this.http.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
             .handle((response, error) -> {
                 if (error != null) {

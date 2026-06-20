@@ -32,12 +32,21 @@ public final class ClientP2PController {
     }
 
     public static void setFriendsOpen(Minecraft minecraft, IntegratedServer integratedServer, boolean open) {
-        ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(open);
         if (open) {
-            publish(minecraft, integratedServer);
+            ClientTermsController.runAfterAcceptance(
+                minecraft,
+                minecraft.screen,
+                () -> setFriendsOpenAccepted(minecraft, integratedServer)
+            );
         } else {
+            ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
             revoke(minecraft);
         }
+    }
+
+    private static void setFriendsOpenAccepted(Minecraft minecraft, IntegratedServer integratedServer) {
+        ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(true);
+        publish(minecraft, integratedServer);
     }
 
     public static void publish(Minecraft minecraft, IntegratedServer integratedServer) {

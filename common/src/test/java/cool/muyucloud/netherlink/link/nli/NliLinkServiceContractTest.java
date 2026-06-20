@@ -16,9 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class NliLinkServiceContractTest {
     @Test
@@ -29,6 +27,8 @@ class NliLinkServiceContractTest {
         AtomicReference<String> acceptedRequestPath = new AtomicReference<>();
         AtomicReference<String> deletedRequestPath = new AtomicReference<>();
         AtomicReference<String> closeAuth = new AtomicReference<>();
+        AtomicReference<String> termsAuth = new AtomicReference<>();
+        AtomicReference<String> termsLanguage = new AtomicReference<>();
         AtomicBoolean closed = new AtomicBoolean();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/instances", exchange -> {
@@ -43,6 +43,11 @@ class NliLinkServiceContractTest {
             respond(exchange, 200, """
                 {"profileId":"00000000-0000-0000-0000-000000000001","name":"Tester","presenceId":"presence-client","instanceToken":"instance-secret","expiresAt":"2099-01-01T00:00:00Z"}
                 """);
+        });
+        server.createContext("/v1/terms", exchange -> {
+            termsAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            termsLanguage.set(exchange.getRequestHeaders().getFirst("Accept-Language"));
+            respondText(exchange, 200, "NLI terms");
         });
         server.createContext("/v1/friends", exchange -> {
             friendsAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
@@ -89,6 +94,12 @@ class NliLinkServiceContractTest {
                 "netherlink.link.nli_v1",
                 assertInstanceOf(TranslatableContents.class, service.name().getContents()).getKey()
             );
+            var terms = service.terms("zh-CN").join().orElseThrow();
+            assertEquals("zh-CN", terms.language());
+            assertEquals("NLI terms", terms.text());
+            assertFalse(terms.revision().isBlank());
+            assertNull(termsAuth.get());
+            assertEquals("zh-CN", termsLanguage.get());
             LinkContextHooks.setClientConnection(runtimeKey, new TestAccount(), "Test client", _ -> {});
             var identity = service.runtime().open(runtimeKey).join();
             service.runtime().renew(runtimeKey).join();
@@ -124,6 +135,14 @@ class NliLinkServiceContractTest {
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.sendResponseHeaders(status, status == 204 ? -1L : bytes.length);
         if (status != 204) exchange.getResponseBody().write(bytes);
+        exchange.close();
+    }
+
+    private static void respondText(HttpExchange exchange, int status, String body) throws IOException {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
+        exchange.sendResponseHeaders(status, bytes.length);
+        exchange.getResponseBody().write(bytes);
         exchange.close();
     }
 

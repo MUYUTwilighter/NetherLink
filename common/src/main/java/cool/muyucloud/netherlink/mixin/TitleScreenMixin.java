@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.mixin;
 
 import cool.muyucloud.netherlink.client.NetherLinkFriendsScreen;
+import cool.muyucloud.netherlink.client.ClientTermsController;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
@@ -20,7 +21,11 @@ public abstract class TitleScreenMixin extends Screen {
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
         this.addRenderableWidget(
-            Button.builder(Component.translatable("netherlink.friends.short"), _ -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, true)))
+            Button.builder(Component.translatable("netherlink.friends.short"), _ -> ClientTermsController.runAfterAcceptance(
+                this.minecraft,
+                this,
+                () -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, true))
+            ))
                 .bounds(this.width / 2 + 104, this.height / 4 + 72, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("netherlink.friends.tooltip")))
                 .build()

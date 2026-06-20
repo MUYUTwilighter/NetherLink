@@ -15,7 +15,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -30,8 +29,6 @@ import cool.muyucloud.netherlink.teacon.Bootstrap;
 import cool.muyucloud.netherlink.teacon.CommonReg;
 import cool.muyucloud.netherlink.teacon.ModBlocks;
 import cool.muyucloud.netherlink.teacon.ModItems;
-import cool.muyucloud.netherlink.teacon.client.renderer.IntroCardStandingSignRenderer;
-import cool.muyucloud.netherlink.teacon.client.renderer.IntroCardHangingSignRenderer;
 import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import cool.muyucloud.netherlink.teacon.network.IntroCardActionPayload;
 
@@ -41,7 +38,6 @@ public class NetherLink {
         NliSetup.init();
         NeoForge.EVENT_BUS.register(this);
         eventBus.addListener(this::onRegister);
-        eventBus.addListener(this::onRegisterRenderers);
         eventBus.addListener(this::onRegisterPayloads);
     }
 
@@ -85,7 +81,7 @@ public class NetherLink {
                 () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
                     .title(Component.translatable("itemGroup." + NliConstants.MOD_ID + ".teacon"))
                     .icon(() -> new ItemStack(ModItems.INTRO_CARD))
-                    .displayItems((params, output) -> {
+                    .displayItems((_, output) -> {
                         output.accept(ModItems.INTRO_CARD);
                         output.accept(ModItems.FRIEND_CARD);
                         ModItems.INTRO_CARD_SIGN_ITEMS.values().forEach(output::accept);
@@ -111,7 +107,7 @@ public class NetherLink {
             if (!payload.pos().closerThan(player.blockPosition(), 6.0D)) return;
             // Ownership check: only the recorded editor may perform these actions
             UUID editor = ds.getEditor();
-            if (editor == null || !player.getUUID().equals(editor)) return;
+            if (!player.getUUID().equals(editor)) return;
 
             if ("clear".equals(payload.action())) {
                 ds.setText(new SignText(), true);
@@ -127,13 +123,4 @@ public class NetherLink {
         });
     }
 
-    @SuppressWarnings("unused")
-    public void onRegisterRenderers(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
-        event.registerBlockEntityRenderer(
-            CommonReg.SIGN_BLOCK_ENTITY.get(),
-            context -> new IntroCardStandingSignRenderer(context));
-        event.registerBlockEntityRenderer(
-            CommonReg.HANGING_SIGN_BLOCK_ENTITY.get(),
-            context -> new IntroCardHangingSignRenderer(context));
-    }
 }

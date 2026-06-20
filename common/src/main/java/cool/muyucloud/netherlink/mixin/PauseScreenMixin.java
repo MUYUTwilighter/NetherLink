@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.mixin;
 
 import cool.muyucloud.netherlink.client.ClientP2PController;
+import cool.muyucloud.netherlink.client.ClientTermsController;
 import cool.muyucloud.netherlink.client.NetherLinkFriendsScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -26,7 +27,11 @@ public abstract class PauseScreenMixin extends Screen {
         IntegratedServer server = this.minecraft.getSingleplayerServer();
         int rowY = this.height / 4 + 80;
         this.addRenderableWidget(
-            Button.builder(Component.translatable("netherlink.friends.short"), _ -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, false)))
+            Button.builder(Component.translatable("netherlink.friends.short"), _ -> ClientTermsController.runAfterAcceptance(
+                this.minecraft,
+                this,
+                () -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, false))
+            ))
                 .bounds(this.width / 2 + 106, rowY, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("netherlink.friends.tooltip")))
                 .build()
