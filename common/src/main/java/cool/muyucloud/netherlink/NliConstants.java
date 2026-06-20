@@ -35,7 +35,7 @@ public class NliConstants {
                     }
                 } else val = custom.trim();
                 if (val.isEmpty() || val.startsWith("${")) {
-                    throw new IllegalStateException("Please specify a valid NETHERLINK_CLIENT_ID in environment variable");
+                    LOG.warn("Invalid NETHERLINK_CLIENT_ID environment variable provided, serverside feature will be disabled");
                 }
             }
             return val;

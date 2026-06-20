@@ -76,7 +76,7 @@ processResources {
             'sources'                      : sources,
             'issue_tracker'                : issue_tracker,
             'release_state'                : release_state,
-            'microsoft_client_id'          : System.getenv("NETHERLINK_CLIENT_ID")
+            'microsoft_client_id'          : java.util.Optional.ofNullable(System.getenv("NETHERLINK_CLIENT_ID")).orElse("")
     ]
 
     var jsonExpandProps = expandProps.collectEntries {

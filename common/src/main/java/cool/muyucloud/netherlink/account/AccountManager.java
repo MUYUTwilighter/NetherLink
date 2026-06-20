@@ -62,6 +62,8 @@ public class AccountManager {
     }
 
     public static void add(Messenger messenger) {
+        if (NliConstants.MS_CLIENT_ID.get() == null)
+            throw new NetherLinkAuthException("Unable to add mojang account while api key is not set");
         Account account = new Account();
         AuthRequest request = new AuthRequest(account, messenger);
         try {
