@@ -36,7 +36,7 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
 
     @SuppressWarnings("unchecked")
     public DoubleSidedSignBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
-        super((BlockEntityType<SignBlockEntity>) (Object) type, pos, state);
+        super((BlockEntityType<SignBlockEntity>) type, pos, state);
     }
 
     @Override
@@ -82,7 +82,12 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
     /** Max width per text line in pixels. Doubled to fit more text. */
     @Override
     public int getMaxTextLineWidth() {
-        return 115;
+        var block = this.getBlockState().getBlock();
+        if (block instanceof net.minecraft.world.level.block.CeilingHangingSignBlock
+            || block instanceof net.minecraft.world.level.block.WallHangingSignBlock) {
+            return 60;
+        }
+        return 90;
     }
 
     /** Vertical spacing between text lines. Larger for hanging signs due to wider layout. */
@@ -91,9 +96,9 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
         var block = this.getBlockState().getBlock();
         if (block instanceof net.minecraft.world.level.block.CeilingHangingSignBlock
             || block instanceof net.minecraft.world.level.block.WallHangingSignBlock) {
-            return 16;
+            return 9;
         }
-        return 13;
+        return 10;
     }
 
     /** @return UUID of the player who last edited this sign, or null. */
@@ -135,8 +140,7 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
             var type = cool.muyucloud.netherlink.teacon.CommonReg.SIGN_BLOCK_ENTITY;
             if (type != null && type.get() != null) return type.get();
         }
-        return (BlockEntityType<SignBlockEntity>) (Object)
-            BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
-                Identifier.fromNamespaceAndPath("minecraft", "sign"));
+        return (BlockEntityType<SignBlockEntity>) BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
+            Identifier.fromNamespaceAndPath("minecraft", "sign"));
     }
 }
