@@ -16,8 +16,11 @@ import net.minecraft.client.gui.components.tabs.TabNavigationBar;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.item.component.ResolvableProfile;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -26,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class NetherLinkFriendsScreen extends Screen {
     private static final Component TITLE = Component.translatable("netherlink.friends.title");
@@ -92,8 +96,7 @@ public class NetherLinkFriendsScreen extends Screen {
             this.snapshot = result;
             this.friendsTab.setSnapshot(result);
             this.requestsTab.setSnapshot(result);
-            int requestCount = result.incoming().size() + result.outgoing().size();
-            this.status = Component.translatable("netherlink.friends.loaded", result.friends().size() + requestCount).withStyle(ChatFormatting.GRAY);
+            this.status = Component.translatable("netherlink.friends.loaded", result.friends().size()).withStyle(ChatFormatting.GRAY);
         }));
     }
 
@@ -443,11 +446,20 @@ public class NetherLinkFriendsScreen extends Screen {
 
         protected abstract Component description();
 
+        protected int textOffset() {
+            return 0;
+        }
+
+        protected void extractDecoration(GuiGraphicsExtractor graphics) {
+        }
+
         @Override
         public void extractContent(@NonNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float partialTick) {
             Minecraft minecraft = Minecraft.getInstance();
-            graphics.text(minecraft.font, this.title(), this.getContentX() + 4, this.getContentY() + 3, -1);
-            graphics.text(minecraft.font, this.description(), this.getContentX() + 4, this.getContentY() + 17, 0xFFAAAAAA);
+            int textX = this.getContentX() + 4 + this.textOffset();
+            this.extractDecoration(graphics);
+            graphics.text(minecraft.font, this.title(), textX, this.getContentY() + 3, -1);
+            graphics.text(minecraft.font, this.description(), textX, this.getContentY() + 17, 0xFFAAAAAA);
         }
 
         @Override
@@ -468,9 +480,30 @@ public class NetherLinkFriendsScreen extends Screen {
 
     private static final class FriendRow extends Row {
         private final ClientFriendService.Friend friend;
+        private final Supplier<PlayerSkin> skin;
 
         private FriendRow(ClientFriendService.Friend friend) {
             this.friend = friend;
+            Supplier<PlayerSkinRenderCache.RenderInfo> skinLookup = Minecraft.getInstance()
+                .playerSkinRenderCache()
+                .createLookup(ResolvableProfile.createUnresolved(friend.profileId()));
+            this.skin = () -> skinLookup.get().playerSkin();
+        }
+
+        @Override
+        protected int textOffset() {
+            return 28;
+        }
+
+        @Override
+        protected void extractDecoration(GuiGraphicsExtractor graphics) {
+            PlayerFaceExtractor.extractRenderState(
+                graphics,
+                this.skin.get(),
+                this.getContentX() + 4,
+                this.getContentY() + (this.getContentHeight() - 24) / 2,
+                24
+            );
         }
 
         @Override
@@ -480,9 +513,12 @@ public class NetherLinkFriendsScreen extends Screen {
 
         @Override
         protected Component description() {
-            return this.friend.instances().isEmpty()
-                ? Component.translatable("netherlink.friends.status.offline")
-                : Component.translatable("netherlink.friends.instances.count", this.friend.instances().size());
+            if (this.friend.instances().isEmpty()) {
+                return Component.translatable("netherlink.friends.status.offline").withStyle(ChatFormatting.DARK_GRAY);
+            }
+            boolean joinable = this.friend.instances().stream().anyMatch(ClientFriendService.Instance::joinable);
+            return Component.translatable("netherlink.friends.instances.count", this.friend.instances().size())
+                .withStyle(joinable ? ChatFormatting.GREEN : ChatFormatting.YELLOW);
         }
     }
 

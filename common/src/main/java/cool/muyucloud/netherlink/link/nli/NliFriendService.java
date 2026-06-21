@@ -3,7 +3,6 @@ package cool.muyucloud.netherlink.link.nli;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
@@ -30,7 +29,7 @@ final class NliFriendService implements LinkFriendService {
     @Override
     public CompletableFuture<LinkFriendSnapshot> refresh() {
         return this.runtimes.session(this.runtimeKey)
-            .thenCompose(session -> this.api.get("v1/friends", session.token()))
+            .thenCompose(session -> this.api.get("v1/friends", session.token(), this.minecraftToken()))
             .thenApply(this::snapshot);
     }
 
@@ -43,11 +42,9 @@ final class NliFriendService implements LinkFriendService {
 
     @Override
     public CompletableFuture<LinkFriendActionOutcome> remove(UUID profileId) {
-        return this.runtimes.session(this.runtimeKey).thenCompose(session -> {
-            MinecraftAccount account = LinkContextHooks.require(this.runtimeKey).account();
-            return this.api.delete(path("v1/friends/", profileId), session.token(), account.getMcToken())
-                .thenApply(_ -> success(null, LinkOfficialSyncStatus.UNSUPPORTED));
-        });
+        return this.runtimes.session(this.runtimeKey)
+            .thenCompose(session -> this.api.delete(path("v1/friends/", profileId), session.token(), this.minecraftToken()))
+            .thenApply(_ -> success(null, LinkOfficialSyncStatus.SUCCESS));
     }
 
     @Override
@@ -67,13 +64,13 @@ final class NliFriendService implements LinkFriendService {
 
     private CompletableFuture<LinkFriendActionOutcome> deleteRequest(UUID profileId) {
         return this.runtimes.session(this.runtimeKey)
-            .thenCompose(session -> this.api.delete(path("v1/friends/requests/", profileId), session.token(), null))
-            .thenApply(_ -> success(null, LinkOfficialSyncStatus.SKIPPED));
+            .thenCompose(session -> this.api.delete(path("v1/friends/requests/", profileId), session.token(), this.minecraftToken()))
+            .thenApply(_ -> success(null, LinkOfficialSyncStatus.SUCCESS));
     }
 
     private CompletableFuture<LinkFriendActionOutcome> mutate(String path, JsonObject body) {
         return this.runtimes.session(this.runtimeKey)
-            .thenCompose(session -> this.api.post(path, session.token(), body))
+            .thenCompose(session -> this.api.post(path, session.token(), body, this.minecraftToken()))
             .thenApply(json -> {
                 String relation = NliApiClient.string(json, "relationship", "");
                 LinkFriendRelationship relationship = switch (relation) {
@@ -81,8 +78,12 @@ final class NliFriendService implements LinkFriendService {
                     case "REQUESTED" -> LinkFriendRelationship.OUTGOING;
                     default -> null;
                 };
-                return success(relationship, LinkOfficialSyncStatus.SKIPPED);
+                return success(relationship, officialSync(json));
             });
+    }
+
+    private String minecraftToken() {
+        return LinkContextHooks.require(this.runtimeKey).account().getMcToken();
     }
 
     private LinkFriendSnapshot snapshot(JsonObject root) {
@@ -144,6 +145,15 @@ final class NliFriendService implements LinkFriendService {
 
     private static String path(String prefix, UUID profileId) {
         return prefix + URLEncoder.encode(profileId.toString(), StandardCharsets.UTF_8);
+    }
+
+    private static LinkOfficialSyncStatus officialSync(JsonObject response) {
+        return switch (NliApiClient.string(response, "officialSync", "SKIPPED")) {
+            case "SUCCESS" -> LinkOfficialSyncStatus.SUCCESS;
+            case "FAILED" -> LinkOfficialSyncStatus.FAILED;
+            case "UNSUPPORTED" -> LinkOfficialSyncStatus.UNSUPPORTED;
+            default -> LinkOfficialSyncStatus.SKIPPED;
+        };
     }
 
     private static LinkFriendActionOutcome success(LinkFriendRelationship relationship, LinkOfficialSyncStatus sync) {

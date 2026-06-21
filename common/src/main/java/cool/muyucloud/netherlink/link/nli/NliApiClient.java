@@ -41,8 +41,10 @@ final class NliApiClient implements AutoCloseable {
         return this.http;
     }
 
-    CompletableFuture<JsonObject> get(String path, String bearer) {
-        return this.parseJson(this.sendRaw(HttpRequest.newBuilder(this.resolve(path)).GET(), bearer));
+    CompletableFuture<JsonObject> get(String path, String bearer, @Nullable String minecraftToken) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path)).GET();
+        addMinecraftToken(builder, minecraftToken);
+        return this.parseJson(this.sendRaw(builder, bearer));
     }
 
     CompletableFuture<String> getPublicText(String path, String language) {
@@ -59,16 +61,26 @@ final class NliApiClient implements AutoCloseable {
         return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, false);
     }
 
+    CompletableFuture<JsonObject> post(String path, String bearer, @Nullable JsonObject body, @Nullable String minecraftToken) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path));
+        addMinecraftToken(builder, minecraftToken);
+        return this.send(builder, bearer, body, false);
+    }
+
     CompletableFuture<JsonObject> put(String path, String bearer, JsonObject body) {
         return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, true);
     }
 
     CompletableFuture<Void> delete(String path, String bearer, @Nullable String minecraftToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path)).DELETE();
+        addMinecraftToken(builder, minecraftToken);
+        return this.sendRaw(builder, bearer).thenApply(_ -> null);
+    }
+
+    private static void addMinecraftToken(HttpRequest.Builder builder, @Nullable String minecraftToken) {
         if (minecraftToken != null && !minecraftToken.isBlank()) {
             builder.header("X-Minecraft-Access-Token", minecraftToken);
         }
-        return this.sendRaw(builder, bearer).thenApply(_ -> null);
     }
 
     private CompletableFuture<JsonObject> send(HttpRequest.Builder builder, String bearer, @Nullable JsonObject body, boolean put) {
@@ -148,7 +160,7 @@ final class NliApiClient implements AutoCloseable {
         }
         LinkFailureCode failureCode = switch (code) {
             case "RATE_LIMITED" -> LinkFailureCode.RATE_LIMITED;
-            case "PROFILE_NOT_FOUND" -> LinkFailureCode.PROFILE_NOT_FOUND;
+            case "PROFILE_NOT_FOUND", "PLAYER_NOT_FOUND" -> LinkFailureCode.PROFILE_NOT_FOUND;
             case "ALREADY_FRIENDS" -> LinkFailureCode.ALREADY_FRIENDS;
             case "REQUEST_NOT_FOUND" -> LinkFailureCode.REQUEST_NOT_FOUND;
             case "NOT_FRIENDS" -> LinkFailureCode.NOT_FRIENDS;
@@ -156,11 +168,11 @@ final class NliApiClient implements AutoCloseable {
             case "TARGET_NOT_JOINABLE" -> LinkFailureCode.TARGET_NOT_JOINABLE;
             case "SESSION_NOT_FOUND", "INVALID_SESSION_STATE" -> LinkFailureCode.INVALID_SESSION;
             case "CONNECTION_LIMIT", "INSTANCE_LIMIT_REACHED" -> LinkFailureCode.CONNECTION_LIMIT;
-            case "FORBIDDEN" -> LinkFailureCode.FORBIDDEN;
+            case "FORBIDDEN", "OFFICIAL_FRIENDS_FORBIDDEN" -> LinkFailureCode.FORBIDDEN;
             case "SERVICE_UNAVAILABLE" -> LinkFailureCode.SERVICE_UNAVAILABLE;
             default -> status == 429 ? LinkFailureCode.RATE_LIMITED
                 : status == 403 ? LinkFailureCode.FORBIDDEN
-                : status == 503 ? LinkFailureCode.SERVICE_UNAVAILABLE
+                : status >= 500 ? LinkFailureCode.SERVICE_UNAVAILABLE
                 : LinkFailureCode.UNKNOWN;
         };
         boolean retryable = status == 429 || status >= 500;

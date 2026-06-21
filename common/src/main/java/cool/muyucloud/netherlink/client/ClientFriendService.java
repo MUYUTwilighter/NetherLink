@@ -68,7 +68,7 @@ public final class ClientFriendService {
                 displayName(entry),
                 entry.presences().stream().map(ClientFriendService::instance).sorted(INSTANCE_ORDER).toList()
             ))
-            .sorted(Comparator.comparing(Friend::name, String.CASE_INSENSITIVE_ORDER))
+            .sorted(FRIEND_ORDER)
             .toList();
     }
 
@@ -112,9 +112,22 @@ public final class ClientFriendService {
     public record Request(UUID profileId, String name, LinkFriendRelationship relationship) {
     }
 
+    private static final Comparator<Friend> FRIEND_ORDER = Comparator
+        .comparingInt(ClientFriendService::friendRank)
+        .thenComparing(Friend::name, String.CASE_INSENSITIVE_ORDER)
+        .thenComparing(Friend::name)
+        .thenComparing(Friend::profileId);
+
     private static final Comparator<Instance> INSTANCE_ORDER = Comparator
         .comparingInt((Instance instance) -> presenceRank(instance.status()))
         .thenComparing(instance -> instance.presenceId() != null ? instance.presenceId() : "");
+
+    private static int friendRank(Friend friend) {
+        if (friend.instances().stream().anyMatch(Instance::joinable)) {
+            return 0;
+        }
+        return friend.instances().isEmpty() ? 2 : 1;
+    }
 
     private static int presenceRank(LinkPresenceStatus status) {
         return switch (status) {

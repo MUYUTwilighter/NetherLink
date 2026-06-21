@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
+import cool.muyucloud.netherlink.link.model.LinkOfficialSyncStatus;
 import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,9 @@ class NliLinkServiceContractTest {
         AtomicReference<String> registrationAuth = new AtomicReference<>();
         AtomicReference<String> renewalAuth = new AtomicReference<>();
         AtomicReference<String> friendsAuth = new AtomicReference<>();
+        AtomicReference<String> friendsMinecraftAuth = new AtomicReference<>();
+        AtomicReference<String> requestMinecraftAuth = new AtomicReference<>();
+        AtomicReference<String> removeMinecraftAuth = new AtomicReference<>();
         AtomicReference<String> acceptedRequestPath = new AtomicReference<>();
         AtomicReference<String> deletedRequestPath = new AtomicReference<>();
         AtomicReference<String> closeAuth = new AtomicReference<>();
@@ -51,29 +55,35 @@ class NliLinkServiceContractTest {
         });
         server.createContext("/v1/friends", exchange -> {
             friendsAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            if ("DELETE".equals(exchange.getRequestMethod())) {
+                removeMinecraftAuth.set(exchange.getRequestHeaders().getFirst("X-Minecraft-Access-Token"));
+                respond(exchange, 204, "");
+                return;
+            }
+            friendsMinecraftAuth.set(exchange.getRequestHeaders().getFirst("X-Minecraft-Access-Token"));
             respond(exchange, 200, """
                 {
                   "friends":[{
                     "profileId":"00000000-0000-0000-0000-000000000002",
                     "name":"Friend",
-                    "source":"netherlink",
+                    "source":"minecraft_sync",
                     "presences":[
                       {"profileId":"00000000-0000-0000-0000-000000000002","presenceId":"friend-a","status":"HOSTING","joinable":true,"sessionId":null,"endpoint":null,"displayText":"World A","updatedAt":"2026-06-19T00:00:00Z","expiresAt":"2099-01-01T00:00:00Z"},
                       {"profileId":"00000000-0000-0000-0000-000000000002","presenceId":"friend-b","status":"ONLINE","joinable":false,"sessionId":null,"endpoint":null,"displayText":"Instance B","updatedAt":"2026-06-19T00:00:00Z","expiresAt":"2099-01-01T00:00:00Z"}
                     ]
                   }],
-                  "incomingRequests":[{"profileId":"00000000-0000-0000-0000-000000000003","name":"Incoming","source":"netherlink"}],
+                  "incomingRequests":[{"profileId":"00000000-0000-0000-0000-000000000003","name":"Incoming","source":"minecraft_sync"}],
                   "outgoingRequests":[]
                 }
                 """);
         });
         server.createContext("/v1/friends/requests", exchange -> {
             String path = exchange.getRequestURI().getPath();
+            requestMinecraftAuth.set(exchange.getRequestHeaders().getFirst("X-Minecraft-Access-Token"));
             if ("POST".equals(exchange.getRequestMethod())) {
                 acceptedRequestPath.set(path);
-                respond(exchange, 200, """
-                    {"result":"SUCCESS","relationship":"ACCEPTED","officialSync":"SKIPPED"}
-                    """);
+                String relationship = "/v1/friends/requests".equals(path) ? "REQUESTED" : "ACCEPTED";
+                respond(exchange, 200, "{\"result\":\"SUCCESS\",\"relationship\":\"" + relationship + "\",\"officialSync\":\"SUCCESS\"}");
             } else {
                 deletedRequestPath.set(path);
                 respond(exchange, 204, "");
@@ -106,17 +116,25 @@ class NliLinkServiceContractTest {
             var friends = service.createFriendService(runtimeKey);
             var snapshot = friends.refresh().join();
             UUID incomingId = UUID.fromString("00000000-0000-0000-0000-000000000003");
-            friends.accept(incomingId).join();
+            var addOutcome = friends.add("TargetPlayer").join();
+            var acceptOutcome = friends.accept(incomingId).join();
             friends.decline(incomingId).join();
+            friends.remove(UUID.fromString("00000000-0000-0000-0000-000000000002")).join();
 
             assertEquals("Bearer minecraft-secret", registrationAuth.get());
             assertEquals("Bearer instance-secret", renewalAuth.get());
             assertEquals("Bearer instance-renewed", friendsAuth.get());
+            assertEquals("minecraft-secret", friendsMinecraftAuth.get());
+            assertEquals("minecraft-secret", requestMinecraftAuth.get());
+            assertEquals("minecraft-secret", removeMinecraftAuth.get());
             assertEquals("presence-client", identity.presenceId());
             assertEquals(1, snapshot.friends().size());
             assertEquals(2, snapshot.friends().getFirst().presences().size());
             assertEquals(LinkPresenceStatus.HOSTING, snapshot.friends().getFirst().presences().getFirst().status());
             assertEquals(LinkFriendRelationship.INCOMING, snapshot.incoming().getFirst().relationship());
+            assertEquals(LinkFriendRelationship.OUTGOING, addOutcome.relationship());
+            assertEquals(LinkOfficialSyncStatus.SUCCESS, addOutcome.officialSync());
+            assertEquals(LinkOfficialSyncStatus.SUCCESS, acceptOutcome.officialSync());
             assertEquals("/v1/friends/requests/" + incomingId, acceptedRequestPath.get());
             assertEquals("/v1/friends/requests/" + incomingId, deletedRequestPath.get());
 
