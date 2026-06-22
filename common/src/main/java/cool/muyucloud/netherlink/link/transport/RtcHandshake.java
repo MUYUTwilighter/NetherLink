@@ -4,6 +4,10 @@ import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.*;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,6 +22,9 @@ public final class RtcHandshake {
     private final CompletableFuture<HandshakeResult> result = new CompletableFuture<>();
     private final AtomicBoolean started = new AtomicBoolean();
     private final AtomicBoolean handedOff = new AtomicBoolean();
+    private final Object remoteIceLock = new Object();
+    private final Queue<RTCIceCandidate> pendingRemoteIceCandidates = new ArrayDeque<>();
+    private boolean remoteDescriptionReady;
     private volatile @Nullable CompletableFuture<String> sdpResult;
     private volatile @Nullable RTCDataChannel dataChannel;
 
@@ -83,6 +90,17 @@ public final class RtcHandshake {
         if (this.result.isDone()) {
             return CompletableFuture.completedFuture(null);
         }
+        synchronized (this.remoteIceLock) {
+            if (!this.remoteDescriptionReady) {
+                this.pendingRemoteIceCandidates.add(candidate);
+                NliConstants.LOG.debug("[P2P][{}] Queued remote ICE candidate until remote description is ready", this.id);
+                return CompletableFuture.completedFuture(null);
+            }
+        }
+        return this.applyRemoteIceCandidate(candidate);
+    }
+
+    private CompletableFuture<Void> applyRemoteIceCandidate(RTCIceCandidate candidate) {
         try {
             NliConstants.LOG.debug("[P2P][{}] Adding remote ICE candidate mid={} line={}", this.id, candidate.sdpMid, candidate.sdpMLineIndex);
             this.peerConnection.addIceCandidate(candidate);
@@ -112,6 +130,7 @@ public final class RtcHandshake {
         this.peerConnection.setRemoteDescription(description, new SetSessionDescriptionObserver() {
             @Override
             public void onSuccess() {
+                RtcHandshake.this.flushPendingRemoteIceCandidates();
                 future.complete(null);
             }
 
@@ -121,6 +140,22 @@ public final class RtcHandshake {
             }
         });
         return future;
+    }
+
+    private void flushPendingRemoteIceCandidates() {
+        List<RTCIceCandidate> pending;
+        synchronized (this.remoteIceLock) {
+            this.remoteDescriptionReady = true;
+            pending = new ArrayList<>(this.pendingRemoteIceCandidates);
+            this.pendingRemoteIceCandidates.clear();
+        }
+        if (!pending.isEmpty()) {
+            NliConstants.LOG.debug("[P2P][{}] Applying {} queued remote ICE candidates", this.id, pending.size());
+        }
+        pending.forEach(candidate -> this.applyRemoteIceCandidate(candidate).exceptionally(error -> {
+            NliConstants.LOG.warn("[P2P][{}] Failed to apply queued ICE candidate: {}", this.id, error.getMessage());
+            return null;
+        }));
     }
 
     private CompletableFuture<Void> setLocalDescription(RTCSessionDescription description) {

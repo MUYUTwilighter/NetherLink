@@ -33,7 +33,7 @@ public final class ServerP2PManager {
     private final ConcurrentHashMap<String, UUID> profileIdsByPresence = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> acceptedAwaitingOffer = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RtcHandshake> handshakes = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, List<PendingIceCandidate>> pendingIceCandidates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<PendingIceKey, List<RTCIceCandidate>> pendingIceCandidates = new ConcurrentHashMap<>();
     private final LinkSignalingClient.ConnectionListener connectionListener = new LinkSignalingClient.ConnectionListener() {
         @Override
         public void onSignalingConnected() {
@@ -214,7 +214,7 @@ public final class ServerP2PManager {
     }
 
     private void handleOffer(LinkPeerRoute source, SignalingMessage.WebRtc.Offer offer) {
-        String acceptedSession = this.acceptedAwaitingOffer.remove(source.presenceId());
+        String acceptedSession = this.acceptedAwaitingOffer.get(source.presenceId());
         if (!offer.sessionId().equals(acceptedSession)) {
             NliConstants.LOG.warn("[P2P][{}] Ignoring offer for unaccepted session {}; accepted={}", this.accountName, offer.sessionId(), acceptedSession);
             return;
@@ -235,8 +235,10 @@ public final class ServerP2PManager {
     }
 
     private CompletableFuture<Void> startAnswerHandshake(LinkPeerRoute peer, @Nullable UUID profileId, String sessionId, String offerSdp) {
-        if (this.handshakes.containsKey(peer.presenceId())) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Handshake already in progress"));
+        RtcHandshake previous = this.handshakes.remove(peer.presenceId());
+        if (previous != null) {
+            NliConstants.LOG.info("[P2P][{}] Superseding handshake {} with retry {}", this.accountName, previous.id(), sessionId);
+            previous.abort("superseded by retry " + sessionId);
         }
         CompletableFuture<Void> result = new CompletableFuture<>();
         NliConstants.LOG.info("[P2P][{}] Requesting TURN auth for session={}", this.accountName, sessionId);
@@ -279,6 +281,7 @@ public final class ServerP2PManager {
                 return null;
             }
         }
+        this.acceptedAwaitingOffer.remove(peer.presenceId(), sessionId);
         this.applyPendingIceCandidates(peer.presenceId(), sessionId, handshake);
         NliConstants.LOG.info("[P2P][{}] Created WebRTC handshake session={} presence={}", this.accountName, sessionId, peer.presenceId());
         CompletableFuture.delayedExecutor(HANDSHAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
@@ -289,7 +292,7 @@ public final class ServerP2PManager {
         });
         handshake.future().whenComplete((handshakeResult, error) -> {
             this.handshakes.remove(peer.presenceId(), handshake);
-            this.pendingIceCandidates.remove(peer.presenceId());
+            this.pendingIceCandidates.remove(new PendingIceKey(peer.presenceId(), sessionId));
             if (error != null) {
                 NliConstants.LOG.warn("[P2P][{}] Handshake failed session={}: {}", this.accountName, sessionId, error.toString());
                 result.completeExceptionally(error);
@@ -307,9 +310,10 @@ public final class ServerP2PManager {
         RtcHandshake handshake = this.handshakes.get(source.presenceId());
         if (handshake == null || !handshake.id().equals(ice.sessionId())) {
             if (this.shouldBufferIceCandidate(source.presenceId(), ice.sessionId())) {
-                this.pendingIceCandidates.compute(source.presenceId(), (_, existing) -> {
-                    List<PendingIceCandidate> candidates = existing != null ? existing : new ArrayList<>();
-                    candidates.add(new PendingIceCandidate(ice.sessionId(), ice.toRtcIceCandidate()));
+                PendingIceKey key = new PendingIceKey(source.presenceId(), ice.sessionId());
+                this.pendingIceCandidates.compute(key, (_, existing) -> {
+                    List<RTCIceCandidate> candidates = existing != null ? existing : new ArrayList<>();
+                    candidates.add(ice.toRtcIceCandidate());
                     return candidates;
                 });
                 NliConstants.LOG.debug("[P2P][{}] Buffered ICE candidate while waiting for handshake session={}", this.accountName, ice.sessionId());
@@ -341,13 +345,11 @@ public final class ServerP2PManager {
     }
 
     private void applyPendingIceCandidates(String presenceId, String sessionId, RtcHandshake handshake) {
-        List<PendingIceCandidate> buffered = this.pendingIceCandidates.remove(presenceId);
+        List<RTCIceCandidate> buffered = this.pendingIceCandidates.remove(new PendingIceKey(presenceId, sessionId));
         if (buffered == null || buffered.isEmpty()) {
             return;
         }
-        buffered.stream()
-            .filter(candidate -> sessionId.equals(candidate.sessionId()))
-            .forEach(candidate -> handshake.addRemoteIceCandidate(candidate.candidate()).exceptionally(error -> {
+        buffered.forEach(candidate -> handshake.addRemoteIceCandidate(candidate).exceptionally(error -> {
                 NliConstants.LOG.warn("[P2P][{}] Failed to replay buffered ICE candidate for {}: {}", this.accountName, sessionId, error.getMessage());
                 return null;
             }));
@@ -360,6 +362,6 @@ public final class ServerP2PManager {
         return this.factory;
     }
 
-    private record PendingIceCandidate(String sessionId, RTCIceCandidate candidate) {
+    private record PendingIceKey(String presenceId, String sessionId) {
     }
 }
