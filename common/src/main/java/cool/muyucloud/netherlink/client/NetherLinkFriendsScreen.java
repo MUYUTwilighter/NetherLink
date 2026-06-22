@@ -549,9 +549,30 @@ public class NetherLinkFriendsScreen extends Screen {
 
     private static final class RequestRow extends Row {
         private final ClientFriendService.Request request;
+        private final Supplier<PlayerSkin> skin;
 
         private RequestRow(ClientFriendService.Request request) {
             this.request = request;
+            Supplier<PlayerSkinRenderCache.RenderInfo> skinLookup = Minecraft.getInstance()
+                .playerSkinRenderCache()
+                .createLookup(ResolvableProfile.createUnresolved(request.profileId()));
+            this.skin = () -> skinLookup.get().playerSkin();
+        }
+
+        @Override
+        protected int textOffset() {
+            return 28;
+        }
+
+        @Override
+        protected void extractDecoration(GuiGraphicsExtractor graphics) {
+            PlayerFaceExtractor.extractRenderState(
+                graphics,
+                this.skin.get(),
+                this.getContentX() + 4,
+                this.getContentY() + (this.getContentHeight() - 24) / 2,
+                24
+            );
         }
 
         @Override
