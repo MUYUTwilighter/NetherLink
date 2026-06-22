@@ -25,6 +25,7 @@ public interface LinkService {
     /** Optional backend features used for presentation and feature gating. */
     enum Capability {
         FRIENDS,
+        FRIEND_SETTINGS,
         HOSTING,
         JOINING,
         MULTI_ACCOUNT_RUNTIME,

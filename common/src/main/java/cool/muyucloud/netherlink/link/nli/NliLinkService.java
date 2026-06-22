@@ -20,10 +20,11 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public final class NliLinkService implements LinkService {
-    private static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "nli_v1");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "nli_v1");
     public static final NliLinkService INSTANCE = new NliLinkService(defaultUri());
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,
+        Capability.FRIEND_SETTINGS,
         Capability.HOSTING,
         Capability.JOINING,
         Capability.MULTI_ACCOUNT_RUNTIME,
@@ -31,11 +32,13 @@ public final class NliLinkService implements LinkService {
     );
 
     private final NliApiClient api;
+    private final URI baseUri;
     private final NliRuntimeService runtime;
     private final NliHostingService hosting;
     private final NliJoinService joining;
 
     public NliLinkService(URI baseUri) {
+        this.baseUri = baseUri;
         this.api = new NliApiClient(baseUri);
         this.runtime = new NliRuntimeService(this.api);
         this.hosting = new NliHostingService(this.api, this.runtime);
@@ -45,6 +48,10 @@ public final class NliLinkService implements LinkService {
     @Override
     public Identifier id() {
         return ID;
+    }
+
+    public URI baseUri() {
+        return this.baseUri;
     }
 
     @Override

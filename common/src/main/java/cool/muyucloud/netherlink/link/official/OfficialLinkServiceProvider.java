@@ -12,10 +12,11 @@ import net.minecraft.resources.Identifier;
 import java.util.Set;
 
 public final class OfficialLinkServiceProvider implements LinkService {
-    private static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2");
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,
+        Capability.FRIEND_SETTINGS,
         Capability.HOSTING,
         Capability.JOINING,
         Capability.MULTI_ACCOUNT_RUNTIME

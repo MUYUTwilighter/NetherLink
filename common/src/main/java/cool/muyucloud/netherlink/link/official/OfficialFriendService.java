@@ -7,6 +7,8 @@ import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
+import cool.muyucloud.netherlink.link.exception.LinkException;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import org.jspecify.annotations.Nullable;
@@ -16,6 +18,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -23,7 +27,9 @@ import java.util.concurrent.Executors;
 
 public final class OfficialFriendService implements LinkFriendService {
     private static final URI FRIENDS_URI = URI.create("https://api.minecraftservices.com/friends");
+    private static final URI ATTRIBUTES_URI = URI.create("https://api.minecraftservices.com/player/attributes");
     private static final URI PRESENCE_URI = URI.create("https://api.minecraftservices.com/presence");
+    private static final Duration FRIEND_REQUEST_COOLDOWN = Duration.ofSeconds(10L);
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "NetherLink Friends");
         thread.setDaemon(true);
@@ -34,7 +40,9 @@ public final class OfficialFriendService implements LinkFriendService {
     private final String accessToken;
     private @Nullable String friendsEtag;
     private @Nullable String presenceEtag;
+    private @Nullable Instant nextFriendRequest;
     private FriendLists friendCache = new FriendLists(List.of(), List.of(), List.of());
+    private Map<UUID, Presence> presenceCache = Map.of();
     private LinkFriendSnapshot cache = new LinkFriendSnapshot(List.of(), List.of(), List.of());
 
     public OfficialFriendService(MinecraftAccount account) {
@@ -57,6 +65,11 @@ public final class OfficialFriendService implements LinkFriendService {
             this.cache = new LinkFriendSnapshot(friends, incoming, outgoing);
             return this.cache;
         }, EXECUTOR);
+    }
+
+    @Override
+    public CompletableFuture<LinkFriendSettings> settings() {
+        return CompletableFuture.supplyAsync(this::getSettings, EXECUTOR);
     }
 
     @Override
@@ -84,7 +97,16 @@ public final class OfficialFriendService implements LinkFriendService {
         return CompletableFuture.supplyAsync(() -> this.putFriendAction(null, profileId, "REMOVE"), EXECUTOR);
     }
 
+    @Override
+    public CompletableFuture<LinkFriendSettings> updateSettings(LinkFriendSettings settings) {
+        return CompletableFuture.supplyAsync(() -> this.putSettings(settings), EXECUTOR);
+    }
+
     private FriendLists getFriends() {
+        if (this.nextFriendRequest != null && Instant.now().isBefore(this.nextFriendRequest)) {
+            return this.friendCache;
+        }
+        this.nextFriendRequest = Instant.now().plus(FRIEND_REQUEST_COOLDOWN);
         HttpRequest.Builder builder = this.authorized(FRIENDS_URI).GET();
         if (this.friendsEtag != null) {
             builder.header("If-None-Match", this.friendsEtag);
@@ -92,15 +114,17 @@ public final class OfficialFriendService implements LinkFriendService {
         try {
             HttpResponse<String> response = this.http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 304) {
+                this.updateFriendPollInterval(response);
                 return this.friendCache;
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("Friend list request failed: " + handleHttpStatus(response.statusCode()));
+                throw requestFailure("Friend list request", response.statusCode());
             }
+            this.updateFriendPollInterval(response);
             this.friendsEtag = response.headers().firstValue("ETag").orElse(null);
             return parseFriendLists(response.body());
         } catch (IOException e) {
-            throw new IllegalStateException("Friend list request failed: " + e.getMessage(), e);
+            throw networkFailure("Friend list request failed", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Friend list request interrupted", e);
@@ -119,27 +143,64 @@ public final class OfficialFriendService implements LinkFriendService {
         try {
             HttpResponse<String> response = this.http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() == 304) {
-                Map<UUID, Presence> cached = new HashMap<>();
-                this.cache.all().forEach(entry -> {
-                    if (!entry.presences().isEmpty()) {
-                        LinkPresence presence = entry.presences().getFirst();
-                        cached.put(entry.profileId(), new Presence(presence.presenceId(), presence.status(), presence.joinable()));
-                    }
-                });
-                return cached;
+                return this.presenceCache;
+            }
+            if (response.statusCode() == 401) {
+                throw new LinkUnauthorizedException("Friend presence request failed: HTTP 401");
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 NliConstants.LOG.warn("Friend presence request failed: HTTP {}", response.statusCode());
-                return Map.of();
+                return this.presenceCache;
             }
             this.presenceEtag = response.headers().firstValue("ETag").orElse(null);
-            return parsePresence(response.body());
+            this.presenceCache = parsePresence(response.body());
+            return this.presenceCache;
         } catch (IOException e) {
             NliConstants.LOG.warn("Friend presence request failed: {}", e.toString());
-            return Map.of();
+            return this.presenceCache;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Map.of();
+            return this.presenceCache;
+        }
+    }
+
+    private LinkFriendSettings getSettings() {
+        HttpRequest request = this.authorized(ATTRIBUTES_URI).GET().build();
+        try {
+            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw requestFailure("Friend settings request", response.statusCode());
+            }
+            return parseSettings(response.body());
+        } catch (IOException error) {
+            throw networkFailure("Friend settings request failed", error);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new LinkException(new LinkFailure(LinkFailureCode.CANCELLED, "Friend settings request interrupted", true), error);
+        }
+    }
+
+    private LinkFriendSettings putSettings(LinkFriendSettings settings) {
+        JsonObject preferences = new JsonObject();
+        preferences.addProperty("friends", settings.friendsEnabled() ? "ENABLED" : "DISABLED");
+        preferences.addProperty("acceptInvites", settings.acceptInvites() ? "ENABLED" : "DISABLED");
+        JsonObject body = new JsonObject();
+        body.add("friendsPreferences", preferences);
+        HttpRequest request = this.authorized(ATTRIBUTES_URI)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .build();
+        try {
+            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw requestFailure("Friend settings update", response.statusCode());
+            }
+            return settings;
+        } catch (IOException error) {
+            throw networkFailure("Friend settings update failed", error);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new LinkException(new LinkFailure(LinkFailureCode.CANCELLED, "Friend settings update interrupted", true), error);
         }
     }
 
@@ -160,9 +221,15 @@ public final class OfficialFriendService implements LinkFriendService {
         try {
             HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
             LinkFriendActionResult result = handleHttpStatus(response.statusCode());
+            if (response.statusCode() == 401) {
+                throw new LinkUnauthorizedException("Friend action failed: HTTP 401");
+            }
             if (result == LinkFriendActionResult.SUCCESS) {
+                this.nextFriendRequest = Instant.now().plus(FRIEND_REQUEST_COOLDOWN);
                 this.friendsEtag = null;
-                this.friendCache = parseFriendLists(response.body());
+                if (response.body() != null && !response.body().isBlank()) {
+                    this.friendCache = parseFriendLists(response.body());
+                }
                 this.cache = this.friendCache.snapshot(Map.of());
             }
             return new LinkFriendActionOutcome(
@@ -258,14 +325,13 @@ public final class OfficialFriendService implements LinkFriendService {
             }
             UUID presenceId = parseUuid(object, "pmid");
             String status = string(object, "status");
-            JsonObject joinInfo = object.has("joinInfo") && object.get("joinInfo").isJsonObject()
-                ? object.getAsJsonObject("joinInfo")
-                : null;
-            String joinValue = joinInfo != null ? string(joinInfo, "value") : null;
+            Instant lastUpdated = instant(object, "lastUpdated");
+            LinkPresenceStatus mappedStatus = officialStatus(status != null ? status : "OFFLINE");
             statuses.put(profileId, new Presence(
                 presenceId != null ? presenceId.toString() : null,
-                officialStatus(status != null ? status : "OFFLINE"),
-                joinValue != null && !joinValue.isBlank()
+                mappedStatus,
+                presenceId != null && mappedStatus == LinkPresenceStatus.HOSTING,
+                lastUpdated
             ));
         }
         return Map.copyOf(statuses);
@@ -283,7 +349,7 @@ public final class OfficialFriendService implements LinkFriendService {
                     friend.name(),
                     null,
                     null,
-                    null,
+                    presence.lastUpdated(),
                     null
                 ));
             return new LinkFriendEntry(friend.profileId(), friend.name(), relationship, presences);
@@ -319,6 +385,58 @@ public final class OfficialFriendService implements LinkFriendService {
             return LinkFriendActionResult.SERVICE_NOT_AVAILABLE;
         }
         return LinkFriendActionResult.ERROR;
+    }
+
+    private void updateFriendPollInterval(HttpResponse<?> response) {
+        retryAfter(response).ifPresent(duration -> this.nextFriendRequest = Instant.now().plus(duration));
+    }
+
+    private static Optional<Duration> retryAfter(HttpResponse<?> response) {
+        return response.headers().firstValue("Retry-After").flatMap(value -> {
+            try {
+                return Optional.of(Duration.ofSeconds(Long.parseLong(value.trim())));
+            } catch (NumberFormatException ignored) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    private static LinkFriendSettings parseSettings(String body) {
+        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        JsonObject preferences = root.has("friendsPreferences") && root.get("friendsPreferences").isJsonObject()
+            ? root.getAsJsonObject("friendsPreferences")
+            : new JsonObject();
+        return new LinkFriendSettings(
+            "ENABLED".equalsIgnoreCase(string(preferences, "friends")),
+            "ENABLED".equalsIgnoreCase(string(preferences, "acceptInvites"))
+        );
+    }
+
+    private static RuntimeException requestFailure(String operation, int status) {
+        if (status == 401) {
+            return new LinkUnauthorizedException(operation + " failed: HTTP 401");
+        }
+        LinkFailureCode code = status == 403 ? LinkFailureCode.FORBIDDEN
+            : status == 429 ? LinkFailureCode.RATE_LIMITED
+            : status >= 500 ? LinkFailureCode.SERVICE_UNAVAILABLE
+            : LinkFailureCode.UNKNOWN;
+        return new LinkException(new LinkFailure(code, operation + " failed: HTTP " + status, status == 429 || status >= 500));
+    }
+
+    private static LinkException networkFailure(String message, IOException error) {
+        return new LinkException(new LinkFailure(LinkFailureCode.NETWORK, message, true), error);
+    }
+
+    private static @Nullable Instant instant(JsonObject object, String key) {
+        String value = string(object, key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Instant.parse(value);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static @Nullable LinkFailure failureFor(LinkFriendActionResult result) {
@@ -375,6 +493,6 @@ public final class OfficialFriendService implements LinkFriendService {
     private record Friend(UUID profileId, String name) {
     }
 
-    private record Presence(@Nullable String presenceId, LinkPresenceStatus status, boolean joinable) {
+    private record Presence(@Nullable String presenceId, LinkPresenceStatus status, boolean joinable, @Nullable Instant lastUpdated) {
     }
 }

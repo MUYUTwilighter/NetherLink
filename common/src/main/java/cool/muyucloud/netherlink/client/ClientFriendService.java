@@ -33,6 +33,10 @@ public final class ClientFriendService {
         return this.runtimeReady.thenCompose(_ -> this.backend.refresh()).thenApply(ClientFriendService::snapshot);
     }
 
+    public CompletableFuture<LinkFriendSettings> settings() {
+        return this.runtimeReady.thenCompose(_ -> this.backend.settings());
+    }
+
     public CompletableFuture<LinkFriendActionOutcome> add(String name) {
         return this.runtimeReady.thenCompose(_ -> this.backend.add(name));
     }
@@ -51,6 +55,10 @@ public final class ClientFriendService {
 
     public CompletableFuture<LinkFriendActionOutcome> revoke(UUID profileId) {
         return this.runtimeReady.thenCompose(_ -> this.backend.revoke(profileId));
+    }
+
+    public CompletableFuture<LinkFriendSettings> updateSettings(LinkFriendSettings settings) {
+        return this.runtimeReady.thenCompose(_ -> this.backend.updateSettings(settings));
     }
 
     private static Snapshot snapshot(LinkFriendSnapshot snapshot) {

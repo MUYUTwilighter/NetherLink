@@ -1,10 +1,12 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.model.LinkFailure;
 import cool.muyucloud.netherlink.link.model.LinkFriendActionOutcome;
 import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
 import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
+import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
 import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -19,6 +21,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.component.ResolvableProfile;
 import org.jspecify.annotations.NonNull;
@@ -35,6 +38,7 @@ public class NetherLinkFriendsScreen extends Screen {
     private static final Component TITLE = Component.translatable("netherlink.friends.title");
     private static final Component FRIENDS_TAB_TITLE = Component.translatable("netherlink.friends.tab.friends");
     private static final Component REQUESTS_TAB_TITLE = Component.translatable("netherlink.friends.tab.requests");
+    private static final Component SETTINGS_TAB_TITLE = Component.translatable("netherlink.friends.tab.settings");
     private static final int LIST_ROW_HEIGHT = 36;
     private static final int BUTTON_WIDTH = 90;
     private static final int BUTTON_GAP = 4;
@@ -48,6 +52,7 @@ public class NetherLinkFriendsScreen extends Screen {
     private TabNavigationBar tabNavigation;
     private FriendsTab friendsTab;
     private RequestsTab requestsTab;
+    private SettingsTab settingsTab;
     private Component status = Component.translatable("netherlink.friends.loading").withStyle(ChatFormatting.GRAY);
 
     public NetherLinkFriendsScreen(Screen parent, boolean allowJoin) {
@@ -58,15 +63,17 @@ public class NetherLinkFriendsScreen extends Screen {
 
     @Override
     protected void init() {
+        ClientLinkSettings.applyConfiguredService(this.minecraft);
         this.service = new ClientFriendService(this.minecraft);
         this.friendsTab = new FriendsTab();
         this.requestsTab = new RequestsTab();
+        this.settingsTab = new SettingsTab();
         this.tabManager = new TabManager(
             this::addRenderableWidget,
             this::removeWidget
         );
         this.tabNavigation = TabNavigationBar.builder(this.tabManager, this.width)
-            .addTabs(this.friendsTab, this.requestsTab)
+            .addTabs(this.friendsTab, this.requestsTab, this.settingsTab)
             .build();
         this.addRenderableWidget(this.tabNavigation);
         this.tabNavigation.selectTab(0, false);
@@ -138,6 +145,10 @@ public class NetherLinkFriendsScreen extends Screen {
             }
             this.friendsTab.updateButtons();
         }));
+    }
+
+    private Component serviceName(Identifier serviceId) {
+        return ClientLinkSettings.createName(serviceId);
     }
 
     @Override
@@ -400,6 +411,162 @@ public class NetherLinkFriendsScreen extends Screen {
                     ? Component.translatable("netherlink.friends.revoke")
                     : Component.translatable("netherlink.friends.decline")
             );
+        }
+    }
+
+    private final class SettingsTab implements Tab {
+        private final StringWidget heading = new StringWidget(SETTINGS_TAB_TITLE, NetherLinkFriendsScreen.this.font);
+        private final StringWidget apiLabel = new StringWidget(Component.translatable("netherlink.friends.settings.api"), NetherLinkFriendsScreen.this.font);
+        private final Button apiButton = Button.builder(Component.empty(), _ -> this.cycleApi()).width(180).build();
+        private final CycleButton<Boolean> friendsNetworkButton;
+        private final CycleButton<Boolean> receiveRequestsButton;
+        private final Button applyButton = Button.builder(Component.translatable("netherlink.friends.settings.apply"), _ -> this.apply()).width(BUTTON_WIDTH).build();
+        private final Button doneButton = Button.builder(CommonComponents.GUI_DONE, _ -> NetherLinkFriendsScreen.this.onClose()).width(BUTTON_WIDTH).build();
+        private Identifier selectedService;
+        private @Nullable LinkFriendSettings remoteSettings;
+
+        private SettingsTab() {
+            this.selectedService = ClientLinkSettings.activeService(NetherLinkFriendsScreen.this.minecraft);
+            this.friendsNetworkButton = CycleButton.onOffBuilder(false)
+                .create(0, 0, 180, 20, Component.translatable("netherlink.friends.settings.network"), (_, _) -> this.updateButtons());
+            this.receiveRequestsButton = CycleButton.onOffBuilder(false)
+                .create(0, 0, 180, 20, Component.translatable("netherlink.friends.settings.requests"), (_, _) -> this.updateButtons());
+            this.updateButtons();
+            this.loadSettings();
+        }
+
+        @Override
+        public @NonNull Component getTabTitle() {
+            return SETTINGS_TAB_TITLE;
+        }
+
+        @Override
+        public @NonNull Component getTabExtraNarration() {
+            return Component.empty();
+        }
+
+        @Override
+        public void visitChildren(Consumer<AbstractWidget> consumer) {
+            consumer.accept(this.heading);
+            consumer.accept(this.apiLabel);
+            consumer.accept(this.apiButton);
+            consumer.accept(this.friendsNetworkButton);
+            consumer.accept(this.receiveRequestsButton);
+            consumer.accept(this.applyButton);
+            consumer.accept(this.doneButton);
+        }
+
+        @Override
+        public void doLayout(ScreenRectangle area) {
+            int center = NetherLinkFriendsScreen.this.width / 2;
+            this.heading.setPosition(center - NetherLinkFriendsScreen.this.font.width(this.heading.getMessage()) / 2, area.top() + 14);
+            this.apiLabel.setPosition(center - 90, area.top() + 43);
+            this.apiButton.setPosition(center - 90, area.top() + 57);
+            this.friendsNetworkButton.setPosition(center - 90, area.top() + 86);
+            this.receiveRequestsButton.setPosition(center - 90, area.top() + 110);
+            positionButtons(List.of(this.applyButton, this.doneButton), NetherLinkFriendsScreen.this.width, NetherLinkFriendsScreen.this.height - 28);
+        }
+
+        private void cycleApi() {
+            int index = ClientLinkSettings.AVAILABLE_SERVICES.indexOf(this.selectedService);
+            this.selectedService = ClientLinkSettings.AVAILABLE_SERVICES.get((index + 1) % ClientLinkSettings.AVAILABLE_SERVICES.size());
+            this.remoteSettings = null;
+            this.updateButtons();
+        }
+
+        private void updateButtons() {
+            this.apiButton.setMessage(NetherLinkFriendsScreen.this.serviceName(this.selectedService));
+            boolean friendSettingsLoaded = LinkServices.current().id().equals(this.selectedService)
+                && LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)
+                && this.remoteSettings != null;
+            this.friendsNetworkButton.active = friendSettingsLoaded;
+            this.receiveRequestsButton.active = friendSettingsLoaded && this.friendsNetworkButton.getValue();
+            if (!this.friendsNetworkButton.getValue()) {
+                this.receiveRequestsButton.setValue(false);
+            }
+        }
+
+        private void loadSettings() {
+            if (!LinkServices.current().id().equals(this.selectedService)
+                || !LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)) {
+                return;
+            }
+            NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.loading").withStyle(ChatFormatting.GRAY);
+            this.applyButton.active = false;
+            NetherLinkFriendsScreen.this.service.settings().whenComplete((settings, error) -> NetherLinkFriendsScreen.this.minecraft.execute(() -> {
+                this.applyButton.active = true;
+                if (error != null) {
+                    NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.load_failed", failureText(LinkFailures.from(error))).withStyle(ChatFormatting.RED);
+                    return;
+                }
+                this.remoteSettings = settings;
+                this.friendsNetworkButton.setValue(settings.friendsEnabled());
+                this.receiveRequestsButton.setValue(settings.acceptInvites());
+                this.updateButtons();
+                NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.loaded").withStyle(ChatFormatting.GRAY);
+            }));
+        }
+
+        private void apply() {
+            LinkFriendSettings settings = new LinkFriendSettings(this.friendsNetworkButton.getValue(), this.receiveRequestsButton.getValue());
+            boolean serviceChanged = !LinkServices.current().id().equals(this.selectedService);
+            this.applyButton.active = false;
+            NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.saving").withStyle(ChatFormatting.GRAY);
+            if (!serviceChanged) {
+                this.finishApply(settings, false);
+                return;
+            }
+            ClientLinkSettings.use(NetherLinkFriendsScreen.this.minecraft, this.selectedService)
+                .whenComplete((_, error) -> NetherLinkFriendsScreen.this.minecraft.execute(() -> {
+                    if (error != null) {
+                        this.applyFailed(error);
+                        return;
+                    }
+                    this.applyButton.active = true;
+                    NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.terms").withStyle(ChatFormatting.GRAY);
+                    ClientTermsController.runAfterAcceptance(
+                        NetherLinkFriendsScreen.this.minecraft,
+                        NetherLinkFriendsScreen.this,
+                        () -> this.finishApply(settings, true)
+                    );
+                }));
+        }
+
+        private void finishApply(LinkFriendSettings settings, boolean serviceChanged) {
+            this.applyButton.active = false;
+            NetherLinkFriendsScreen.this.service = new ClientFriendService(NetherLinkFriendsScreen.this.minecraft);
+            CompletableFuture<LinkFriendSettings> operation;
+            if (!LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)) {
+                operation = CompletableFuture.completedFuture(null);
+            } else if (serviceChanged || this.remoteSettings == null) {
+                operation = NetherLinkFriendsScreen.this.service.settings();
+            } else {
+                operation = NetherLinkFriendsScreen.this.service.updateSettings(settings);
+            }
+            operation.whenComplete((saved, error) -> NetherLinkFriendsScreen.this.minecraft.execute(() -> {
+                if (error != null) {
+                    this.applyFailed(error);
+                    return;
+                }
+                this.applyButton.active = true;
+                if (saved != null) {
+                    this.remoteSettings = saved;
+                    ClientLinkSettings.updateMinecraftSocialManager(NetherLinkFriendsScreen.this.minecraft, saved);
+                    this.friendsNetworkButton.setValue(saved.friendsEnabled());
+                    this.receiveRequestsButton.setValue(saved.acceptInvites());
+                }
+                this.updateButtons();
+                NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.saved").withStyle(ChatFormatting.GREEN);
+                NetherLinkFriendsScreen.this.refresh();
+            }));
+        }
+
+        private void applyFailed(Throwable error) {
+            this.applyButton.active = true;
+            NetherLinkFriendsScreen.this.status = Component.translatable(
+                "netherlink.friends.settings.failed",
+                failureText(LinkFailures.from(error))
+            ).withStyle(ChatFormatting.RED);
         }
     }
 

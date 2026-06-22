@@ -34,6 +34,13 @@ final class NliFriendService implements LinkFriendService {
     }
 
     @Override
+    public CompletableFuture<LinkFriendSettings> settings() {
+        return this.runtimes.session(this.runtimeKey)
+            .thenCompose(session -> this.api.get("v1/friends/settings", session.token(), this.minecraftToken()))
+            .thenApply(NliFriendService::settings);
+    }
+
+    @Override
     public CompletableFuture<LinkFriendActionOutcome> add(String name) {
         JsonObject body = new JsonObject();
         body.addProperty("name", name);
@@ -60,6 +67,30 @@ final class NliFriendService implements LinkFriendService {
     @Override
     public CompletableFuture<LinkFriendActionOutcome> revoke(UUID profileId) {
         return this.deleteRequest(profileId);
+    }
+
+    @Override
+    public CompletableFuture<LinkFriendSettings> updateSettings(LinkFriendSettings settings) {
+        JsonObject body = new JsonObject();
+        body.addProperty("friendsEnabled", settings.friendsEnabled());
+        body.addProperty("acceptInvites", settings.acceptInvites());
+        return this.runtimes.session(this.runtimeKey)
+            .thenCompose(session -> this.api.put("v1/friends/settings", session.token(), body, this.minecraftToken()))
+            .thenApply(json -> new LinkFriendSettings(
+                json.has("friendsEnabled") && !json.get("friendsEnabled").isJsonNull()
+                    ? json.get("friendsEnabled").getAsBoolean()
+                    : settings.friendsEnabled(),
+                json.has("acceptInvites") && !json.get("acceptInvites").isJsonNull()
+                    ? json.get("acceptInvites").getAsBoolean()
+                    : settings.acceptInvites()
+            ));
+    }
+
+    private static LinkFriendSettings settings(JsonObject json) {
+        return new LinkFriendSettings(
+            json.has("friendsEnabled") && !json.get("friendsEnabled").isJsonNull() && json.get("friendsEnabled").getAsBoolean(),
+            json.has("acceptInvites") && !json.get("acceptInvites").isJsonNull() && json.get("acceptInvites").getAsBoolean()
+        );
     }
 
     private CompletableFuture<LinkFriendActionOutcome> deleteRequest(UUID profileId) {

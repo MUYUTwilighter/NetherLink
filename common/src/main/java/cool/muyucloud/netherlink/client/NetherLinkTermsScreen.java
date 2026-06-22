@@ -3,6 +3,7 @@ package cool.muyucloud.netherlink.client;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.Button;
@@ -16,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 final class NetherLinkTermsScreen extends Screen {
     private final Screen parent;
@@ -24,8 +26,10 @@ final class NetherLinkTermsScreen extends Screen {
     private HeaderAndFooterLayout layout;
     private @Nullable ScrollableLayout scrollArea;
     private @Nullable LinkTerms terms;
+    private @Nullable LinkFriendSettings friendSettings;
     private @Nullable Component error;
     private boolean loading = true;
+    private boolean accepting;
     private boolean requestStarted;
     private boolean completed;
 
@@ -57,7 +61,9 @@ final class NetherLinkTermsScreen extends Screen {
             this.scrollArea.setMinWidth(310);
             this.layout.addToContents(this.scrollArea);
             LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));
-            footer.addChild(Button.builder(Component.translatable("netherlink.terms.accept"), _ -> this.accept()).width(100).build());
+            Button acceptButton = Button.builder(this.acceptButtonText(), _ -> this.accept()).width(this.shouldEnableFriendNetwork() ? 160 : 100).build();
+            acceptButton.active = !this.accepting;
+            footer.addChild(acceptButton);
             footer.addChild(Button.builder(Component.translatable("netherlink.terms.decline"), _ -> this.onClose()).width(100).build());
         }
 
@@ -80,7 +86,10 @@ final class NetherLinkTermsScreen extends Screen {
 
     private void fetch() {
         String language = this.minecraft.getLanguageManager().getSelected().replace('_', '-');
-        this.service.terms(language).whenComplete((result, failure) -> this.minecraft.execute(() -> {
+        CompletableFuture<LinkFriendSettings> settingsFuture = this.service.supports(LinkService.Capability.FRIEND_SETTINGS)
+            ? new ClientFriendService(this.minecraft).settings()
+            : CompletableFuture.completedFuture(new LinkFriendSettings(true, true));
+        this.service.terms(language).thenCombine(settingsFuture, TermsState::new).whenComplete((state, failure) -> this.minecraft.execute(() -> {
             if (this.completed) {
                 return;
             }
@@ -94,13 +103,14 @@ final class NetherLinkTermsScreen extends Screen {
                 this.rebuildWidgets();
                 return;
             }
-            Optional<LinkTerms> fetched = result;
+            this.friendSettings = state.settings();
+            Optional<LinkTerms> fetched = state.terms();
             if (fetched.isEmpty()) {
                 this.continueAction();
                 return;
             }
             this.terms = fetched.get();
-            if (ClientTermsConsent.isAccepted(this.minecraft, this.service.id(), this.terms)) {
+            if (ClientTermsConsent.isAccepted(this.minecraft, this.service.id(), this.terms) && !this.shouldEnableFriendNetwork()) {
                 this.continueAction();
                 return;
             }
@@ -119,11 +129,38 @@ final class NetherLinkTermsScreen extends Screen {
     }
 
     private void accept() {
-        if (this.terms == null) {
+        if (this.terms == null || this.accepting) {
+            return;
+        }
+        if (!this.shouldEnableFriendNetwork()) {
+            this.recordAcceptanceAndContinue();
+            return;
+        }
+        this.accepting = true;
+        this.rebuildWidgets();
+        new ClientFriendService(this.minecraft).updateSettings(new LinkFriendSettings(true, true))
+            .whenComplete((saved, error) -> this.minecraft.execute(() -> {
+                this.accepting = false;
+                if (error != null) {
+                    NliConstants.LOG.warn("Failed to enable friend network after accepting terms for {}", this.service.id(), error);
+                    this.error = Component.translatable("netherlink.terms.enable_error", LinkFailures.from(error).message());
+                    this.terms = null;
+                    this.rebuildWidgets();
+                    return;
+                }
+                ClientLinkSettings.updateMinecraftSocialManager(this.minecraft, saved);
+                this.friendSettings = saved;
+                this.recordAcceptanceAndContinue();
+            }));
+    }
+
+    private void recordAcceptanceAndContinue() {
+        LinkTerms acceptedTerms = this.terms;
+        if (acceptedTerms == null) {
             return;
         }
         try {
-            ClientTermsConsent.accept(this.minecraft, this.service.id(), this.terms);
+            ClientTermsConsent.accept(this.minecraft, this.service.id(), acceptedTerms);
             this.continueAction();
         } catch (RuntimeException failure) {
             NliConstants.LOG.warn("Failed to record accepted terms for {}", this.service.id(), failure);
@@ -131,6 +168,19 @@ final class NetherLinkTermsScreen extends Screen {
             this.terms = null;
             this.rebuildWidgets();
         }
+    }
+
+    private Component acceptButtonText() {
+        return this.shouldEnableFriendNetwork()
+            ? Component.translatable("netherlink.terms.accept_enable_friends")
+            : Component.translatable("netherlink.terms.accept");
+    }
+
+    private boolean shouldEnableFriendNetwork() {
+        return this.friendSettings != null && !this.friendSettings.friendsEnabled();
+    }
+
+    private record TermsState(Optional<LinkTerms> terms, LinkFriendSettings settings) {
     }
 
     private void continueAction() {

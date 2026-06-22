@@ -71,6 +71,12 @@ final class NliApiClient implements AutoCloseable {
         return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, true);
     }
 
+    CompletableFuture<JsonObject> put(String path, String bearer, JsonObject body, @Nullable String minecraftToken) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path));
+        addMinecraftToken(builder, minecraftToken);
+        return this.send(builder, bearer, body, true);
+    }
+
     CompletableFuture<Void> delete(String path, String bearer, @Nullable String minecraftToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path)).DELETE();
         addMinecraftToken(builder, minecraftToken);

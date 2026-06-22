@@ -10,6 +10,9 @@ public final class ClientTermsController {
 
     /** Runs an action only after the active backend's current terms have been accepted. */
     public static void runAfterAcceptance(Minecraft minecraft, Screen parent, Runnable action) {
-        minecraft.execute(() -> minecraft.setScreen(new NetherLinkTermsScreen(parent, LinkServices.current(), action)));
+        minecraft.execute(() -> {
+            ClientLinkSettings.applyConfiguredService(minecraft);
+            minecraft.setScreen(new NetherLinkTermsScreen(parent, LinkServices.current(), action));
+        });
     }
 }

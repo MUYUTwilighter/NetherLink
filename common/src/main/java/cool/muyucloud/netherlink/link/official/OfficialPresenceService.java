@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink.link.official;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
@@ -22,7 +21,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Instant;
+import java.util.HashMap;
 
 public final class OfficialPresenceService implements LinkPresenceService {
     private static final URI PRESENCE_URI = URI.create("https://api.minecraftservices.com/presence");
@@ -40,17 +40,17 @@ public final class OfficialPresenceService implements LinkPresenceService {
     public void revoke(String runtimeKey) {
         MinecraftAccount account = LinkContextHooks.require(runtimeKey).account();
         NliConstants.LOG.info("Revoking NetherLink presence for {}", account.getMcProfileName());
-        presence(account, PresenceStatus.OFFLINE, false);
+        presence(account, PresenceStatus.OFFLINE);
     }
 
     OfficialPresenceResult publishHosting(MinecraftAccount account, LinkPresenceUpdate update) {
         NliConstants.LOG.debug("Official Presence ignores display text: {}", update.displayText());
-        Map<String, UUID> peers = presence(account, PresenceStatus.PLAYING_HOSTED_SERVER, true);
+        Map<String, UUID> peers = presence(account, PresenceStatus.PLAYING_HOSTED_SERVER);
         LinkPresence published = new LinkPresence(null, LinkPresenceStatus.HOSTING, true, update.displayText(), null, null, null, null);
         return new OfficialPresenceResult(peers, published);
     }
 
-    private Map<String, UUID> presence(MinecraftAccount account, PresenceStatus status, boolean includeJoinInfo) {
+    private Map<String, UUID> presence(MinecraftAccount account, PresenceStatus status) {
         String token = account.getMcToken();
         if (token == null || token.isBlank()) {
             throw new NetherLinkAuthException("Minecraft access token was not found");
@@ -58,12 +58,6 @@ public final class OfficialPresenceService implements LinkPresenceService {
 
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("status", status.name());
-        if (includeJoinInfo) {
-            JsonObject joinInfo = new JsonObject();
-            joinInfo.add("value", JsonNull.INSTANCE);
-            joinInfo.add("invites", new JsonArray());
-            requestBody.add("joinInfo", joinInfo);
-        }
 
         HttpRequest request = HttpRequest.newBuilder(PRESENCE_URI)
             .header("Authorization", "Bearer " + token)
@@ -97,7 +91,7 @@ public final class OfficialPresenceService implements LinkPresenceService {
         JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
             ? root.getAsJsonArray("presence")
             : new JsonArray();
-        Map<String, UUID> peers = new ConcurrentHashMap<>();
+        Map<String, UUID> peers = new HashMap<>();
         presence.forEach(element -> {
             if (!element.isJsonObject()) {
                 return;
@@ -105,11 +99,25 @@ public final class OfficialPresenceService implements LinkPresenceService {
             JsonObject entry = element.getAsJsonObject();
             UUID pmid = parseUuid(entry, "pmid");
             UUID profileId = parseUuid(entry, "profileId");
+            String status = entry.has("status") ? entry.get("status").getAsString() : "OFFLINE";
+            Instant lastUpdated = parseInstant(entry, "lastUpdated");
             if (pmid != null && profileId != null) {
                 peers.putIfAbsent(pmid.toString(), profileId);
             }
+            NliConstants.LOG.debug("Official presence profile={} pmid={} status={} lastUpdated={}", profileId, pmid, status, lastUpdated);
         });
         return Map.copyOf(peers);
+    }
+
+    private static @Nullable Instant parseInstant(JsonObject object, String key) {
+        if (!object.has(key) || !object.get(key).isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return Instant.parse(object.get(key).getAsString());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static @Nullable UUID parseUuid(JsonObject object, String key) {

@@ -13,6 +13,7 @@ import java.nio.file.Path;
 public final class NliV1Config {
     public static final String DEFAULT_SERVER = "https://nli-api.muyucloud.cool";
     public static final String SERVER_KEY = "server";
+    public static final String ACTIVE_SERVICE_KEY = "activeService";
     public static final String ACCEPTED_TERMS_KEY = "acceptedTerms";
 
     private NliV1Config() {
@@ -22,7 +23,7 @@ public final class NliV1Config {
         return gameDirectory.resolve("config").resolve("netherlink").resolve("nli-v1.json");
     }
 
-    static URI serverUri(Path path) {
+    public static URI serverUri(Path path) {
         JsonObject config = read(path);
         String configured = config.has(SERVER_KEY) && !config.get(SERVER_KEY).isJsonNull()
             ? config.get(SERVER_KEY).getAsString().trim()
