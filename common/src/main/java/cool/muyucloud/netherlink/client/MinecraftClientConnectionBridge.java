@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
+import cool.muyucloud.netherlink.access.MinecraftAccess;
 import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
-import cool.muyucloud.netherlink.mixin.MinecraftAccessor;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -50,7 +50,7 @@ public final class MinecraftClientConnectionBridge implements LinkClientConnecti
                 false
             );
             connection.send(new ServerboundHelloPacket(this.minecraft.getUser().getName(), this.minecraft.getUser().getProfileId()));
-            ((MinecraftAccessor)this.minecraft).nli$setPendingConnection(connection);
+            MinecraftAccess.setPendingConnection(connection);
         });
     }
 

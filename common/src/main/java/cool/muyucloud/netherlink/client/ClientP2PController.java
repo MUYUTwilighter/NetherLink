@@ -1,6 +1,8 @@
 package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.NetherLinkConfig;
+import cool.muyucloud.netherlink.access.MinecraftAccess;
 import cool.muyucloud.netherlink.bridge.MinecraftServerConnectionBridge;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
@@ -67,12 +69,13 @@ public final class ClientP2PController {
                 }
                 stopPublication();
                 String hostKey = LinkRuntimeService.CLIENT_KEY;
-                LinkContextHooks.setClientConnection(hostKey, sessionAccount, "Minecraft Java instance", new MinecraftClientConnectionBridge(minecraft));
-                LinkContextHooks.setServerConnection(hostKey, sessionAccount, "Minecraft Java instance", new MinecraftServerConnectionBridge(integratedServer));
+                String instanceName = instanceName(minecraft, integratedServer);
+                LinkContextHooks.setClientConnection(hostKey, sessionAccount, instanceName, new MinecraftClientConnectionBridge(minecraft));
+                LinkContextHooks.setServerConnection(hostKey, sessionAccount, instanceName, new MinecraftServerConnectionBridge(integratedServer));
                 LinkServices.current().runtime().open(hostKey).join();
                 publication = LinkServices.current().hosting().publish(
                     hostKey,
-                    LinkPresenceUpdate.hosting("Minecraft Java integrated server"),
+                    LinkPresenceUpdate.hosting(instanceName),
                     SIGNALING_READY_TIMEOUT
                 );
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
@@ -138,6 +141,19 @@ public final class ClientP2PController {
 
     private static void message(Minecraft minecraft, Component message) {
         minecraft.execute(() -> minecraft.gui.getChat().addClientSystemMessage(message));
+    }
+
+    private static String instanceName(Minecraft minecraft, IntegratedServer integratedServer) {
+        return NetherLinkConfig.instanceNameOr(minecraft.gameDirectory.toPath(), windowTitle(integratedServer.getMotd()));
+    }
+
+    private static String windowTitle(String fallback) {
+        try {
+            return MinecraftAccess.createWindowTitle();
+        } catch (RuntimeException error) {
+            NliConstants.LOG.debug("Unable to read Minecraft window title; using integrated server MOTD instead", error);
+            return fallback;
+        }
     }
 
     private static boolean isMinecraftTokenRejected(Throwable error) {

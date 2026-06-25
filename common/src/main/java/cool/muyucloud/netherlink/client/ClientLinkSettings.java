@@ -1,8 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import cool.muyucloud.netherlink.NetherLinkConfig;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
@@ -14,17 +13,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.Writer;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 
 final class ClientLinkSettings {
     private static final Identifier LEGACY_OFFICIAL_ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
@@ -34,7 +26,9 @@ final class ClientLinkSettings {
     }
 
     static Identifier activeService(Minecraft minecraft) {
-        String configured = string(read(path(minecraft)), NliV1Config.ACTIVE_SERVICE_KEY, NliLinkService.ID.toString());
+        String configured = NetherLinkConfig.string(NetherLinkConfig.read(path(minecraft)), NetherLinkConfig.ACTIVE_SERVICE_KEY)
+            .or(() -> NetherLinkConfig.string(readLegacyNliConfig(minecraft), NetherLinkConfig.ACTIVE_SERVICE_KEY))
+            .orElse(NliLinkService.ID.toString());
         try {
             Identifier id = Identifier.parse(configured);
             if (LEGACY_OFFICIAL_ID.equals(id)) {
@@ -47,12 +41,9 @@ final class ClientLinkSettings {
     }
 
     static CompletableFuture<Void> use(Minecraft minecraft, Identifier serviceId) {
-        JsonObject config = read(path(minecraft));
-        config.addProperty(NliV1Config.ACTIVE_SERVICE_KEY, serviceId.toString());
-        if (!config.has(NliV1Config.SERVER_KEY)) {
-            config.addProperty(NliV1Config.SERVER_KEY, NliV1Config.DEFAULT_SERVER);
-        }
-        write(path(minecraft), config);
+        JsonObject config = NetherLinkConfig.read(path(minecraft));
+        config.addProperty(NetherLinkConfig.ACTIVE_SERVICE_KEY, serviceId.toString());
+        NetherLinkConfig.write(path(minecraft), config);
         return LinkServices.use(create(minecraft, serviceId));
     }
 
@@ -79,12 +70,12 @@ final class ClientLinkSettings {
         if (OfficialLinkServiceProvider.ID.equals(serviceId)) {
             return OfficialLinkServiceProvider.INSTANCE;
         }
-        return new NliLinkService(NliV1Config.serverUri(path(minecraft)));
+        return new NliLinkService(NliV1Config.serverUri(nliPath(minecraft)));
     }
 
     private static boolean requiresNliReload(Minecraft minecraft, LinkService current) {
         return current instanceof NliLinkService nli
-            && !nli.baseUri().equals(NliV1Config.serverUri(path(minecraft)));
+            && !nli.baseUri().equals(NliV1Config.serverUri(nliPath(minecraft)));
     }
 
     private static void invoke(Object target, String name, boolean value) {
@@ -96,40 +87,20 @@ final class ClientLinkSettings {
     }
 
     private static Path path(Minecraft minecraft) {
+        return NetherLinkConfig.path(minecraft.gameDirectory.toPath());
+    }
+
+    private static Path nliPath(Minecraft minecraft) {
         return NliV1Config.path(minecraft.gameDirectory.toPath());
     }
 
-    private static JsonObject read(Path path) {
-        if (!Files.isRegularFile(path)) {
-            return new JsonObject();
-        }
-        try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            return JsonParser.parseReader(reader).getAsJsonObject();
-        } catch (IOException | RuntimeException error) {
-            NliConstants.LOG.warn("Unable to read NetherLink client settings from {}; using defaults", path, error);
-            return new JsonObject();
-        }
-    }
-
-    private static void write(Path path, JsonObject config) {
+    private static JsonObject readLegacyNliConfig(Minecraft minecraft) {
         try {
-            Files.createDirectories(path.getParent());
-            Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
-            try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
-                new GsonBuilder().setPrettyPrinting().create().toJson(config, writer);
-            }
-            try {
-                Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException ignored) {
-                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (IOException error) {
-            throw new CompletionException(new IllegalStateException("Unable to save NetherLink client settings", error));
+            return NliV1Config.read(nliPath(minecraft));
+        } catch (RuntimeException error) {
+            NliConstants.LOG.warn("Unable to read legacy NetherLink settings from {}; ignoring legacy values", nliPath(minecraft), error);
+            return new JsonObject();
         }
-    }
-
-    private static String string(JsonObject object, String key, String fallback) {
-        return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : fallback;
     }
 
 }

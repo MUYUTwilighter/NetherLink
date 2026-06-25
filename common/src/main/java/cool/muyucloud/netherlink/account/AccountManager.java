@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonWriter;
 import com.mojang.serialization.JsonOps;
+import cool.muyucloud.netherlink.NetherLinkConfig;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
@@ -409,11 +410,12 @@ public class AccountManager {
     private static void ensureP2P(String name, Account account, MinecraftServer currentServer) {
         P2P.computeIfAbsent(name, _ -> {
             String runtimeKey = runtimeKey(account);
+            String instanceName = instanceName(currentServer);
             NliConstants.LOG.info("Starting NetherLink P2P manager for account {} as runtime {}", name, runtimeKey);
             LinkContextHooks.setServerConnection(
                 runtimeKey,
                 account,
-                "Minecraft Java dedicated server",
+                instanceName,
                 new MinecraftServerConnectionBridge(currentServer),
                 () -> refreshAccount(account, currentServer)
             );
@@ -421,7 +423,7 @@ public class AccountManager {
                 LinkServices.current().runtime().open(runtimeKey).join();
                 LinkHostPublication publication = LinkServices.current().hosting().publish(
                     runtimeKey,
-                    LinkPresenceUpdate.hosting("Minecraft Java dedicated server"),
+                    LinkPresenceUpdate.hosting(instanceName),
                     SIGNALING_READY_TIMEOUT
                 );
                 return new HostedPublication(runtimeKey, publication);
@@ -439,6 +441,10 @@ public class AccountManager {
             throw new NetherLinkAuthException("Minecraft profile id was not found");
         }
         return "dedicated:" + profileId.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static String instanceName(MinecraftServer currentServer) {
+        return NetherLinkConfig.instanceNameOr(currentServer.getServerDirectory(), currentServer.getMotd());
     }
 
     private static void refreshAccount(Account account, MinecraftServer currentServer) {
