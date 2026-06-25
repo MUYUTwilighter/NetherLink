@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
-import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.NetherLinkConfig;
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.MinecraftAccess;
 import cool.muyucloud.netherlink.bridge.MinecraftServerConnectionBridge;
 import cool.muyucloud.netherlink.link.LinkServices;

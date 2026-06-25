@@ -1,13 +1,8 @@
 package cool.muyucloud.netherlink.client;
 
-import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.LinkServices;
-import cool.muyucloud.netherlink.link.model.LinkFailure;
-import cool.muyucloud.netherlink.link.model.LinkFriendActionOutcome;
-import cool.muyucloud.netherlink.link.model.LinkFriendActionResult;
-import cool.muyucloud.netherlink.link.model.LinkFriendRelationship;
-import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
-import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
+import cool.muyucloud.netherlink.link.exception.LinkFailures;
+import cool.muyucloud.netherlink.link.model.*;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;

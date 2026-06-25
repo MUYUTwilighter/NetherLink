@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.mixin;
 
-import cool.muyucloud.netherlink.client.NetherLinkFriendsScreen;
 import cool.muyucloud.netherlink.client.ClientTermsController;
+import cool.muyucloud.netherlink.client.NetherLinkFriendsScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;

@@ -12,8 +12,6 @@ public class NetherLink implements ModInitializer {
         NliSetup.init();
         ServerLifecycleEvents.SERVER_STARTED.register(NliSetup::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(NliSetup::onServerStopping);
-        CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) -> {
-            NliConstants.SERVER_COMMAND.register(dispatcher);
-        });
+        CommandRegistrationCallback.EVENT.register((dispatcher, _, _) -> NliConstants.SERVER_COMMAND.register(dispatcher));
     }
 }
