@@ -109,32 +109,25 @@ class LinkContractTest {
         assertThrows(IllegalArgumentException.class, () -> new LinkJoinTarget(UUID.randomUUID(), " "));
     }
 
-    private static final class TestAccount implements MinecraftAccount {
-        private final String profileId;
-        private final String name;
-
-        private TestAccount(String profileId, String name) {
-            this.profileId = profileId;
-            this.name = name;
-        }
+    private record TestAccount(String profileId, String name) implements MinecraftAccount {
 
         private static TestAccount create(String name) {
-            return new TestAccount(UUID.randomUUID().toString(), name);
-        }
+                return new TestAccount(UUID.randomUUID().toString(), name);
+            }
 
-        @Override
-        public String getMcToken() {
-            return "test-token-" + this.profileId;
-        }
+            @Override
+            public String getMcToken() {
+                return "test-token-" + this.profileId;
+            }
 
-        @Override
-        public String getMcProfileId() {
-            return this.profileId;
-        }
+            @Override
+            public String getMcProfileId() {
+                return this.profileId;
+            }
 
-        @Override
-        public String getMcProfileName() {
-            return this.name;
+            @Override
+            public String getMcProfileName() {
+                return this.name;
+            }
         }
-    }
 }

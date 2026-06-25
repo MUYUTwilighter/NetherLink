@@ -133,13 +133,13 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
     @SuppressWarnings("unchecked")
     private static BlockEntityType<SignBlockEntity> determineType(BlockState state) {
         var block = state.getBlock();
+        java.util.function.Supplier<BlockEntityType<SignBlockEntity>> type;
         if (block instanceof CeilingHangingSignBlock || block instanceof WallHangingSignBlock) {
-            var type = cool.muyucloud.netherlink.teacon.CommonReg.HANGING_SIGN_BLOCK_ENTITY;
-            if (type != null && type.get() != null) return type.get();
+            type = cool.muyucloud.netherlink.teacon.CommonReg.HANGING_SIGN_BLOCK_ENTITY;
         } else {
-            var type = cool.muyucloud.netherlink.teacon.CommonReg.SIGN_BLOCK_ENTITY;
-            if (type != null && type.get() != null) return type.get();
+            type = cool.muyucloud.netherlink.teacon.CommonReg.SIGN_BLOCK_ENTITY;
         }
+        if (type != null && type.get() != null) return type.get();
         return (BlockEntityType<SignBlockEntity>) BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
             Identifier.fromNamespaceAndPath("minecraft", "sign"));
     }

@@ -22,6 +22,7 @@ neoForge {
         client {
             client()
             gameDirectory = this.mkdir(this.file("runs/client"))
+            devLogin = true
         }
         data {
             clientData()
