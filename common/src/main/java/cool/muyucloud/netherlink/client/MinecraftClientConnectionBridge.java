@@ -8,26 +8,40 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ProgressScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.LevelLoadTracker;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.Connection;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.login.LoginProtocols;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import net.minecraft.server.network.EventLoopGroupHolder;
 
+import java.util.function.Consumer;
+
 public final class MinecraftClientConnectionBridge implements LinkClientConnectionBridge {
     private final Minecraft minecraft;
+    private final Screen progressScreen;
+    private final Consumer<Component> statusChanged;
 
     public MinecraftClientConnectionBridge(Minecraft minecraft) {
+        this(minecraft, new ProgressScreen(true), _ -> {
+        });
+    }
+
+    public MinecraftClientConnectionBridge(Minecraft minecraft, Screen progressScreen, Consumer<Component> statusChanged) {
         this.minecraft = minecraft;
+        this.progressScreen = progressScreen;
+        this.statusChanged = statusChanged;
     }
 
     @Override
     public void join(Channel channel) {
         this.minecraft.execute(() -> {
-            this.minecraft.disconnect(new ProgressScreen(true), false);
+            this.statusChanged.accept(Component.translatable("netherlink.join.minecraft.connecting"));
+            this.minecraft.disconnect(this.progressScreen, false);
             Connection connection = this.connection(channel);
             LevelLoadTracker tracker = new LevelLoadTracker(0L);
             connection.initiateServerboundPlayConnection(
@@ -42,8 +56,7 @@ public final class MinecraftClientConnectionBridge implements LinkClientConnecti
                     null,
                     false,
                     null,
-                    _ -> {
-                    },
+                    this.statusChanged,
                     tracker,
                     null
                 ),

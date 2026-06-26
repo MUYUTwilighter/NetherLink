@@ -132,14 +132,7 @@ public class NetherLinkFriendsScreen extends Screen {
             return;
         }
         this.status = Component.translatable("netherlink.friends.joining", friend.name()).withStyle(ChatFormatting.YELLOW);
-        ClientJoinController.join(this.minecraft, friend.profileId(), presenceId).whenComplete((_, error) -> this.minecraft.execute(() -> {
-            if (error != null) {
-                this.status = Component.translatable("netherlink.friends.join_failed", failureText(LinkFailures.from(error))).withStyle(ChatFormatting.RED);
-            } else {
-                this.status = Component.translatable("netherlink.friends.join_sent", friend.name()).withStyle(ChatFormatting.GRAY);
-            }
-            this.friendsTab.updateButtons();
-        }));
+        this.minecraft.setScreen(new NetherLinkJoinScreen(this, friend.profileId(), presenceId, friend.name()));
     }
 
     private Component serviceName(Identifier serviceId) {

@@ -53,6 +53,26 @@
   "netherlink.friends.joining": "Joining %s through NetherLink...",
   "netherlink.friends.join_sent": "Connected to %s through NetherLink.",
   "netherlink.friends.join_failed": "NetherLink join failed: %s",
+  "netherlink.join.title": "Joining %s",
+  "netherlink.join.preparing": "Preparing NetherLink join...",
+  "netherlink.join.opening_runtime": "Opening NetherLink runtime...",
+  "netherlink.join.state.requesting": "Requesting to join...",
+  "netherlink.join.state.accepted": "Join request accepted.",
+  "netherlink.join.state.negotiating": "Establishing P2P connection...",
+  "netherlink.join.state.connecting": "Opening Minecraft connection...",
+  "netherlink.join.state.connected": "Connected through NetherLink.",
+  "netherlink.join.state.rejected": "Join request rejected.",
+  "netherlink.join.state.failed": "NetherLink join failed.",
+  "netherlink.join.state.cancelled": "Join cancelled.",
+  "netherlink.join.detail.requesting": "Waiting for %s to accept the request.",
+  "netherlink.join.detail.accepted": "Preparing TURN credentials and WebRTC negotiation.",
+  "netherlink.join.detail.negotiating": "Exchanging offer, answer, and ICE candidates.",
+  "netherlink.join.detail.connecting": "The P2P channel is ready; handing off to Minecraft.",
+  "netherlink.join.detail.connected": "Minecraft is starting its login flow.",
+  "netherlink.join.detail.cancelled": "Returning to the friends screen.",
+  "netherlink.join.minecraft": "Entering Minecraft server...",
+  "netherlink.join.minecraft.connecting": "Starting Minecraft connection...",
+  "netherlink.join.minecraft.waiting": "Waiting for Minecraft login to continue.",
   "netherlink.friends.relation.friend": "Friend",
   "netherlink.friends.relation.incoming": "Incoming",
   "netherlink.friends.relation.outgoing": "Outgoing",
@@ -92,7 +112,6 @@
   "netherlink.failure.cancelled": "The operation was cancelled.",
   "netherlink.failure.internal": "An internal NetherLink error occurred.",
   "netherlink.failure.unknown": "Unexpected error: %s",
-
   "itemGroup.netherlink.teacon": "NetherLink Teacon",
   "item.netherlink.intro_card": "Intro Card",
   "item.netherlink.friend_card": "Friend Card",
@@ -110,7 +129,6 @@
   "screen.netherlink.owner.message": "What would you like to do?",
   "screen.netherlink.owner.edit": "Edit",
   "screen.netherlink.owner.clear": "Clear",
-
   "block.netherlink.intro_card_oak_standing_sign": "Oak Intro Card Standing Sign",
   "block.netherlink.intro_card_oak_wall_sign": "Oak Intro Card Wall Sign",
   "block.netherlink.intro_card_oak_wall_hanging_sign": "Oak Intro Card Wall Hanging Sign",
@@ -183,5 +201,4 @@
   "block.netherlink.intro_card_pale_oak_ceiling_hanging_sign": "Pale Oak Intro Card Ceiling Hanging Sign",
   "item.netherlink.intro_card_pale_oak_sign": "Pale Oak Intro Card Sign",
   "item.netherlink.intro_card_pale_oak_hanging_sign": "Pale Oak Intro Card Hanging Sign"
-
 }
