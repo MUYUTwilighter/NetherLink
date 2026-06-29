@@ -65,6 +65,11 @@ sourceSets.configureEach {
     }
 }
 
+dependencies {
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+}
+
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
