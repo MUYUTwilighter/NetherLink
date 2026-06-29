@@ -1,21 +1,29 @@
 package cool.muyucloud.netherlink;
 
-
-import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
-@Mod(Constants.MOD_ID)
+@Mod(NliConstants.MOD_ID)
 public class NetherLink {
+    public NetherLink() {
+        NliSetup.init();
+        NeoForge.EVENT_BUS.addListener(this::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
+    }
 
-    public NetherLink(IEventBus eventBus) {
+    private void onServerStarted(ServerStartedEvent event) {
+        NliSetup.onServerStarted(event.getServer());
+    }
 
-        // This method is invoked by the NeoForge mod loader when it is ready
-        // to load your mod. You can access NeoForge and Common code in this
-        // project.
+    private void onServerStopping(ServerStoppingEvent event) {
+        NliSetup.onServerStopping(event.getServer());
+    }
 
-        // Use NeoForge to bootstrap the Common mod.
-        Constants.LOG.info("Hello NeoForge world!");
-        CommonClass.init();
-
+    private void onRegisterCommands(RegisterCommandsEvent event) {
+        NliConstants.SERVER_COMMAND.register(event.getDispatcher());
     }
 }

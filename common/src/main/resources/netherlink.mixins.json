@@ -8,7 +8,6 @@
     "MinecraftServerMixin"
   ],
   "client": [
-    "FriendJoinHandlerMixin",
     "IntegratedServerMixin",
     "MultiplayerOptionsScreenMixin",
     "PresenceHandlerMixin"

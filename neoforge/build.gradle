@@ -7,6 +7,15 @@ plugins {
     id 'net.darkhax.curseforgegradle' version '1.1.26'
 }
 
+configurations {
+    webrtcBundle
+}
+
+dependencies {
+    webrtcBundle implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}")
+    webrtcBundle runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}:windows-x86_64")
+}
+
 neoForge {
     version = neoforge_version
     // Automatically enable neoforge AccessTransformers if the file exists
@@ -45,6 +54,19 @@ neoForge {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+tasks.named('jar', Jar) {
+    from({
+        configurations.webrtcBundle.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+        exclude 'fabric.mod.json'
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+}
+
 // Implement mcgradleconventions loader attribute
 def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
 ['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements'].each { variant ->
@@ -79,24 +101,21 @@ modrinth {
     if (changelogFile.exists()) {
         changelog = changelogFile.text
     }
-    dependencies {
-        required.project "fabric-api"
-    }
 }
 
 tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
-    def mainFile = upload('880165', jar)
+    def mainFile = upload(curseforge_id, jar)
     mainFile.displayName = archivesName
-    versionType = release_state
+    mainFile.releaseType = release_state
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
         mainFile.changelog = changelogFile.text
     }
     mainFile.changelogType = 'markdown'
     mainFile.gameVersions = [minecraft_version]
-    mainFile.addJavaVersion("Java 25")
+    mainFile.addJavaVersion("Java ${java_version}")
     mainFile.addEnvironment("server", "client")
-    mainFile.addModLoader("neoforge")
+    mainFile.addModLoader(project.name)
 }

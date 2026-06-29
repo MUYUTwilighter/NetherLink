@@ -52,7 +52,7 @@ public class PresenceHandlerMixin {
             MultiplayerScope scope = server.getMultiplayerScope();
             if (scope == MultiplayerScope.OFF || scope == MultiplayerScope.LAN) {
                 cir.setReturnValue(PresenceStatus.OFFLINE);
-            } else if (scope == MultiplayerScope.ONLINE || scope == ClientConstants.INTEGRATED_SERVER) {
+            } else if (scope == ClientConstants.INTEGRATED_SERVER) {
                 cir.setReturnValue(PresenceStatus.PLAYING_HOSTED_SERVER);
             } else {
                 throw new MatchException(null, null);

@@ -32,7 +32,6 @@ public abstract class MultiplayerOptionsScreenMixin extends Screen {
         if (this.wantedMultiplayerScope == ClientConstants.INTEGRATED_SERVER) {
             if (server.unpublishServer()) {
                 this.sendPublishMessage(Component.translatable("menu.multiplayerOptions.publish.stopped"));
-                this.minecraft.getPlayerSocialManager().getPresenceHandler().clearInvites();
             }
 
             this.publish(server, ClientConstants.INTEGRATED_SERVER);
