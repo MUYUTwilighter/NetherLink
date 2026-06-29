@@ -7,31 +7,15 @@ plugins {
     id 'net.darkhax.curseforgegradle' version '1.1.26'
 }
 
-configurations {
-    webrtcBundle
-}
-
 dependencies {
+
     localRuntime "net.litetex.mcm:dev-auth-neo:1.1.0"
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 
-    webrtcBundle implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}")
-    webrtcBundle runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}:windows-x86_64")
-}
-
-tasks.named('jar', Jar) {
-    from({
-        configurations.webrtcBundle.collect { zipTree(it) }
-    }) {
-        exclude 'META-INF/MANIFEST.MF'
-        exclude 'META-INF/*.SF'
-        exclude 'META-INF/*.DSA'
-        exclude 'META-INF/*.RSA'
-        exclude 'fabric.mod.json'
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")
+    implementation include("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 }
 
 loom {
@@ -79,7 +63,7 @@ sourceSets.configureEach {
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
-    versionName = "${base.archivesName}-${version}"
+    versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     versionNumber = "${version}"
     versionType = release_state
     uploadFile = jar

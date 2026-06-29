@@ -12,15 +12,11 @@ neoForge {
     }
 }
 
-dependencies {
-    compileOnly group: 'org.spongepowered', name: 'mixin', version: '0.8.5'
-    // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
-    compileOnly group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.5.3'
-    annotationProcessor group: 'io.github.llamalad7', name: 'mixinextras-common', version: '0.5.3'
-    compileOnly group: 'dev.onvoid.webrtc', name: 'webrtc-java', version: webrtc_java_version
-}
-
 configurations {
+    webrtcBundle {
+        canBeResolved = true
+        canBeConsumed = true
+    }
     commonJava {
         canBeResolved = false
         canBeConsumed = true
@@ -29,11 +25,50 @@ configurations {
         canBeResolved = false
         canBeConsumed = true
     }
+    testCompileClasspath.extendsFrom(modDevCompileDependencies)
+    testRuntimeClasspath.extendsFrom(modDevRuntimeDependencies)
+}
+
+dependencies {
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    // fabric and neoforge both bundle mixinextras, so it is safe to use it in common
+    compileOnly 'io.github.llamalad7:mixinextras-common:0.5.3'
+    annotationProcessor 'io.github.llamalad7:mixinextras-common:0.5.3'
+
+    implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'io.netty:netty-transport:4.2.7.Final'
+    testRuntimeOnly 'com.google.code.gson:gson:2.11.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 artifacts {
     commonJava sourceSets.main.java.sourceDirectories.singleFile
     commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
+
+tasks.named('jar', Jar) {
+    dependsOn(configurations.webrtcBundle)
+    from({
+        configurations.webrtcBundle.collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+        exclude 'fabric.mod.json'
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
 }
 
 // Implement mcgradleconventions loader attribute

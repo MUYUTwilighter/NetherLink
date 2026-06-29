@@ -7,15 +7,6 @@ plugins {
     id 'net.darkhax.curseforgegradle' version '1.1.26'
 }
 
-configurations {
-    webrtcBundle
-}
-
-dependencies {
-    webrtcBundle implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}")
-    webrtcBundle runtimeOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_java_version}:windows-x86_64")
-}
-
 neoForge {
     version = neoforge_version
     // Automatically enable neoforge AccessTransformers if the file exists
@@ -31,6 +22,7 @@ neoForge {
         client {
             client()
             gameDirectory = this.mkdir(this.file("runs/client"))
+            devLogin = true
         }
         data {
             clientData()
@@ -54,19 +46,6 @@ neoForge {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
-tasks.named('jar', Jar) {
-    from({
-        configurations.webrtcBundle.collect { zipTree(it) }
-    }) {
-        exclude 'META-INF/MANIFEST.MF'
-        exclude 'META-INF/*.SF'
-        exclude 'META-INF/*.DSA'
-        exclude 'META-INF/*.RSA'
-        exclude 'fabric.mod.json'
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
-}
-
 // Implement mcgradleconventions loader attribute
 def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', String)
 ['apiElements', 'runtimeElements', 'sourcesElements', 'javadocElements'].each { variant ->
@@ -86,17 +65,20 @@ sourceSets.configureEach {
     }
 }
 
-def archivesName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
+dependencies {
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+}
 
 modrinth {
     token = System.getenv("MODRINTH_MOD_PUBLISH")
     projectId = modrinth_id
-    versionName = archivesName
-    versionNumber = version
+    versionName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
+    versionNumber = "${version}"
     versionType = release_state
     uploadFile = jar
     gameVersions = [minecraft_version]
-    loaders = ["neoforge"]
+    loaders = [project.name]
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
         changelog = changelogFile.text
@@ -107,7 +89,7 @@ tasks.register('curseforge', TaskPublishCurseForge) {
     apiToken = System.getenv("CURSEFORGE_MOD_PUBLISH")
     group = 'publishing'
     def mainFile = upload(curseforge_id, jar)
-    mainFile.displayName = archivesName
+    mainFile.displayName = "${mod_id}-${minecraft_version}-${project.name}-${version}"
     mainFile.releaseType = release_state
     File changelogFile = rootProject.file("changelog.md")
     if (changelogFile.exists()) {
