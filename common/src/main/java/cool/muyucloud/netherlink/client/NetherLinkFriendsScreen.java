@@ -5,6 +5,8 @@ import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.model.*;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.components.tabs.Tab;
@@ -15,6 +17,7 @@ import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -180,13 +183,48 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     private static final class SimpleTabButton extends TabButton {
+        private static final WidgetSprites SPRITES = new WidgetSprites(
+            Identifier.withDefaultNamespace("widget/tab_selected"),
+            Identifier.withDefaultNamespace("widget/tab"),
+            Identifier.withDefaultNamespace("widget/tab_selected_highlighted"),
+            Identifier.withDefaultNamespace("widget/tab_highlighted")
+        );
+
         private SimpleTabButton(TabManager tabManager, Tab tab, int width, int height) {
             super(tabManager, tab, width, height);
         }
 
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            graphics.centeredText(Minecraft.getInstance().font, this.getMessage(), this.getX() + this.getWidth() / 2, this.getY() + 7, this.isSelected() ? 0xFFFFFFFF : 0xFFAAAAAA);
+            graphics.blitSprite(
+                RenderPipelines.GUI_TEXTURED,
+                SPRITES.get(this.isSelected(), this.isHoveredOrFocused()),
+                this.getX(),
+                this.getY(),
+                this.width,
+                this.height
+            );
+            Font font = Minecraft.getInstance().font;
+            if (this.isSelected()) {
+                this.renderFocusUnderline(graphics, font, this.active ? -1 : -6250336);
+            }
+            this.renderLabel(graphics.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.NONE));
+            this.handleCursor(graphics);
+        }
+
+        private void renderLabel(ActiveTextCollector output) {
+            int left = this.getX() + 1;
+            int top = this.getY() + (this.isSelected() ? 0 : 3);
+            int right = this.getX() + this.getWidth() - 1;
+            int bottom = this.getY() + this.getHeight();
+            output.acceptScrollingWithDefaultCenter(this.getMessage(), left, right, top, bottom);
+        }
+
+        private void renderFocusUnderline(GuiGraphicsExtractor graphics, Font font, int color) {
+            int width = Math.min(font.width(this.getMessage()), this.getWidth() - 4);
+            int left = this.getX() + (this.getWidth() - width) / 2;
+            int top = this.getY() + this.getHeight() - 2;
+            graphics.fill(left, top, left + width, top + 1, color);
         }
     }
 
