@@ -43,7 +43,9 @@ public final class MinecraftServerConnectionBridge implements LinkServerConnecti
                 Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND, false, null);
                 connection.configurePacketHandler(pipeline);
                 connection.setListenerForServerboundHandshake(new ServerHandshakePacketListenerImpl(MinecraftServerConnectionBridge.this.server, connection));
-                setIntendedProfileId(connection, profileId);
+                if (MinecraftServerConnectionBridge.this.server.usesAuthentication()) {
+                    setIntendedProfileId(connection, profileId);
+                }
                 listener.getConnections().add(connection);
             }
         });
@@ -51,7 +53,7 @@ public final class MinecraftServerConnectionBridge implements LinkServerConnecti
     }
 
     private static void setIntendedProfileId(Connection connection, @Nullable UUID profileId) {
-        if (SET_INTENDED_PROFILE_ID == null) {
+        if (profileId == null || SET_INTENDED_PROFILE_ID == null) {
             return;
         }
         try {
