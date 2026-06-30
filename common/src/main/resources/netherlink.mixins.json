@@ -8,9 +8,11 @@
     "MinecraftServerMixin"
   ],
   "client": [
+    "CommonButtonsMixin",
     "IntegratedServerMixin",
-    "MultiplayerOptionsScreenMixin",
-    "PresenceHandlerMixin"
+    "MinecraftLifecycleMixin",
+    "MinecraftMixin",
+    "MultiplayerOptionsScreenMixin"
   ],
   "server": [],
   "injectors": {

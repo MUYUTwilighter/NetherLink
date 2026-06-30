@@ -4,9 +4,7 @@
   "package": "cool.muyucloud.netherlink.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
-  "client": [
-    "MixinTitleScreen"
-  ],
+  "client": [],
   "server": [],
   "injectors": {
     "defaultRequire": 1

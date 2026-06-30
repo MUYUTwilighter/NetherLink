@@ -19,7 +19,6 @@
       "cool.muyucloud.netherlink.platform.NetherLink"
     ],
     "client": [
-      "cool.muyucloud.netherlink.platform.NetherLinkClient"
     ]
   },
   "mixins": [
@@ -28,6 +27,7 @@
   ],
   "depends": {
     "fabricloader": ">=0.19.0",
+    "fabric-api": "*",
     "minecraft": "*",
     "java": "*"
   }

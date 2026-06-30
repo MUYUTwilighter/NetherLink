@@ -35,7 +35,7 @@ public class NliConstants {
                     }
                 } else val = custom.trim();
                 if (val.isEmpty() || val.startsWith("${")) {
-                    throw new IllegalStateException("Please specify a valid NETHERLINK_CLIENT_ID in environment variable");
+                    LOG.warn("Invalid NETHERLINK_CLIENT_ID environment variable provided, serverside feature will be disabled");
                 }
             }
             return val;
@@ -43,7 +43,6 @@ public class NliConstants {
     };
     public static final Long TIMEOUT = 300000L;
     public static final Integer INTERVAL_TOKEN = 1200;
-    public static final Integer INTERVAL_PRESENCE = 200;
     public static final Path ACCOUNT_DIR = Path.of("netherlink/accounts");
     public static final NliCommand<CommandSourceStack> SERVER_COMMAND = new NliCommand<>();
 }
