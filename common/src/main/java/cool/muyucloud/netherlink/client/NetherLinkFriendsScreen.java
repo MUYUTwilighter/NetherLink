@@ -237,7 +237,7 @@ public class NetherLinkFriendsScreen extends Screen {
         }
 
         @Override
-        public Layout getLayout() {
+        public @NonNull Layout getLayout() {
             return this.layout;
         }
 
@@ -372,7 +372,7 @@ public class NetherLinkFriendsScreen extends Screen {
         }
 
         @Override
-        public Layout getLayout() {
+        public @NonNull Layout getLayout() {
             return this.layout;
         }
 
@@ -486,7 +486,7 @@ public class NetherLinkFriendsScreen extends Screen {
         }
 
         @Override
-        public Layout getLayout() {
+        public @NonNull Layout getLayout() {
             return this.layout;
         }
 
