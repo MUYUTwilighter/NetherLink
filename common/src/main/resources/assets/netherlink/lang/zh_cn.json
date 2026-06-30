@@ -1,6 +1,8 @@
 {
   "menu.multiplayerOptions.network.integrated_server": "集成服务端",
   "menu.multiplayerOptions.network.integrated_server.tooltip": "好友可通过 NetherLink 免批准加入这个世界",
+  "netherlink.multiplayer.scope": "NetherLink",
+  "netherlink.multiplayer.scope.tooltip": "好友可通过 NetherLink 加入这个世界。",
   "netherlink.lan.friends": "向好友开放",
   "netherlink.lan.friends.open": "向好友开放",
   "netherlink.lan.friends.close": "关闭好友访问",

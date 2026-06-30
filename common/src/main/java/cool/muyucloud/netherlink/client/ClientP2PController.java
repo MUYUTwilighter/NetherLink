@@ -14,6 +14,7 @@ import cool.muyucloud.netherlink.link.transport.SignalingException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.HttpUtil;
 
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
@@ -34,25 +35,41 @@ public final class ClientP2PController {
     }
 
     public static void setFriendsOpen(Minecraft minecraft, IntegratedServer integratedServer, boolean open) {
+        int port = integratedServer.getPort() > 0 ? integratedServer.getPort() : HttpUtil.getAvailablePort();
+        setFriendsOpen(minecraft, integratedServer, open, port);
+    }
+
+    public static void setFriendsOpen(Minecraft minecraft, IntegratedServer integratedServer, boolean open, int port) {
         if (open) {
             ClientTermsController.runAfterAcceptance(
                 minecraft,
                 minecraft.gui.screen(),
-                () -> setFriendsOpenAccepted(minecraft, integratedServer)
+                () -> setFriendsOpenAccepted(minecraft, integratedServer, port)
             );
         } else {
-            ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
-            revoke(minecraft);
+            NetherLinkIntegratedServer bridge = (NetherLinkIntegratedServer)integratedServer;
+            if (bridge.nli$isFriendsOpen()) {
+                integratedServer.unpublishServer();
+            } else {
+                bridge.nli$setFriendsOpen(false);
+                revoke(minecraft);
+            }
         }
     }
 
-    private static void setFriendsOpenAccepted(Minecraft minecraft, IntegratedServer integratedServer) {
-        ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(true);
+    private static void setFriendsOpenAccepted(Minecraft minecraft, IntegratedServer integratedServer, int port) {
+        NetherLinkIntegratedServer bridge = (NetherLinkIntegratedServer)integratedServer;
+        if (!bridge.nli$publishFriendsNetwork(port)) {
+            bridge.nli$setFriendsOpen(false);
+            message(minecraft, Component.translatable("netherlink.client.friends.failed"));
+            return;
+        }
         publish(minecraft, integratedServer);
     }
 
     public static void publish(Minecraft minecraft, IntegratedServer integratedServer) {
         if (!integratedServer.isPublished()) {
+            message(minecraft, Component.translatable("netherlink.client.friends.failed"));
             return;
         }
         if (!PENDING.compareAndSet(false, true)) {
@@ -62,9 +79,14 @@ public final class ClientP2PController {
             try {
                 LauncherSessionAccount sessionAccount = new LauncherSessionAccount(minecraft.getUser());
                 if (!sessionAccount.isUsable()) {
-                    ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
+                    NetherLinkIntegratedServer bridge = (NetherLinkIntegratedServer)integratedServer;
+                    boolean wasFriendsOpen = bridge.nli$isFriendsOpen();
+                    bridge.nli$setFriendsOpen(false);
                     NliConstants.LOG.warn("Launcher account is missing a Minecraft access token or profile id; NetherLink friends access is unavailable");
                     message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
+                    if (wasFriendsOpen) {
+                        minecraft.execute(integratedServer::unpublishServer);
+                    }
                     return;
                 }
                 stopPublication();
@@ -81,7 +103,9 @@ public final class ClientP2PController {
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
                 message(minecraft, Component.translatable("netherlink.client.friends.opened"));
             } catch (RuntimeException e) {
-                ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
+                NetherLinkIntegratedServer bridge = (NetherLinkIntegratedServer)integratedServer;
+                boolean wasFriendsOpen = bridge.nli$isFriendsOpen();
+                bridge.nli$setFriendsOpen(false);
                 if (isMinecraftTokenRejected(e)) {
                     NliConstants.LOG.warn("Launcher Minecraft token was rejected; restart the game to get a fresh token", e);
                     message(minecraft, Component.translatable("netherlink.client.friends.token_rejected"));
@@ -90,6 +114,9 @@ public final class ClientP2PController {
                     message(minecraft, Component.translatable("netherlink.client.friends.failed"));
                 }
                 stopPublication();
+                if (wasFriendsOpen) {
+                    minecraft.execute(integratedServer::unpublishServer);
+                }
             } finally {
                 PENDING.set(false);
             }
