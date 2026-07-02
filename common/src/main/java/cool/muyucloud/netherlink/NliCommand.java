@@ -3,10 +3,10 @@ package cool.muyucloud.netherlink;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
-import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 
@@ -17,9 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public class NliCommand<S> {
-    private static final AtomicInteger THREAD_ID = new AtomicInteger();
-    private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
-        Thread thread = new Thread(task, "NetherLink Command-" + THREAD_ID.getAndIncrement());
+    private static final AtomicInteger COMMAND_THREAD_ID = new AtomicInteger();
+    private final ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "NetherLink Command-" + COMMAND_THREAD_ID.incrementAndGet());
         thread.setDaemon(true);
         return thread;
     });
@@ -42,14 +42,14 @@ public class NliCommand<S> {
             .executes(context -> executeAsync(context.getSource(), "refresh all accounts", messenger -> AccountManager.refresh(true, messenger)))
             .then(LiteralArgumentBuilder.<S>literal("all")
                 .executes(context -> executeAsync(context.getSource(), "refresh all accounts", messenger -> AccountManager.refresh(true, messenger))))
-            .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+            .then(RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
                 .executes(context -> {
                     String name = StringArgumentType.getString(context, "name");
                     return executeAsync(context.getSource(), "refresh account " + name, messenger -> AccountManager.refresh(name, true, messenger));
                 }));
 
-        remove.then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+        remove.then(RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
             .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
             .executes(context -> {
                 String name = StringArgumentType.getString(context, "name");
@@ -62,7 +62,7 @@ public class NliCommand<S> {
                 });
             }));
 
-        toggle.then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+        toggle.then(RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
             .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
             .executes(context -> {
                 String name = StringArgumentType.getString(context, "name");
@@ -73,7 +73,7 @@ public class NliCommand<S> {
             .executes(context -> executeAsync(context.getSource(), "publish all accounts", AccountManager::publish))
             .then(LiteralArgumentBuilder.<S>literal("all")
                 .executes(context -> executeAsync(context.getSource(), "publish all accounts", AccountManager::publish)))
-            .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+            .then(RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
                 .executes(context -> {
                     String name = StringArgumentType.getString(context, "name");
@@ -84,7 +84,7 @@ public class NliCommand<S> {
             .executes(context -> executeAsync(context.getSource(), "revoke all accounts", AccountManager::revoke))
             .then(LiteralArgumentBuilder.<S>literal("all")
                 .executes(context -> executeAsync(context.getSource(), "revoke all accounts", AccountManager::revoke)))
-            .then(com.mojang.brigadier.builder.RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
+            .then(RequiredArgumentBuilder.<S, String>argument("name", StringArgumentType.word())
                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(AccountManager.names(), builder))
                 .executes(context -> {
                     String name = StringArgumentType.getString(context, "name");
@@ -94,7 +94,7 @@ public class NliCommand<S> {
         root.then(add).then(list).then(refresh).then(remove).then(toggle).then(publish).then(revoke);
         root.requires(source -> {
             Messenger m = Messenger.of(source);
-            return m.nli$hasPermission(Commands.LEVEL_ADMINS);
+            return m.nli$hasPermission(4);
         });
     }
 

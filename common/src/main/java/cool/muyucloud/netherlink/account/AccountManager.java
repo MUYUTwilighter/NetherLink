@@ -4,11 +4,18 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonWriter;
 import com.mojang.serialization.JsonOps;
+import cool.muyucloud.netherlink.NetherLinkConfig;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
-import cool.muyucloud.netherlink.p2p.ServerP2PManager;
-import cool.muyucloud.netherlink.p2p.SignalingException;
+import cool.muyucloud.netherlink.bridge.MinecraftServerConnectionBridge;
+import cool.muyucloud.netherlink.link.LinkServices;
+import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
+import cool.muyucloud.netherlink.link.model.LinkHostPublication;
+import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
+import net.minecraft.Util;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
@@ -19,8 +26,8 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,8 +39,7 @@ public class AccountManager {
     private static final Map<String, Account> ACCOUNTS = new ConcurrentHashMap<>();
     private static final Map<String, AuthRequest> REQUESTS = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> PUBLISHED = new ConcurrentHashMap<>();
-    private static final Map<String, ServerP2PManager> P2P = new ConcurrentHashMap<>();
-    private static final PresencePublisher PRESENCE = new PresencePublisher();
+    private static final Map<String, HostedPublication> P2P = new ConcurrentHashMap<>();
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "NetherLink Account");
         thread.setDaemon(true);
@@ -59,6 +65,8 @@ public class AccountManager {
     }
 
     public static void add(Messenger messenger) {
+        if (NliConstants.MS_CLIENT_ID.get() == null)
+            throw new NetherLinkAuthException("Unable to add mojang account while api key is not set");
         Account account = new Account();
         AuthRequest request = new AuthRequest(account, messenger);
         try {
@@ -104,31 +112,33 @@ public class AccountManager {
             messenger.nli$sendMessage(() -> Component.literal("NetherLink account %s is disabled".formatted(name)));
             return;
         }
-        AuthRequest request = REQUESTS.computeIfAbsent(name, ignored -> new AuthRequest(account, messenger));
-        if (!request.isPending()) {
-            request.setMessenger(messenger);
-        }
-        request.refreshMcProfileId(force);
-        if (account.getMcProfileName() == null || account.getMcProfileName().isBlank()) {
-            REQUESTS.remove(name);
-            throw new NetherLinkAuthException("Minecraft profile name was not found");
-        }
-        String profileName = account.getMcProfileName();
-        if (!name.equals(profileName)) {
-            ACCOUNTS.remove(name);
-            ACCOUNTS.put(profileName, account);
-            REQUESTS.remove(name);
-            REQUESTS.put(profileName, request);
-            if (PUBLISHED.remove(name) != null) {
-                PUBLISHED.put(profileName, true);
+        AuthRequest request = REQUESTS.computeIfAbsent(name, ignored5 -> new AuthRequest(account, messenger));
+        synchronized (request) {
+            if (!request.isPending()) {
+                request.setMessenger(messenger);
             }
-            ServerP2PManager manager = P2P.remove(name);
-            if (manager != null) {
-                P2P.put(profileName, manager);
+            request.refreshMcProfileId(force);
+            if (account.getMcProfileName() == null || account.getMcProfileName().isBlank()) {
+                REQUESTS.remove(name);
+                throw new NetherLinkAuthException("Minecraft profile name was not found");
             }
-            deleteAccountFile(name);
+            String profileName = account.getMcProfileName();
+            if (!name.equals(profileName)) {
+                ACCOUNTS.remove(name);
+                ACCOUNTS.put(profileName, account);
+                REQUESTS.remove(name);
+                REQUESTS.put(profileName, request);
+                if (PUBLISHED.remove(name) != null) {
+                    PUBLISHED.put(profileName, true);
+                }
+                HostedPublication publication = P2P.remove(name);
+                if (publication != null) {
+                    P2P.put(profileName, publication);
+                }
+                deleteAccountFile(name);
+            }
+            dump(profileName);
         }
-        dump(profileName);
     }
 
     public static void refresh(boolean force, Messenger messenger) {
@@ -140,16 +150,8 @@ public class AccountManager {
     public static void tick(int tickCount, Messenger messenger) {
         dumpMessages();
         boolean refresh = tickCount % NliConstants.INTERVAL_TOKEN == 0;
-        boolean publish = tickCount % NliConstants.INTERVAL_PRESENCE == 0;
-        if (refresh || publish) {
-            submitMaintenance("maintain accounts", () -> {
-                if (refresh) {
-                    refresh(false, messenger);
-                }
-                if (publish) {
-                    publish();
-                }
-            });
+        if (refresh) {
+            submitMaintenance("maintain accounts", () -> refresh(false, messenger));
         }
     }
 
@@ -164,17 +166,16 @@ public class AccountManager {
     }
 
     public static void dumpMessages() {
-        REQUESTS.forEach((name, ignored) -> dumpMessages(name));
+        REQUESTS.forEach((name, ignored1) -> dumpMessages(name));
     }
 
     public static void clearRequests() {
         REQUESTS.clear();
-        P2P.values().forEach(ServerP2PManager::shutdown);
-        P2P.clear();
+        new ArrayList<>(P2P.keySet()).forEach(AccountManager::stopP2P);
     }
 
     public static void disconnectPlayersForShutdown(MinecraftServer server) {
-        if (server.getPlayerList() == null || server.getPlayerList().getPlayers().isEmpty()) {
+        if (server.getPlayerList().getPlayers().isEmpty()) {
             return;
         }
         NliConstants.LOG.info("Disconnecting players before NetherLink P2P shutdown");
@@ -189,10 +190,7 @@ public class AccountManager {
     public static void dump(String name) {
         Account account = ACCOUNTS.get(name);
         if (account == null) return;
-        JsonElement json = Account.CODEC.codec().encodeStart(JsonOps.INSTANCE, account)
-            .getOrThrow(false, message -> {
-                throw new IllegalStateException(message);
-            });
+        JsonElement json = Util.getOrThrow(Account.CODEC.codec().encodeStart(JsonOps.INSTANCE, account), IllegalStateException::new);
         StringWriter writer = new StringWriter();
         GSON.toJson(json, new JsonWriter(writer));
         try {
@@ -204,17 +202,14 @@ public class AccountManager {
     }
 
     public static void dump() {
-        ACCOUNTS.forEach((name, ignored) -> dump(name));
+        ACCOUNTS.forEach((name, ignored2) -> dump(name));
     }
 
     public static void load(String name) {
         try {
             String raw = Files.readString(NliConstants.ACCOUNT_DIR.resolve(name + ".json"));
             JsonElement json = GSON.fromJson(raw, JsonElement.class);
-            Account account = Account.CODEC.codec().decode(JsonOps.INSTANCE, json)
-                .getOrThrow(false, message -> {
-                    throw new IllegalStateException(message);
-                }).getFirst();
+            Account account = Util.getOrThrow(Account.CODEC.codec().decode(JsonOps.INSTANCE, json), IllegalStateException::new).getFirst();
             String key = account.getMcProfileName() == null || account.getMcProfileName().isBlank() ? name : account.getMcProfileName();
             ACCOUNTS.put(key, account);
             REQUESTS.remove(name);
@@ -251,31 +246,24 @@ public class AccountManager {
         if (currentServer == null) {
             throw new NetherLinkAuthException("Minecraft server is not ready");
         }
-        refresh(name, false, (Messenger)(Object)currentServer);
-        ServerP2PManager manager;
-        Map<java.util.UUID, java.util.UUID> presence;
+        refresh(name, false, Messenger.of(currentServer));
         try {
-            manager = ensureP2P(name, account, currentServer);
-            awaitSignalingReady(manager);
-            presence = PRESENCE.publish(account);
+            publishOrRefresh(name, account, currentServer);
         } catch (NetherLinkAuthException e) {
             if (!isMinecraftTokenRejected(e)) {
                 throw e;
             }
             NliConstants.LOG.warn("Minecraft token for {} was rejected, refreshing and retrying publish once", name);
-            refresh(name, true, (Messenger)(Object)currentServer);
+            refresh(name, true, Messenger.of(currentServer));
             stopP2P(name);
-            manager = ensureP2P(name, account, currentServer);
-            awaitSignalingReady(manager);
-            presence = PRESENCE.publish(account);
+            publishOrRefresh(name, account, currentServer);
         }
-        manager.updatePresence(presence);
         PUBLISHED.put(name, true);
         NliConstants.LOG.info("Published NetherLink account presence: {}", name);
     }
 
     public static void publish() {
-        ACCOUNTS.forEach((s, ignored) -> publish(s));
+        ACCOUNTS.forEach((s, ignored3) -> publish(s));
     }
 
     public static void revoke(String name) {
@@ -283,26 +271,20 @@ public class AccountManager {
         if (account == null) {
             return;
         }
-        if (account.getMcToken() != null && !account.getMcToken().isBlank()) {
-            try {
-                PRESENCE.revoke(account);
-            } catch (PresencePublisher.UnauthorizedException e) {
-                MinecraftServer currentServer = server;
-                if (currentServer == null) {
-                    throw e;
-                }
-                NliConstants.LOG.warn("Presence revoke for {} was unauthorized, refreshing Minecraft token and retrying once", name);
-                refresh(name, true, (Messenger)(Object)currentServer);
-                PRESENCE.revoke(account);
+        try {
+            HostedPublication publication = P2P.remove(name);
+            if (publication != null) {
+                publication.publication().close();
             }
+        } finally {
+            stopP2P(name);
+            PUBLISHED.remove(name);
         }
-        stopP2P(name);
-        PUBLISHED.remove(name);
         NliConstants.LOG.info("Revoked NetherLink account presence: {}", name);
     }
 
     public static void revoke() {
-        ACCOUNTS.forEach((s, ignored) -> revoke(s));
+        ACCOUNTS.forEach((s, ignored4) -> revoke(s));
     }
 
     public static void setInability(String name, boolean enable) {
@@ -374,11 +356,10 @@ public class AccountManager {
     }
 
     private static String formatStatus(String name, Account account) {
-        return "- %s [%s] profile=%s pmid=%s mcToken=%s".formatted(
+        return "- %s [%s] profile=%s mcToken=%s".formatted(
             name,
             (account.isEnabled() ? "enabled" : "disabled") + "," + (PUBLISHED.containsKey(name) ? "published" : "not published"),
             valueOrMissing(account.getMcProfileId()),
-            valueOrMissing(account.getMcPmid()),
             tokenStatus(account.getMcExpireAt())
         );
     }
@@ -408,33 +389,81 @@ public class AccountManager {
     }
 
     private static void stopP2P(String name) {
-        ServerP2PManager manager = P2P.remove(name);
-        if (manager != null) {
-            manager.shutdown();
+        HostedPublication hosted = P2P.remove(name);
+        Account account = ACCOUNTS.get(name);
+        String runtimeKey = hosted != null ? hosted.runtimeKey() : account != null ? runtimeKey(account) : null;
+        if (hosted != null) {
+            hosted.publication().close();
+        }
+        if (runtimeKey != null) {
+            LinkServices.current().runtime().close(runtimeKey);
+            LinkContextHooks.removeServerConnection(runtimeKey);
         }
     }
 
-    private static ServerP2PManager ensureP2P(String name, Account account, MinecraftServer currentServer) {
-        return P2P.computeIfAbsent(name, key -> {
-            NliConstants.LOG.info("Starting NetherLink P2P manager for account {}", key);
-            ServerP2PManager created = new ServerP2PManager(key, account, currentServer);
-            created.start();
-            return created;
+    private static void publishOrRefresh(String name, Account account, MinecraftServer currentServer) {
+        if (P2P.containsKey(name)) {
+            return;
+        }
+        ensureP2P(name, account, currentServer);
+    }
+
+    private static void ensureP2P(String name, Account account, MinecraftServer currentServer) {
+        P2P.computeIfAbsent(name, ignored6 -> {
+            String runtimeKey = runtimeKey(account);
+            String instanceName = instanceName(currentServer);
+            NliConstants.LOG.info("Starting NetherLink P2P manager for account {} as runtime {}", name, runtimeKey);
+            LinkContextHooks.setServerConnection(
+                runtimeKey,
+                account,
+                instanceName,
+                new MinecraftServerConnectionBridge(currentServer),
+                () -> refreshAccount(account, currentServer)
+            );
+            try {
+                LinkServices.current().runtime().open(runtimeKey).join();
+                LinkHostPublication publication = LinkServices.current().hosting().publish(
+                    runtimeKey,
+                    LinkPresenceUpdate.hosting(instanceName),
+                    SIGNALING_READY_TIMEOUT
+                );
+                return new HostedPublication(runtimeKey, publication);
+            } catch (RuntimeException error) {
+                LinkServices.current().runtime().close(runtimeKey);
+                LinkContextHooks.removeServerConnection(runtimeKey);
+                throw error;
+            }
         });
     }
 
-    private static void awaitSignalingReady(ServerP2PManager manager) {
-        try {
-            manager.awaitSignalingReady(SIGNALING_READY_TIMEOUT).join();
-        } catch (CompletionException e) {
-            throw new NetherLinkAuthException("Signaling did not become ready before publishing presence", e);
+    private static String runtimeKey(Account account) {
+        String profileId = account.getMcProfileId();
+        if (profileId == null || profileId.isBlank()) {
+            throw new NetherLinkAuthException("Minecraft profile id was not found");
         }
+        return "dedicated:" + profileId.toLowerCase(Locale.ROOT);
+    }
+
+    private static String instanceName(MinecraftServer currentServer) {
+        return NetherLinkConfig.instanceNameOr(currentServer.getServerDirectory().toPath(), currentServer.getMotd());
+    }
+
+    private static void refreshAccount(Account account, MinecraftServer currentServer) {
+        String name = ACCOUNTS.entrySet().stream()
+            .filter(entry -> entry.getValue() == account)
+            .map(Map.Entry::getKey)
+            .findFirst()
+            .orElseThrow(() -> new NetherLinkAuthException("NetherLink account is no longer registered"));
+        refresh(name, true, Messenger.of(currentServer));
+    }
+
+    private record HostedPublication(String runtimeKey, LinkHostPublication publication) {
     }
 
     private static boolean isMinecraftTokenRejected(Throwable error) {
         Throwable current = error;
         while (current != null) {
-            if (current instanceof PresencePublisher.UnauthorizedException || current instanceof SignalingException.SignalingAuthException) {
+            if (current instanceof LinkUnauthorizedException || current instanceof SignalingException.SignalingAuthException) {
                 return true;
             }
             current = current.getCause();

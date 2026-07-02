@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink;
 
+import cool.muyucloud.netherlink.platform.ForgeConnectionBridgeEvents;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -11,6 +12,7 @@ import net.minecraftforge.fml.common.Mod;
 public class NetherLink {
     public NetherLink() {
         NliSetup.init();
+        ForgeConnectionBridgeEvents.register();
         MinecraftForge.EVENT_BUS.register(this);
     }
 
