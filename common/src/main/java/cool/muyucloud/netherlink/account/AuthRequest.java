@@ -8,9 +8,7 @@ import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.account.data.Endpoint;
 import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 
 import java.io.IOException;
@@ -21,7 +19,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
@@ -170,7 +167,6 @@ public class AuthRequest {
             String mcToken = requiredString(response, "access_token");
             account.setMcToken(mcToken);
             account.setMcExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
-            account.setMcPmid(extractPmid(mcToken));
         } finally {
             pendingMcToken = false;
         }
@@ -278,8 +274,7 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.BLUE)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, uri))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Open login page"))));
+                .withInsertion(uri));
     }
 
     private static MutableComponent copyToClipboard(String value) {
@@ -287,8 +282,6 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, value))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("Copy to clipboard")))
                 .withInsertion(value));
     }
 
@@ -375,21 +368,6 @@ public class AuthRequest {
 
     private long expiresAtFromSeconds(long seconds) {
         return System.currentTimeMillis() + seconds * 1000L;
-    }
-
-    private String extractPmid(String token) {
-        String[] parts = token.split("\\.");
-        if (parts.length < 2) {
-            return null;
-        }
-        try {
-            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-            JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
-            return optionalString(json, "pmid");
-        } catch (RuntimeException e) {
-            NliConstants.LOG.warn("Failed to parse PMID from Minecraft access token", e);
-            return null;
-        }
     }
 
     private String requiredString(JsonObject object, String key) {

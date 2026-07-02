@@ -38,7 +38,7 @@ public abstract class IntegratedServerMixin implements NetherLinkIntegratedServe
     @Inject(method = "publishServer", at = @At("RETURN"))
     private void onPublishServer(@Nullable GameType gameMode, boolean allowCommands, int port, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ()) {
-            ClientP2PController.setFriendsOpen(this.minecraft, (IntegratedServer) (Object) this, ClientLanSettings.friendsOpen());
+            ClientP2PController.setFriendsOpen(this.minecraft, (IntegratedServer)(Object)this, ClientLanSettings.friendsOpen());
         }
     }
 

@@ -12,6 +12,4 @@ public interface MinecraftAccount {
     @Nullable
     String getMcProfileName();
 
-    @Nullable
-    String getMcPmid();
 }

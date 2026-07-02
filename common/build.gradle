@@ -19,8 +19,7 @@ neoForge {
 configurations {
     webrtcBundle {
         canBeResolved = true
-        canBeConsumed = false
-        transitive = false
+        canBeConsumed = true
     }
 }
 

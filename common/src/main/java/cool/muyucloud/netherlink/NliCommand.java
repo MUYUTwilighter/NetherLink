@@ -6,7 +6,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.AccountManager;
-import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 
@@ -90,7 +89,7 @@ public class NliCommand<S> {
         root.then(add).then(list).then(refresh).then(remove).then(toggle).then(publish).then(revoke);
         root.requires(source -> {
             Messenger m = Messenger.of(source);
-            return m.nli$hasPermission(Commands.LEVEL_ADMINS);
+            return m.nli$hasPermission(4);
         });
     }
 

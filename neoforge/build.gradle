@@ -44,21 +44,8 @@ neoForge {
     }
 }
 
-dependencies {
-    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}")) {
-        version {
-            prefer webrtc_version
-        }
-    }
-    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-
-    runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
-}
-
 configurations {
-    webrtcNative {
+    webrtcNativeBundle {
         canBeResolved = true
         canBeConsumed = false
         transitive = false
@@ -66,13 +53,16 @@ configurations {
 }
 
 dependencies {
-    webrtcNative "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-}
+    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    jarJar files(configurations.webrtcNativeBundle)
 
-tasks.named('jar', Jar) {
-    from({ configurations.webrtcNative.collect { zipTree(it) } }) {
-        include '*.dll'
-    }
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    webrtcNativeBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+
+    runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }

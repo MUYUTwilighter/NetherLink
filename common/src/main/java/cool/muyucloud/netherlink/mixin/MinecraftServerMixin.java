@@ -32,7 +32,7 @@ public abstract class MinecraftServerMixin implements Messenger {
     }
 
     @Override
-    public boolean nli$hasPermission(int level) {
+    public boolean nli$hasPermission(int permissionLevel) {
         return true;
     }
 }

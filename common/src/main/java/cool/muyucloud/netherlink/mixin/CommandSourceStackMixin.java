@@ -14,7 +14,7 @@ public abstract class CommandSourceStackMixin implements Messenger {
     public abstract void sendSystemMessage(Component message);
 
     @Shadow
-    public abstract boolean hasPermission(int level);
+    public abstract boolean hasPermission(int permissionLevel);
 
     @Override
     public void nli$sendMessage(Supplier<Component> msg) {
@@ -22,7 +22,7 @@ public abstract class CommandSourceStackMixin implements Messenger {
     }
 
     @Override
-    public boolean nli$hasPermission(int level) {
-        return this.hasPermission(level);
+    public boolean nli$hasPermission(int permissionLevel) {
+        return this.hasPermission(permissionLevel);
     }
 }

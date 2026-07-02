@@ -15,5 +15,5 @@ public interface Messenger {
 
     void nli$sendMessage(Supplier<Component> msg);
 
-    boolean nli$hasPermission(int level);
+    boolean nli$hasPermission(int permissionLevel);
 }
