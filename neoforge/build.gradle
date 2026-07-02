@@ -44,12 +44,21 @@ neoForge {
     }
 }
 
+configurations {
+    webrtcNativeBundle {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
 dependencies {
     jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    jarJar files(configurations.webrtcNativeBundle)
 
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    webrtcNativeBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 
     runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 }
