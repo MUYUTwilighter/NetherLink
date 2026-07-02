@@ -44,37 +44,14 @@ neoForge {
     }
 }
 
-configurations {
-    webrtcApiEmbed {
-        canBeResolved = true
-        canBeConsumed = false
-        transitive = false
-    }
-}
-
 dependencies {
-    implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    webrtcApiEmbed "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    jarJar(implementation("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")) {
-        version {
-            prefer webrtc_version
-        }
-    }
+    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+
+    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 
     runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
-}
-
-tasks.named('jar', Jar) {
-    dependsOn configurations.webrtcApiEmbed
-    from({
-        configurations.webrtcApiEmbed.collect { zipTree(it) }
-    }) {
-        exclude 'META-INF/MANIFEST.MF'
-        exclude 'META-INF/*.RSA'
-        exclude 'META-INF/*.SF'
-        exclude 'META-INF/*.DSA'
-    }
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }

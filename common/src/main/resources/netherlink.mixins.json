@@ -9,7 +9,8 @@
   ],
   "client": [
     "IntegratedServerMixin",
-    "MinecraftAccessor",
+    "MinecraftLifecycleMixin",
+    "MinecraftMixin",
     "PauseScreenMixin",
     "ShareToLanScreenMixin",
     "TitleScreenMixin"
