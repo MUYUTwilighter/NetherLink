@@ -1,0 +1,450 @@
+package cool.muyucloud.netherlink.link.official.signaling;
+
+import com.google.gson.*;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
+import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
+import cool.muyucloud.netherlink.link.transport.SignalingMessage;
+import dev.onvoid.webrtc.RTCIceServer;
+import net.minecraft.core.UUIDUtil;
+import org.jetbrains.annotations.Nullable;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
+
+public final class OfficialSignalingClient implements LinkSignalingClient {
+    private static final Codec<String> SIGNALING_URI_CODEC = Codec.STRING.fieldOf("signalingUri").codec().fieldOf("result").codec();
+    private static final Duration PING_INTERVAL = Duration.ofSeconds(50L);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15L);
+    private static final String HEADER_AUTH = "x-mojangauth";
+    private static final String HEADER_SESSION_ID = "Session-Id";
+    private static final String HEADER_REQUEST_ID = "Request-Id";
+    private static final Environment ENVIRONMENT = Optional.ofNullable(System.getenv("signaling.environment"))
+        .or(() -> Optional.ofNullable(System.getProperty("signaling.environment")))
+        .flatMap(Environment::byName)
+        .orElse(Environment.PRODUCTION);
+
+    private final String accessToken;
+    private final String sessionId = UUID.randomUUID().toString();
+    private final ScheduledExecutorService executor;
+    private final List<LinkSignalingClient.ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
+    private @Nullable HttpClient httpClient;
+    private @Nullable CompletableFuture<JsonRpcClient> websocketConnect;
+    private @Nullable ScheduledFuture<?> pingTask;
+    private @Nullable FriendJoinHandler friendJoinHandler;
+    private @Nullable WebRtcSignalingHandler webRtcSignalingHandler;
+    private @Nullable CachedTurn cachedTurn;
+    private @Nullable CachedSignalingUri cachedSignalingUri;
+    private @Nullable CompletableFuture<RTCIceServer> pendingTurnRefresh;
+
+    public OfficialSignalingClient(String accessToken, String threadName) {
+        this.accessToken = accessToken;
+        this.executor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, threadName);
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    @Override
+    public void setFriendJoinHandler(@Nullable FriendJoinHandler handler) {
+        this.executor.execute(() -> this.friendJoinHandler = handler);
+    }
+
+    @Override
+    public void setWebRtcSignalingHandler(@Nullable WebRtcSignalingHandler handler) {
+        this.executor.execute(() -> this.webRtcSignalingHandler = handler);
+    }
+
+    @Override
+    public void addConnectionListener(LinkSignalingClient.ConnectionListener listener) {
+        this.connectionListeners.add(listener);
+    }
+
+    @Override
+    public void removeConnectionListener(LinkSignalingClient.ConnectionListener listener) {
+        this.connectionListeners.remove(listener);
+    }
+
+    @Override
+    public void connect() {
+        NliConstants.LOG.info("[P2P][signaling] Connecting signaling session {}", this.sessionId);
+        this.executor.execute(this::connectWebSocket);
+    }
+
+    @Override
+    public void disconnect() {
+        NliConstants.LOG.info("[P2P][signaling] Disconnect requested for session {}", this.sessionId);
+        this.executor.execute(() -> this.teardown("explicit disconnect"));
+    }
+
+    @Override
+    public void shutdown() {
+        NliConstants.LOG.info("[P2P][signaling] Shutdown requested for session {}", this.sessionId);
+        this.executor.execute(() -> {
+            this.friendJoinHandler = null;
+            this.webRtcSignalingHandler = null;
+            this.teardown("shutdown");
+            this.executor.shutdown();
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> sendClientMessage(LinkPeerRoute target, SignalingMessage message) {
+        UUID targetPmid = UUID.fromString(target.presenceId());
+        NliConstants.LOG.info("[P2P][signaling] Sending {} session={} to {}", message.type(), message.sessionId(), targetPmid);
+        String encoded = SignalingMessage.CODEC.encodeStart(JsonOps.INSTANCE, message).getOrThrow(IllegalStateException::new).toString();
+        return CompletableFuture.completedFuture(null)
+            .thenComposeAsync(ignored6 -> this.sendRequest("Signaling_SendClientMessage_v1_0", List.of(
+                JsonNull.INSTANCE,
+                new JsonPrimitive(targetPmid.toString()),
+                new JsonPrimitive(encoded)
+            )), this.executor)
+            .thenApply(ignored7 -> (Void)null)
+            .exceptionallyCompose(error -> {
+                if (error.getCause() instanceof JsonRpcException rpcError) {
+                    SignalingException mapped = SignalingErrorMapper.fromJsonRpc(target, rpcError);
+                    this.fireListeners(listener -> listener.onSignalingError(target, mapped));
+                    return CompletableFuture.failedFuture(mapped);
+                }
+                return CompletableFuture.failedFuture(error);
+            });
+    }
+
+    @Override
+    public CompletableFuture<RTCIceServer> requestTurnAuth() {
+        return CompletableFuture.completedFuture(null).thenComposeAsync(ignored8 -> {
+            CachedTurn cached = this.cachedTurn;
+            if (cached != null && cached.isUsable()) {
+                NliConstants.LOG.info("[P2P][signaling] Using cached TURN auth");
+                return CompletableFuture.completedFuture(cached.turnAuth().toRtcIceServer());
+            }
+            if (this.pendingTurnRefresh != null) {
+                return this.pendingTurnRefresh;
+            }
+            CompletableFuture<RTCIceServer> refresh = this.refreshTurnAuth();
+            this.pendingTurnRefresh = refresh;
+            refresh.whenCompleteAsync((ignored1, ignored101) -> this.pendingTurnRefresh = null, this.executor);
+            return refresh;
+        }, this.executor);
+    }
+
+    private CompletableFuture<JsonElement> sendRequest(String method, List<JsonElement> params) {
+        return this.websocketConnect == null
+            ? CompletableFuture.failedFuture(new IllegalStateException("Signaling is not connected; call connect() first"))
+            : this.websocketConnect.thenCompose(rpc -> rpc.sendRequest(method, params).orTimeout(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS));
+    }
+
+    private CompletableFuture<RTCIceServer> refreshTurnAuth() {
+        NliConstants.LOG.info("[P2P][signaling] Requesting TURN auth");
+        return this.sendRequest("Signaling_TurnAuth_v1_0", List.of())
+            .whenComplete((ignored2, error) -> {
+                if (error != null) {
+                    NliConstants.LOG.warn("[P2P][signaling] TURN auth request failed: {}", error.toString());
+                }
+            })
+            .exceptionallyCompose(error -> CompletableFuture.failedFuture(
+                this.mapTurnAuthError(error)
+            ))
+            .thenApplyAsync(result -> {
+                TurnAuthResult turnAuth = TurnAuthResult.CODEC.parse(JsonOps.INSTANCE, result)
+                    .getOrThrow(message -> new IllegalStateException("Malformed TurnAuth response: " + message));
+                this.cachedTurn = new CachedTurn(turnAuth);
+                NliConstants.LOG.info("[P2P][signaling] Received TURN auth with {} server entries", turnAuth.turnAuthServers().size());
+                return turnAuth.toRtcIceServer();
+            }, this.executor);
+    }
+
+    private Throwable mapTurnAuthError(Throwable error) {
+        if (error.getCause() instanceof JsonRpcException rpcError) {
+            SignalingException mapped = SignalingErrorMapper.fromJsonRpc(null, rpcError);
+            if (mapped instanceof SignalingException.SignalingAuthException) {
+                this.fireListeners(listener -> listener.onSignalingError(null, mapped));
+                return mapped;
+            }
+            return new SignalingException.TurnAuthFailedException(mapped.getMessage());
+        }
+        return error;
+    }
+
+    private void connectWebSocket() {
+        if (this.websocketConnect != null) {
+            NliConstants.LOG.debug("[P2P][signaling] Connect skipped; websocket already pending/connected");
+            return;
+        }
+        HttpClient client = HttpClient.newHttpClient();
+        this.httpClient = client;
+        JsonRpcClient rpc = new JsonRpcClient(this.executor, this::onRpcMethod, this::onWebsocketDown);
+        String requestId = UUID.randomUUID().toString();
+        this.websocketConnect = this.getSignalingUri(client, requestId)
+            .thenComposeAsync(wsUrl -> this.openWebSocket(client, rpc, wsUrl, requestId), this.executor);
+        this.websocketConnect.whenCompleteAsync((ignored3, error) -> {
+            if (error != null) {
+                Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                NliConstants.LOG.warn("Signaling websocket connect failed: {}", cause.toString());
+                if (cause instanceof SignalingException.SignalingAuthException authError) {
+                    this.fireListeners(listener -> listener.onSignalingError(null, authError));
+                }
+                this.cachedSignalingUri = null;
+                if (this.teardown("websocket connect failed: " + cause.getMessage())) {
+                    this.fireListeners(ConnectionListener::onSignalingConnectFailed);
+                }
+            } else {
+                NliConstants.LOG.info("[P2P][signaling] WebSocket connected for session {}", this.sessionId);
+            }
+        }, this.executor);
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    private CompletableFuture<String> getSignalingUri(HttpClient client, String requestId) {
+        CachedSignalingUri cached = this.cachedSignalingUri;
+        if (cached != null && cached.isUsable()) {
+            NliConstants.LOG.debug("[P2P][signaling] Using cached signaling URI");
+            return CompletableFuture.completedFuture(cached.wsUrl());
+        }
+        String configurationUri = ENVIRONMENT.getConfigurationUri();
+        NliConstants.LOG.info("[P2P][signaling] Fetching signaling configuration from {}", configurationUri);
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(configurationUri))
+            .header(HEADER_AUTH, this.accessToken)
+            .header(HEADER_SESSION_ID, this.sessionId)
+            .header(HEADER_REQUEST_ID, requestId)
+            .GET()
+            .build();
+        return client.sendAsync(request, BodyHandlers.ofString())
+            .thenApplyAsync(response -> {
+                if (response.statusCode() == 401) {
+                    throw new SignalingException.SignalingAuthException("Signaling configuration failed: HTTP 401");
+                }
+                if (response.statusCode() != 200) {
+                    throw new IllegalStateException("Unexpected config response status: " + response.statusCode());
+                }
+                String baseUri = SIGNALING_URI_CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(response.body()))
+                    .getOrThrow(message -> new IllegalStateException("Malformed config response: " + message));
+                String wsUrl = baseUri + "/ws/v1.0/messaging/connect/java";
+                this.cachedSignalingUri = new CachedSignalingUri(wsUrl);
+                NliConstants.LOG.info("[P2P][signaling] Signaling URI acquired");
+                return wsUrl;
+            }, this.executor);
+    }
+
+    private CompletableFuture<JsonRpcClient> openWebSocket(HttpClient client, JsonRpcClient rpc, String wsUrl, String requestId) {
+        return client.newWebSocketBuilder()
+            .header(HEADER_AUTH, this.accessToken)
+            .header(HEADER_SESSION_ID, this.sessionId)
+            .header(HEADER_REQUEST_ID, requestId)
+            .buildAsync(URI.create(wsUrl), rpc)
+            .thenApplyAsync(ignored9 -> {
+                this.schedulePing(rpc);
+                this.fireListeners(ConnectionListener::onSignalingConnected);
+                return rpc;
+            }, this.executor);
+    }
+
+    private void schedulePing(JsonRpcClient rpc) {
+        this.pingTask = this.executor.scheduleAtFixedRate(() -> rpc.sendNotification("System_Ping_v1_0"), PING_INTERVAL.toMillis(), PING_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    private void onWebsocketDown() {
+        NliConstants.LOG.warn("[P2P][signaling] WebSocket closed for session {}", this.sessionId);
+        if (this.teardown("websocket closed")) {
+            this.fireListeners(ConnectionListener::onSignalingDisconnected);
+        }
+    }
+
+    private boolean teardown(String reason) {
+        HttpClient client = this.httpClient;
+        CompletableFuture<JsonRpcClient> connectFuture = this.websocketConnect;
+        if (client == null || connectFuture == null) {
+            return false;
+        }
+        NliConstants.LOG.info("[P2P][signaling] Tearing down session {}: {}", this.sessionId, reason);
+        if (this.pingTask != null) {
+            this.pingTask.cancel(false);
+            this.pingTask = null;
+        }
+        this.pendingTurnRefresh = null;
+        connectFuture.whenComplete((rpc, ignored4) -> {
+            CompletableFuture<?> closed = rpc != null ? rpc.close() : CompletableFuture.completedFuture(null);
+            closed.whenComplete((ignored, ignored5) -> CompletableFuture.runAsync(client::close));
+        });
+        connectFuture.completeExceptionally(new IllegalStateException("Signaling torn down: " + reason));
+        this.httpClient = null;
+        this.websocketConnect = null;
+        return true;
+    }
+
+    private void onRpcMethod(JsonRpcClient rpc, @Nullable JsonElement id, String method, @Nullable JsonElement params) {
+        switch (method) {
+            case "System_Pong_v1_0" -> {
+            }
+            case "Signaling_ReceiveMessage_v1_0" -> {
+                NliConstants.LOG.debug("[P2P][signaling] Received Signaling_ReceiveMessage_v1_0");
+                this.handleReceiveMessage(rpc, id, params);
+            }
+            default -> {
+                NliConstants.LOG.debug("[P2P][signaling] Unknown RPC method {}", method);
+                if (id != null) {
+                    rpc.sendError(id, JsonRPCErrors.METHOD_NOT_FOUND, method);
+                }
+            }
+        }
+    }
+
+    private void handleReceiveMessage(JsonRpcClient rpc, @Nullable JsonElement id, @Nullable JsonElement params) {
+        JsonArray array = params != null && params.isJsonArray() ? params.getAsJsonArray() : null;
+        JsonElement first = array != null && !array.isEmpty() ? array.get(0) : null;
+        if (first == null || !first.isJsonObject()) {
+            return;
+        }
+        if (id != null) {
+            rpc.sendResponse(id, new JsonObject());
+        }
+        ClientWebRtcMessage envelope = ClientWebRtcMessage.CODEC.parse(JsonOps.INSTANCE, first)
+            .getOrThrow(error -> new IllegalStateException("Malformed ReceiveMessage envelope: " + error));
+        JsonElement inner = JsonParser.parseString(envelope.message());
+        SignalingException serviceError = SignalingErrorMapper.fromServiceEnvelope(inner);
+        if (serviceError != null) {
+            LinkPeerRoute errorPeer = serviceError.peer();
+            if (errorPeer == null) {
+                errorPeer = new LinkPeerRoute(null, UUID.fromString(envelope.from()).toString());
+            }
+            NliConstants.LOG.warn("[P2P][signaling] Service error from {}: {}", errorPeer.presenceId(), serviceError.getMessage());
+            LinkPeerRoute resolvedErrorPeer = errorPeer;
+            this.fireListeners(listener -> listener.onSignalingError(resolvedErrorPeer, serviceError));
+            return;
+        }
+        SignalingMessage parsed = SignalingMessage.CODEC.parse(JsonOps.INSTANCE, inner)
+            .getOrThrow(error -> new IllegalStateException("Malformed signaling payload: " + error));
+        LinkPeerRoute source = new LinkPeerRoute(null, UUID.fromString(envelope.from()).toString());
+        NliConstants.LOG.info("[P2P][signaling] Received {} session={} from {}", parsed.type(), parsed.sessionId(), source.presenceId());
+        switch (parsed) {
+            case SignalingMessage.FriendJoin friendJoin -> this.dispatchFriendJoinMessage(source, friendJoin);
+            case SignalingMessage.WebRtc webRtc -> this.dispatchWebRtcMessage(source, webRtc);
+        }
+    }
+
+    private void dispatchFriendJoinMessage(LinkPeerRoute source, SignalingMessage.FriendJoin message) {
+        FriendJoinHandler handler = this.friendJoinHandler;
+        if (handler != null) {
+            handler.handle(source, message);
+        }
+    }
+
+    private void dispatchWebRtcMessage(LinkPeerRoute source, SignalingMessage.WebRtc message) {
+        WebRtcSignalingHandler handler = this.webRtcSignalingHandler;
+        if (handler != null) {
+            handler.handle(source, message);
+        }
+    }
+
+    private void fireListeners(Consumer<LinkSignalingClient.ConnectionListener> action) {
+        for (LinkSignalingClient.ConnectionListener listener : this.connectionListeners) {
+            action.accept(listener);
+        }
+    }
+
+    private record CachedSignalingUri(String wsUrl, Instant expiresAt) {
+        private static final Duration TTL = Duration.ofMinutes(5L);
+
+        private CachedSignalingUri(String wsUrl) {
+            this(wsUrl, Instant.now().plus(TTL));
+        }
+
+        private boolean isUsable() {
+            return Instant.now().isBefore(this.expiresAt);
+        }
+    }
+
+    private record CachedTurn(TurnAuthResult turnAuth, Instant expiresAt) {
+        private static final Duration EXPIRY_MARGIN = Duration.ofSeconds(60L);
+
+        private CachedTurn(TurnAuthResult turnAuth) {
+            this(turnAuth, Instant.now().plusSeconds(turnAuth.expirationInSeconds()));
+        }
+
+        private boolean isUsable() {
+            return Instant.now().isBefore(this.expiresAt.minus(EXPIRY_MARGIN));
+        }
+    }
+
+    private record ClientWebRtcMessage(String from, String message, @Nullable UUID id) {
+        private static final Codec<ClientWebRtcMessage> CODEC = RecordCodecBuilder.create(
+            instance -> instance.group(
+                    Codec.STRING.fieldOf("From").forGetter(ClientWebRtcMessage::from),
+                    Codec.STRING.fieldOf("Message").forGetter(ClientWebRtcMessage::message),
+                    UUIDUtil.STRING_CODEC.optionalFieldOf("Id").forGetter(message -> Optional.ofNullable(message.id()))
+                )
+                .apply(instance, (from, message, id) -> new ClientWebRtcMessage(from, message, id.orElse(null)))
+        );
+    }
+
+    private record TurnAuthResult(long expirationInSeconds, List<TurnAuthServer> turnAuthServers) {
+        private static final Codec<TurnAuthResult> CODEC = RecordCodecBuilder.create(
+            instance -> instance.group(
+                    Codec.LONG.fieldOf("ExpirationInSeconds").forGetter(TurnAuthResult::expirationInSeconds),
+                    TurnAuthServer.CODEC.listOf().fieldOf("TurnAuthServers").forGetter(TurnAuthResult::turnAuthServers)
+                )
+                .apply(instance, TurnAuthResult::new)
+        );
+
+        private RTCIceServer toRtcIceServer() {
+            TurnAuthServer first = this.turnAuthServers.getFirst();
+            RTCIceServer ice = new RTCIceServer();
+            ice.username = first.username();
+            ice.password = first.password();
+            for (TurnAuthServer turnServer : this.turnAuthServers) {
+                ice.urls.addAll(turnServer.urls());
+            }
+            return ice;
+        }
+    }
+
+    private record TurnAuthServer(String username, String password, List<String> urls) {
+        private static final Codec<TurnAuthServer> CODEC = RecordCodecBuilder.create(
+            instance -> instance.group(
+                    Codec.STRING.fieldOf("Username").forGetter(TurnAuthServer::username),
+                    Codec.STRING.fieldOf("Password").forGetter(TurnAuthServer::password),
+                    Codec.STRING.listOf().fieldOf("Urls").forGetter(TurnAuthServer::urls)
+                )
+                .apply(instance, TurnAuthServer::new)
+        );
+    }
+
+    private enum Environment {
+        STAGE("https://signaling-afd.stage-6fd5f759.franchise.minecraft-services.net"),
+        PRODUCTION("https://signaling-afd.franchise.minecraft-services.net");
+
+        private final String baseUrl;
+
+        Environment(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        private static Optional<Environment> byName(String name) {
+            return switch (name.toLowerCase(Locale.ROOT)) {
+                case "stage", "staging" -> Optional.of(STAGE);
+                case "prod", "production" -> Optional.of(PRODUCTION);
+                default -> Optional.empty();
+            };
+        }
+
+        private String getConfigurationUri() {
+            return this.baseUrl + "/api/v1.0/configuration/java";
+        }
+    }
+}
