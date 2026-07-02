@@ -12,6 +12,7 @@ import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
 import cool.muyucloud.netherlink.link.transport.RtcChannel;
 import cool.muyucloud.netherlink.link.transport.RtcHandshake;
+import cool.muyucloud.netherlink.link.transport.SignalingException;
 import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
@@ -146,7 +147,7 @@ public final class OfficialJoinService implements LinkJoinService {
         signaling.setWebRtcSignalingHandler((source, message) -> this.handleWebRtc(runtimeKey, source, message));
         signaling.addConnectionListener(new LinkSignalingClient.ConnectionListener() {
             @Override
-            public void onSignalingError(@Nullable LinkPeerRoute peer, cool.muyucloud.netherlink.link.transport.SignalingException cause) {
+            public void onSignalingError(@Nullable LinkPeerRoute peer, SignalingException cause) {
                 if (peer == null) {
                     OfficialJoinService.this.outgoing.forEach((key, operation) -> {
                         if (key.runtimeKey().equals(runtimeKey)) operation.fail(cause);

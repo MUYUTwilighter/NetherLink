@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -165,7 +166,7 @@ final class NliFriendService implements LinkFriendService {
         };
     }
 
-    private static @org.jetbrains.annotations.Nullable Instant instant(JsonObject object, String key) {
+    private static @Nullable Instant instant(JsonObject object, String key) {
         String value = NliApiClient.nullableString(object, key);
         return value != null ? Instant.parse(value) : null;
     }

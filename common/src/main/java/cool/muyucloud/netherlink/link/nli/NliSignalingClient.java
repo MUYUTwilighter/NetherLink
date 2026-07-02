@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -178,7 +179,7 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
     }
 
     @Override
-    public CompletionStage<?> onPing(WebSocket webSocket, java.nio.ByteBuffer message) {
+    public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
         webSocket.request(1L);
         return webSocket.sendPong(message);
     }

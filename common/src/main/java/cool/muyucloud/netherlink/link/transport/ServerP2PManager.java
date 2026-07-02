@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -103,7 +104,7 @@ public final class ServerP2PManager {
         return result;
     }
 
-    public void updatePresence(java.util.Map<String, UUID> profileIdsByPresence) {
+    public void updatePresence(Map<String, UUID> profileIdsByPresence) {
         this.profileIdsByPresence.clear();
         this.profileIdsByPresence.putAll(profileIdsByPresence);
         NliConstants.LOG.info("[P2P][{}] Updated presence peer map: {} entries", this.accountName, profileIdsByPresence.size());

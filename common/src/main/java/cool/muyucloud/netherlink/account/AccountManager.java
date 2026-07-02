@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -440,7 +441,7 @@ public class AccountManager {
         if (profileId == null || profileId.isBlank()) {
             throw new NetherLinkAuthException("Minecraft profile id was not found");
         }
-        return "dedicated:" + profileId.toLowerCase(java.util.Locale.ROOT);
+        return "dedicated:" + profileId.toLowerCase(Locale.ROOT);
     }
 
     private static String instanceName(MinecraftServer currentServer) {

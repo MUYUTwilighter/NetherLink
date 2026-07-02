@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.link.official.signaling;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -196,7 +197,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
         }
         request.addProperty("method", method);
         if (!params.isEmpty()) {
-            com.google.gson.JsonArray array = new com.google.gson.JsonArray(params.size());
+            JsonArray array = new JsonArray(params.size());
             params.forEach(array::add);
             request.add("params", array);
         }

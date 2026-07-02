@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
 import com.mojang.authlib.GameProfile;
+import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.model.*;
@@ -449,7 +450,7 @@ public class NetherLinkFriendsScreen extends Screen {
         private void updateButtons() {
             this.apiButton.setMessage(NetherLinkFriendsScreen.this.serviceName(this.selectedService));
             boolean friendSettingsLoaded = LinkServices.current().id().equals(this.selectedService)
-                && LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)
+                && LinkServices.current().supports(LinkService.Capability.FRIEND_SETTINGS)
                 && this.remoteSettings != null;
             this.friendsNetworkButton.active = friendSettingsLoaded;
             this.receiveRequestsButton.active = friendSettingsLoaded && this.friendsNetworkButton.getValue();
@@ -460,7 +461,7 @@ public class NetherLinkFriendsScreen extends Screen {
 
         private void loadSettings() {
             if (!LinkServices.current().id().equals(this.selectedService)
-                || !LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)) {
+                || !LinkServices.current().supports(LinkService.Capability.FRIEND_SETTINGS)) {
                 return;
             }
             NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.loading").withStyle(ChatFormatting.GRAY);
@@ -508,7 +509,7 @@ public class NetherLinkFriendsScreen extends Screen {
             this.applyButton.active = false;
             NetherLinkFriendsScreen.this.service = new ClientFriendService(NetherLinkFriendsScreen.this.minecraft);
             CompletableFuture<LinkFriendSettings> operation;
-            if (!LinkServices.current().supports(cool.muyucloud.netherlink.link.LinkService.Capability.FRIEND_SETTINGS)) {
+            if (!LinkServices.current().supports(LinkService.Capability.FRIEND_SETTINGS)) {
                 operation = CompletableFuture.completedFuture(null);
             } else if (serviceChanged || this.remoteSettings == null) {
                 operation = NetherLinkFriendsScreen.this.service.settings();
