@@ -1,8 +1,7 @@
 package cool.muyucloud.netherlink.link.nli;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.exception.LinkException;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
 import cool.muyucloud.netherlink.link.model.LinkFailure;
@@ -58,23 +57,23 @@ final class NliApiClient implements AutoCloseable {
     }
 
     CompletableFuture<JsonObject> post(String path, String bearer, @Nullable JsonObject body) {
-        return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, false);
+        return this.post(HttpRequest.newBuilder(this.resolve(path)), bearer, body);
     }
 
     CompletableFuture<JsonObject> post(String path, String bearer, @Nullable JsonObject body, @Nullable String minecraftToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path));
         addMinecraftToken(builder, minecraftToken);
-        return this.send(builder, bearer, body, false);
+        return this.post(builder, bearer, body);
     }
 
     CompletableFuture<JsonObject> put(String path, String bearer, JsonObject body) {
-        return this.send(HttpRequest.newBuilder(this.resolve(path)), bearer, body, true);
+        return this.put(HttpRequest.newBuilder(this.resolve(path)), bearer, body);
     }
 
     CompletableFuture<JsonObject> put(String path, String bearer, JsonObject body, @Nullable String minecraftToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(this.resolve(path));
         addMinecraftToken(builder, minecraftToken);
-        return this.send(builder, bearer, body, true);
+        return this.put(builder, bearer, body);
     }
 
     CompletableFuture<Void> delete(String path, String bearer, @Nullable String minecraftToken) {
@@ -89,28 +88,20 @@ final class NliApiClient implements AutoCloseable {
         }
     }
 
-    private CompletableFuture<JsonObject> send(HttpRequest.Builder builder, String bearer, @Nullable JsonObject body, boolean put) {
-        String json = body == null ? "{}" : body.toString();
-        builder.header("Content-Type", "application/json");
-        if (put) {
-            builder.PUT(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
-        } else {
-            builder.POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
-        }
+    private CompletableFuture<JsonObject> post(HttpRequest.Builder builder, String bearer, @Nullable JsonObject body) {
+        builder.header("Content-Type", "application/json").POST(JsonHttp.jsonBody(body));
+        return this.parseJson(this.sendRaw(builder, bearer));
+    }
+
+    private CompletableFuture<JsonObject> put(HttpRequest.Builder builder, String bearer, JsonObject body) {
+        builder.header("Content-Type", "application/json").PUT(JsonHttp.jsonBody(body));
         return this.parseJson(this.sendRaw(builder, bearer));
     }
 
     private CompletableFuture<JsonObject> parseJson(CompletableFuture<HttpResponse<String>> responseFuture) {
         return responseFuture.thenApply(response -> {
-            if (response.body() == null || response.body().isBlank()) {
-                return new JsonObject();
-            }
             try {
-                JsonElement parsed = JsonParser.parseString(response.body());
-                if (!parsed.isJsonObject()) {
-                    throw new IllegalStateException("NLI response is not a JSON object");
-                }
-                return parsed.getAsJsonObject();
+                return JsonHttp.parseObject(response.body());
             } catch (RuntimeException error) {
                 throw new CompletionException(new LinkException(
                     new LinkFailure(LinkFailureCode.INTERNAL, "NLI returned malformed JSON", false),
@@ -143,7 +134,7 @@ final class NliApiClient implements AutoCloseable {
                     }
                     throw new CompletionException(cause);
                 }
-                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                if (!JsonHttp.isSuccess(response.statusCode())) {
                     throw new CompletionException(this.error(response.statusCode(), response.body()));
                 }
                 return response;
@@ -155,7 +146,7 @@ final class NliApiClient implements AutoCloseable {
         String message = "NLI request failed with HTTP " + status;
         try {
             if (body != null && !body.isBlank()) {
-                JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+                JsonObject json = JsonHttp.parseObject(body);
                 code = string(json, "code", "");
                 message = string(json, "message", message);
             }
@@ -193,11 +184,11 @@ final class NliApiClient implements AutoCloseable {
         if (!object.has(key) || object.get(key).isJsonNull()) {
             throw new IllegalStateException("NLI response is missing " + key);
         }
-        return object.get(key).getAsString();
+        return JsonHttp.requiredString(object, key);
     }
 
     static @Nullable String nullableString(JsonObject object, String key) {
-        return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : null;
+        return JsonHttp.string(object, key);
     }
 
     static String string(JsonObject object, String key, String fallback) {
