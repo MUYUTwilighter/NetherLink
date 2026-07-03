@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink.link.nli;
 
 import com.google.gson.JsonObject;
-import cool.muyucloud.netherlink.NetherLinkConfig;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
@@ -23,13 +22,14 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public final class NliLinkService implements LinkService {
-    public static final ResourceLocation ID = new ResourceLocation(NliConstants.MOD_ID, "nli_v1");
+    public static final ResourceLocation ID = ResourceLocation.tryBuild(NliConstants.MOD_ID, "nli_v1");
     public static final NliLinkService INSTANCE = new NliLinkService(defaultUri(), NliV1Config.path(Path.of("")));
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,
         Capability.FRIEND_SETTINGS,
         Capability.HOSTING,
         Capability.JOINING,
+        Capability.SELF_PRESENCE,
         Capability.MULTI_ACCOUNT_RUNTIME,
         Capability.MULTI_PRESENCE
     );
@@ -152,16 +152,7 @@ public final class NliLinkService implements LinkService {
     private Optional<String> acceptedRevision(String language) {
         synchronized (this.termsLock) {
             JsonObject accepted = NliV1Config.acceptedTerms(NliV1Config.read(this.configPath));
-            Optional<String> revision = string(accepted, key(this.id(), language));
-            if (revision.isPresent()) {
-                return revision;
-            }
-            Path legacyPath = this.configPath.resolveSibling("config.json");
-            JsonObject legacy = NetherLinkConfig.read(legacyPath);
-            if (legacy.has(NliV1Config.ACCEPTED_TERMS_KEY) && legacy.get(NliV1Config.ACCEPTED_TERMS_KEY).isJsonObject()) {
-                return string(legacy.getAsJsonObject(NliV1Config.ACCEPTED_TERMS_KEY), key(this.id(), language));
-            }
-            return Optional.empty();
+            return string(accepted, key(this.id(), language));
         }
     }
 

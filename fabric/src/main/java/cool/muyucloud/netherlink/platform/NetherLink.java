@@ -7,11 +7,17 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 
 public class NetherLink implements ModInitializer {
+    static {
+        NliConstants.platform = "Fabric";
+    }
+
     @Override
     public void onInitialize() {
         NliSetup.init();
+        ServerLifecycleEvents.SERVER_STARTING.register(NliSetup::onServerStarting);
         ServerLifecycleEvents.SERVER_STARTED.register(NliSetup::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(NliSetup::onServerStopping);
+        ServerLifecycleEvents.SERVER_STOPPED.register(NliSetup::onServerStopped);
         CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) -> {
             NliConstants.SERVER_COMMAND.register(dispatcher);
         });

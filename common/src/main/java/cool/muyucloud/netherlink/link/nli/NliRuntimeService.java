@@ -20,9 +20,7 @@ final class NliRuntimeService implements LinkRuntimeService {
     private static final Duration RENEW_MARGIN = Duration.ofMinutes(5L);
     private static final Duration RENEW_RETRY = Duration.ofSeconds(30L);
     private static final Duration PRESENCE_REFRESH = Duration.ofSeconds(45L);
-    private static final LinkPresenceUpdate ONLINE = new LinkPresenceUpdate(
-        LinkPresenceStatus.ONLINE, false, "Minecraft Java instance", null, null, Duration.ofSeconds(90L)
-    );
+    private static final Duration ONLINE_TTL = Duration.ofSeconds(90L);
 
     private final NliApiClient api;
     private final ScheduledExecutorService maintenance;
@@ -41,6 +39,11 @@ final class NliRuntimeService implements LinkRuntimeService {
     @Override
     public CompletableFuture<LinkRuntimeIdentity> open(String key) {
         return this.session(key).thenApply(NliSession::identity);
+    }
+
+    @Override
+    public CompletableFuture<LinkRuntimeIdentity> publishOnline(String key) {
+        return this.restoreOnline(key).thenApply(ignored -> this.requireSession(key).identity());
     }
 
     CompletableFuture<NliSession> session(String key) {
@@ -65,8 +68,9 @@ final class NliRuntimeService implements LinkRuntimeService {
         if (minecraftToken == null || minecraftToken.isBlank()) {
             return CompletableFuture.failedFuture(new IllegalStateException("Minecraft access token is missing"));
         }
+        String instanceName = context.displayText();
         JsonObject body = new JsonObject();
-        body.addProperty("displayText", context.displayText());
+        body.addProperty("displayText", instanceName);
         return this.api.post("v1/instances", minecraftToken, body).thenApply(json -> {
             NliSession session = new NliSession(
                 key,
@@ -76,9 +80,7 @@ final class NliRuntimeService implements LinkRuntimeService {
                 NliApiClient.requiredString(json, "instanceToken"),
                 Instant.parse(NliApiClient.requiredString(json, "expiresAt"))
             );
-            session.desiredPresence(new LinkPresenceUpdate(
-                ONLINE.status(), ONLINE.joinable(), context.displayText(), null, null, ONLINE.ttl()
-            ));
+            session.desiredPresence(online(instanceName));
             this.scheduleRenewal(session);
             this.schedulePresence(session);
             this.failures.remove(key);
@@ -176,9 +178,7 @@ final class NliRuntimeService implements LinkRuntimeService {
 
     CompletableFuture<LinkPresence> restoreOnline(String key) {
         LinkRuntimeContext context = LinkContextHooks.require(key);
-        return this.publishPresence(key, new LinkPresenceUpdate(
-            LinkPresenceStatus.ONLINE, false, context.displayText(), null, null, Duration.ofSeconds(90L)
-        ));
+        return this.publishPresence(key, online(context.displayText()));
     }
 
     @Override
@@ -231,5 +231,9 @@ final class NliRuntimeService implements LinkRuntimeService {
             case PLAYING_OFFLINE, PLAYING_REALMS, PLAYING_SERVER -> "IN_GAME";
             case OFFLINE, UNKNOWN -> throw new IllegalArgumentException("NLI Presence cannot publish " + status);
         };
+    }
+
+    private static LinkPresenceUpdate online(String displayText) {
+        return new LinkPresenceUpdate(LinkPresenceStatus.ONLINE, false, displayText, null, null, ONLINE_TTL);
     }
 }

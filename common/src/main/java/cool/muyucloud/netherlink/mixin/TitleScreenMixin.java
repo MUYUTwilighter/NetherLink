@@ -21,11 +21,14 @@ public abstract class TitleScreenMixin extends Screen {
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
         this.addRenderableWidget(
-            Button.builder(Component.translatable("netherlink.friends.short"), ignored1 -> ClientTermsController.runAfterAcceptance(
-                this.minecraft,
-                this,
-                () -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, true))
-            ))
+            Button.builder(Component.translatable("netherlink.friends.short"), ignored1 -> {
+                    assert this.minecraft != null;
+                    ClientTermsController.runAfterAcceptance(
+                        this.minecraft,
+                        this,
+                        () -> this.minecraft.setScreen(new NetherLinkFriendsScreen(this, true))
+                    );
+                })
                 .bounds(this.width / 2 + 104, this.height / 4 + 72, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("netherlink.friends.tooltip")))
                 .build()

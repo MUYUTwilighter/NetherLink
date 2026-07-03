@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Result of a friend graph mutation.
- * @param result broad result retained for presentation compatibility
+ * @param result broad result suitable for presentation
  * @param relationship relationship after a successful mutation, when known
  * @param officialSync best-effort synchronization status with the official friend graph
  * @param failure normalized failure detail when {@code result} is not successful

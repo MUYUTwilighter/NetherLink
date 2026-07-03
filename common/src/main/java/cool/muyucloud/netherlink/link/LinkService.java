@@ -29,6 +29,7 @@ public interface LinkService {
         FRIEND_SETTINGS,
         HOSTING,
         JOINING,
+        SELF_PRESENCE,
         MULTI_ACCOUNT_RUNTIME,
         MULTI_PRESENCE
     }
@@ -44,6 +45,14 @@ public interface LinkService {
     default Component name() {
         ResourceLocation id = this.id();
         return Component.translatable(id.getNamespace() + ".link." + id.getPath());
+    }
+
+    /**
+     * Returns the client-side settings renderer identifier for this backend. This deliberately
+     * stays as data so the common service abstraction never references client-only classes.
+     */
+    default ResourceLocation settingsRendererId() {
+        return this.id();
     }
 
     /**

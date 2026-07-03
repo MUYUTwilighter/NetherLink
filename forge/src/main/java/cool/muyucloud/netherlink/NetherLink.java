@@ -10,6 +10,10 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
+    static {
+        NliConstants.platform = "Forge";
+    }
+
     public NetherLink() {
         NliSetup.init();
         ForgeConnectionBridgeEvents.register();

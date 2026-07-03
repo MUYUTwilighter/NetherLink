@@ -24,6 +24,7 @@ public abstract class PauseScreenMixin extends Screen {
 
     @Inject(method = "createPauseMenu", at = @At("TAIL"))
     private void onCreatePauseMenu(CallbackInfo ci) {
+        assert this.minecraft != null;
         IntegratedServer server = this.minecraft.getSingleplayerServer();
         int rowY = this.height / 4 + 80;
         this.addRenderableWidget(

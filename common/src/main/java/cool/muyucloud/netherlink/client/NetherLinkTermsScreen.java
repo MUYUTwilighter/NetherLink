@@ -2,6 +2,7 @@ package cool.muyucloud.netherlink.client;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
+import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
@@ -33,14 +34,22 @@ final class NetherLinkTermsScreen extends Screen {
     private boolean loading;
     private boolean accepting;
     private boolean requestStarted;
+    private boolean settingsRequestStarted;
     private boolean completed;
 
-    NetherLinkTermsScreen(Screen parent, LinkService service, Runnable action, LinkTermsState initialState, @Nullable LinkFriendSettings initialSettings) {
+    NetherLinkTermsScreen(Screen parent, LinkService service, Runnable action) {
         super(Component.translatable("netherlink.terms.title", service.name()));
         this.parent = parent;
         this.service = service;
         this.action = action;
-        this.friendSettings = initialSettings;
+        this.loading = true;
+    }
+
+    NetherLinkTermsScreen(Screen parent, LinkService service, Runnable action, LinkTermsState initialState) {
+        super(Component.translatable("netherlink.terms.title", service.name()));
+        this.parent = parent;
+        this.service = service;
+        this.action = action;
         this.loading = false;
         this.requestStarted = true;
         this.applyTermsState(initialState);
@@ -79,6 +88,7 @@ final class NetherLinkTermsScreen extends Screen {
             this.requestStarted = true;
             this.fetch(false);
         }
+        this.loadFriendSettingsIfNeeded();
     }
 
     private void addMessage(Component message) {
@@ -91,11 +101,10 @@ final class NetherLinkTermsScreen extends Screen {
     }
 
     private void fetch(boolean refreshTerms) {
-        CompletableFuture<LinkFriendSettings> settingsFuture = ClientTermsController.friendSettings(this.minecraft, this.service);
         CompletableFuture<LinkTermsState> termsFuture = refreshTerms
             ? ClientTermsController.refreshTermsState(this.minecraft, this.service)
             : ClientTermsController.termsState(this.minecraft, this.service);
-        termsFuture.thenCombine(settingsFuture, TermsScreenState::new).whenComplete((state, failure) -> this.minecraft.execute(() -> {
+        termsFuture.whenComplete((state, failure) -> this.minecraft.execute(() -> {
             if (this.completed) {
                 return;
             }
@@ -106,8 +115,7 @@ final class NetherLinkTermsScreen extends Screen {
                 this.rebuildWidgets();
                 return;
             }
-            this.friendSettings = state.settings();
-            this.applyTermsState(state.terms());
+            this.applyTermsState(state);
             if (this.error != null) {
                 this.loading = false;
                 this.rebuildWidgets();
@@ -117,20 +125,42 @@ final class NetherLinkTermsScreen extends Screen {
                 this.continueAction();
                 return;
             }
-            if (state.terms().isAccepted() && !this.shouldEnableFriendNetwork()) {
+            if (state.isAccepted()) {
                 this.continueAction();
                 return;
             }
             this.loading = false;
             this.error = null;
             this.rebuildWidgets();
+            this.loadFriendSettingsIfNeeded();
         }));
+    }
+
+    private void loadFriendSettingsIfNeeded() {
+        if (this.terms == null || this.friendSettings != null || this.settingsRequestStarted) {
+            return;
+        }
+        this.settingsRequestStarted = true;
+        ClientTermsController.friendSettings(this.minecraft, this.service)
+            .whenComplete((settings, failure) -> this.minecraft.execute(() -> {
+                if (this.completed) {
+                    return;
+                }
+                if (failure != null) {
+                    NliConstants.LOG.warn("Failed to fetch friend settings while showing terms for {}", this.service.id(), failure);
+                    return;
+                }
+                this.friendSettings = settings;
+                this.rebuildWidgets();
+            }));
     }
 
     private void retry() {
         this.loading = true;
         this.error = null;
         this.terms = null;
+        this.friendSettings = null;
+        this.settingsRequestStarted = false;
         this.rebuildWidgets();
         this.fetch(true);
     }
@@ -145,7 +175,7 @@ final class NetherLinkTermsScreen extends Screen {
         }
         this.accepting = true;
         this.rebuildWidgets();
-        new ClientFriendService(this.minecraft).updateSettings(new LinkFriendSettings(true, true))
+        new ClientFriendService(this.minecraft, this.service).updateSettings(new LinkFriendSettings(true, true))
             .whenComplete((saved, error) -> this.minecraft.execute(() -> {
                 this.accepting = false;
                 if (error != null) {
@@ -155,7 +185,6 @@ final class NetherLinkTermsScreen extends Screen {
                     this.rebuildWidgets();
                     return;
                 }
-                ClientLinkSettings.updateMinecraftSocialManager(this.minecraft, saved);
                 this.friendSettings = saved;
                 this.recordAcceptanceAndContinue();
             }));
@@ -206,9 +235,6 @@ final class NetherLinkTermsScreen extends Screen {
         return Component.translatable("netherlink.terms.error", LinkFailures.from(failure).message());
     }
 
-    private record TermsScreenState(LinkTermsState terms, LinkFriendSettings settings) {
-    }
-
     private void continueAction() {
         if (this.completed) {
             return;
@@ -223,7 +249,21 @@ final class NetherLinkTermsScreen extends Screen {
     @Override
     public void onClose() {
         this.completed = true;
+        this.closeInactiveService();
         this.minecraft.setScreen(this.parent);
+    }
+
+    private void closeInactiveService() {
+        try {
+            if (LinkServices.current() != this.service) {
+                this.service.shutdown().exceptionally(error -> {
+                    NliConstants.LOG.warn("Failed to close inactive terms backend {}", this.service.id(), error);
+                    return null;
+                });
+            }
+        } catch (RuntimeException ignored) {
+            // A service transition is already in progress; the transition owner is responsible for cleanup.
+        }
     }
 
     @Override

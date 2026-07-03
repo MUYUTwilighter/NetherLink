@@ -1,5 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
+import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.*;
@@ -10,27 +12,34 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public final class ClientFriendService {
     private final LinkFriendService backend;
-    private final CompletableFuture<?> runtimeReady;
+    private final CompletableFuture<LinkRuntimeIdentity> runtimeReady;
+    private final boolean selfPresenceSupported;
 
     public ClientFriendService(Minecraft minecraft) {
+        this(minecraft, LinkServices.current());
+    }
+
+    ClientFriendService(Minecraft minecraft, LinkService service) {
         LauncherSessionAccount account = new LauncherSessionAccount(minecraft.getUser());
         LinkContextHooks.setClientConnection(
             LinkRuntimeService.CLIENT_KEY,
             account,
-            "Minecraft Java instance",
+            NliConstants.resolveInstanceName(),
             new MinecraftClientConnectionBridge(minecraft)
         );
-        this.runtimeReady = LinkServices.current().runtime().open(LinkRuntimeService.CLIENT_KEY);
-        this.backend = LinkServices.current().createFriendService(LinkRuntimeService.CLIENT_KEY);
+        this.selfPresenceSupported = service.supports(LinkService.Capability.SELF_PRESENCE);
+        this.runtimeReady = service.runtime().open(LinkRuntimeService.CLIENT_KEY);
+        this.backend = service.createFriendService(LinkRuntimeService.CLIENT_KEY);
     }
 
     public CompletableFuture<Snapshot> refresh() {
-        return this.runtimeReady.thenCompose(ignored1 -> this.backend.refresh()).thenApply(ClientFriendService::snapshot);
+        return this.runtimeReady.thenCompose(identity -> this.backend.refresh().thenApply(snapshot -> snapshot(snapshot, this.selfPresenceSupported, identity)));
     }
 
     public CompletableFuture<LinkFriendSettings> settings() {
@@ -61,8 +70,17 @@ public final class ClientFriendService {
         return this.runtimeReady.thenCompose(ignored8 -> this.backend.updateSettings(settings));
     }
 
-    private static Snapshot snapshot(LinkFriendSnapshot snapshot) {
+    private static Snapshot snapshot(LinkFriendSnapshot snapshot, boolean includeSelfPresences, LinkRuntimeIdentity identity) {
         return new Snapshot(
+            includeSelfPresences
+                ? snapshot.selfPresences().stream()
+                .filter(presence -> !Objects.equals(presence.presenceId(), identity.presenceId()))
+                .map(ClientFriendService::instance)
+                .sorted(INSTANCE_ORDER)
+                .toList()
+                : List.of(),
+            identity.profileId(),
+            identity.name(),
             friends(snapshot.friends()),
             requests(snapshot.incoming()),
             requests(snapshot.outgoing())
@@ -100,8 +118,14 @@ public final class ClientFriendService {
         );
     }
 
-    public record Snapshot(List<Friend> friends, List<Request> incoming, List<Request> outgoing) {
+    public record Snapshot(List<Instance> selfInstances, @Nullable UUID selfProfileId, String selfName, List<Friend> friends, List<Request> incoming, List<Request> outgoing) {
+        public Snapshot(List<Friend> friends, List<Request> incoming, List<Request> outgoing) {
+            this(List.of(), null, "", friends, incoming, outgoing);
+        }
+
         public Snapshot {
+            selfInstances = List.copyOf(selfInstances);
+            selfName = selfName != null ? selfName : "";
             friends = List.copyOf(friends);
             incoming = List.copyOf(incoming);
             outgoing = List.copyOf(outgoing);
