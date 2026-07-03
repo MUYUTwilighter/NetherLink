@@ -12,7 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.Set;
 
 public final class OfficialLinkServiceProvider implements LinkService {
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2");
+    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "official");
     public static final OfficialLinkServiceProvider INSTANCE = new OfficialLinkServiceProvider();
     private static final Set<Capability> CAPABILITIES = Set.of(
         Capability.FRIENDS,

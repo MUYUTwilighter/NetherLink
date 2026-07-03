@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 
 final class ClientLinkSettings {
     private static final ResourceLocation LEGACY_OFFICIAL_ID = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
+    private static final ResourceLocation LEGACY_OFFICIAL_ID_V1 = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2");
     static final List<ResourceLocation> AVAILABLE_SERVICES = List.of(NliLinkService.ID, OfficialLinkServiceProvider.ID);
 
     private ClientLinkSettings() {
@@ -31,7 +32,7 @@ final class ClientLinkSettings {
             .orElse(NliLinkService.ID.toString());
         try {
             ResourceLocation id = ResourceLocation.parse(configured);
-            if (LEGACY_OFFICIAL_ID.equals(id)) {
+            if (LEGACY_OFFICIAL_ID.equals(id) || LEGACY_OFFICIAL_ID_V1.equals(id)) {
                 return OfficialLinkServiceProvider.ID;
             }
             return AVAILABLE_SERVICES.contains(id) ? id : NliLinkService.ID;
@@ -47,7 +48,7 @@ final class ClientLinkSettings {
         return LinkServices.use(create(minecraft, serviceId));
     }
 
-    static Component createName(ResourceLocation serviceId) {
+    static Component serviceName(ResourceLocation serviceId) {
         return Component.translatable(serviceId.getNamespace() + ".link." + serviceId.getPath());
     }
 
@@ -64,6 +65,22 @@ final class ClientLinkSettings {
         Object manager = minecraft.getPlayerSocialManager();
         invoke(manager, "setFriendListEnabled", settings.friendsEnabled());
         invoke(manager, "setAllowFriendRequests", settings.acceptInvites());
+    }
+
+    static String configuredInstanceName(Minecraft minecraft) {
+        return NetherLinkConfig.instanceName(minecraft.gameDirectory.toPath()).orElse("");
+    }
+
+    static void saveInstanceName(Minecraft minecraft, String instanceName) {
+        Path path = path(minecraft);
+        JsonObject config = NetherLinkConfig.read(path);
+        String trimmed = instanceName == null ? "" : instanceName.trim();
+        if (trimmed.isEmpty()) {
+            config.remove(NetherLinkConfig.INSTANCE_NAME_KEY);
+        } else {
+            config.addProperty(NetherLinkConfig.INSTANCE_NAME_KEY, trimmed);
+        }
+        NetherLinkConfig.write(path, config);
     }
 
     private static LinkService create(Minecraft minecraft, ResourceLocation serviceId) {

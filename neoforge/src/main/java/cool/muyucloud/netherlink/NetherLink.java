@@ -11,6 +11,10 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 @Mod(NliConstants.MOD_ID)
 public class NetherLink {
+    static {
+        NliConstants.platform = "NeoForge";
+    }
+
     public NetherLink(IEventBus eventBus) {
         NliSetup.init();
         NeoForge.EVENT_BUS.register(this);

@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 public class NetherLink implements ModInitializer {
     @Override
     public void onInitialize() {
+        NliConstants.platform = "Fabric";
         NliSetup.init();
         ServerLifecycleEvents.SERVER_STARTED.register(NliSetup::onServerStarted);
         ServerLifecycleEvents.SERVER_STOPPING.register(NliSetup::onServerStopping);

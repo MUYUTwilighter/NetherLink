@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.client;
 
 import com.mojang.authlib.GameProfile;
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
@@ -136,7 +137,7 @@ public class NetherLinkFriendsScreen extends Screen {
     }
 
     private Component serviceName(ResourceLocation serviceId) {
-        return ClientLinkSettings.createName(serviceId);
+        return ClientLinkSettings.serviceName(serviceId);
     }
 
     @Override
@@ -396,15 +397,21 @@ public class NetherLinkFriendsScreen extends Screen {
         private final StringWidget heading = new StringWidget(SETTINGS_TAB_TITLE, NetherLinkFriendsScreen.this.font);
         private final StringWidget apiLabel = new StringWidget(Component.translatable("netherlink.friends.settings.api"), NetherLinkFriendsScreen.this.font);
         private final Button apiButton = Button.builder(Component.empty(), ignored18 -> this.cycleApi()).width(180).build();
+        private final StringWidget instanceNameLabel = new StringWidget(Component.translatable("netherlink.friends.settings.instance_name"), NetherLinkFriendsScreen.this.font);
+        private final EditBox instanceName = new EditBox(NetherLinkFriendsScreen.this.font, 0, 0, 180, 20, Component.translatable("netherlink.friends.settings.instance_name"));
         private final CycleButton<Boolean> friendsNetworkButton;
         private final CycleButton<Boolean> receiveRequestsButton;
         private final Button applyButton = Button.builder(Component.translatable("netherlink.friends.settings.apply"), ignored19 -> this.apply()).width(BUTTON_WIDTH).build();
         private final Button doneButton = Button.builder(CommonComponents.GUI_DONE, ignored20 -> NetherLinkFriendsScreen.this.onClose()).width(BUTTON_WIDTH).build();
         private ResourceLocation selectedService;
+        private String savedInstanceName = ClientLinkSettings.configuredInstanceName(NetherLinkFriendsScreen.this.minecraft);
         private @Nullable LinkFriendSettings remoteSettings;
 
         private SettingsTab() {
             this.selectedService = ClientLinkSettings.activeService(NetherLinkFriendsScreen.this.minecraft);
+            this.instanceName.setHint(Component.translatable("netherlink.friends.settings.instance_name.hint"));
+            this.instanceName.setValue(this.savedInstanceName);
+            this.instanceName.setResponder(ignored -> this.updateButtons());
             this.friendsNetworkButton = CycleButton.onOffBuilder(false)
                 .create(0, 0, 180, 20, Component.translatable("netherlink.friends.settings.network"), (ignored1, ignored101) -> this.updateButtons());
             this.receiveRequestsButton = CycleButton.onOffBuilder(false)
@@ -421,6 +428,8 @@ public class NetherLinkFriendsScreen extends Screen {
         @Override
         public void visitChildren(Consumer<AbstractWidget> consumer) {
             consumer.accept(this.heading);
+            consumer.accept(this.instanceNameLabel);
+            consumer.accept(this.instanceName);
             consumer.accept(this.apiLabel);
             consumer.accept(this.apiButton);
             consumer.accept(this.friendsNetworkButton);
@@ -433,10 +442,12 @@ public class NetherLinkFriendsScreen extends Screen {
         public void doLayout(ScreenRectangle area) {
             int center = NetherLinkFriendsScreen.this.width / 2;
             this.heading.setPosition(center - NetherLinkFriendsScreen.this.font.width(this.heading.getMessage()) / 2, area.top() + 14);
-            this.apiLabel.setPosition(center - 90, area.top() + 43);
-            this.apiButton.setPosition(center - 90, area.top() + 57);
-            this.friendsNetworkButton.setPosition(center - 90, area.top() + 86);
-            this.receiveRequestsButton.setPosition(center - 90, area.top() + 110);
+            this.instanceNameLabel.setPosition(center - 90, area.top() + 43);
+            this.instanceName.setPosition(center - 90, area.top() + 57);
+            this.apiLabel.setPosition(center - 90, area.top() + 86);
+            this.apiButton.setPosition(center - 90, area.top() + 100);
+            this.friendsNetworkButton.setPosition(center - 90, area.top() + 129);
+            this.receiveRequestsButton.setPosition(center - 90, area.top() + 153);
             positionButtons(List.of(this.applyButton, this.doneButton), NetherLinkFriendsScreen.this.width, NetherLinkFriendsScreen.this.height - 28);
         }
 
@@ -457,6 +468,8 @@ public class NetherLinkFriendsScreen extends Screen {
             if (!this.friendsNetworkButton.getValue()) {
                 this.receiveRequestsButton.setValue(false);
             }
+            this.instanceName.active = true;
+            this.applyButton.active = this.serviceChanged() || this.instanceNameChanged() || this.friendSettingsChanged();
         }
 
         private void loadSettings() {
@@ -482,7 +495,15 @@ public class NetherLinkFriendsScreen extends Screen {
 
         private void apply() {
             LinkFriendSettings settings = new LinkFriendSettings(this.friendsNetworkButton.getValue(), this.receiveRequestsButton.getValue());
-            boolean serviceChanged = !LinkServices.current().id().equals(this.selectedService);
+            boolean serviceChanged = this.serviceChanged();
+            boolean instanceNameChanged = this.saveInstanceNameIfNeeded();
+            if (instanceNameChanged) {
+                ClientP2PController.refreshPresence(NetherLinkFriendsScreen.this.minecraft).exceptionally(error -> {
+                    LinkFailure failure = LinkFailures.from(error);
+                    NliConstants.LOG.warn("Failed to refresh NetherLink presence after instance name update: {}", failure.message(), error);
+                    return false;
+                });
+            }
             this.applyButton.active = false;
             NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.saving").withStyle(ChatFormatting.GRAY);
             if (!serviceChanged) {
@@ -513,6 +534,8 @@ public class NetherLinkFriendsScreen extends Screen {
                 operation = CompletableFuture.completedFuture(null);
             } else if (serviceChanged || this.remoteSettings == null) {
                 operation = NetherLinkFriendsScreen.this.service.settings();
+            } else if (!this.friendSettingsChanged(settings)) {
+                operation = CompletableFuture.completedFuture(this.remoteSettings);
             } else {
                 operation = NetherLinkFriendsScreen.this.service.updateSettings(settings);
             }
@@ -540,6 +563,37 @@ public class NetherLinkFriendsScreen extends Screen {
                 "netherlink.friends.settings.failed",
                 failureText(LinkFailures.from(error))
             ).withStyle(ChatFormatting.RED);
+        }
+
+        private boolean serviceChanged() {
+            return !LinkServices.current().id().equals(this.selectedService);
+        }
+
+        private boolean instanceNameChanged() {
+            return !this.savedInstanceName.equals(this.normalizedInstanceName());
+        }
+
+        private String normalizedInstanceName() {
+            return this.instanceName.getValue().trim();
+        }
+
+        private boolean friendSettingsChanged() {
+            return this.friendSettingsChanged(new LinkFriendSettings(this.friendsNetworkButton.getValue(), this.receiveRequestsButton.getValue()));
+        }
+
+        private boolean friendSettingsChanged(LinkFriendSettings settings) {
+            return this.remoteSettings != null && !this.remoteSettings.equals(settings);
+        }
+
+        private boolean saveInstanceNameIfNeeded() {
+            String value = this.normalizedInstanceName();
+            if (this.savedInstanceName.equals(value)) {
+                return false;
+            }
+            ClientLinkSettings.saveInstanceName(NetherLinkFriendsScreen.this.minecraft, value);
+            this.savedInstanceName = value;
+            NetherLinkFriendsScreen.this.status = Component.translatable("netherlink.friends.settings.instance_name.saved").withStyle(ChatFormatting.GREEN);
+            return true;
         }
     }
 
