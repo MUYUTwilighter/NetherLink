@@ -65,6 +65,22 @@ final class ClientLinkSettings {
         return LinkServices.use(service).thenRun(() -> saveConfiguredService(minecraft, service.id()));
     }
 
+    static String configuredInstanceName(Minecraft minecraft) {
+        return NetherLinkConfig.instanceName(minecraft.gameDirectory.toPath()).orElse("");
+    }
+
+    static void saveInstanceName(Minecraft minecraft, String instanceName) {
+        Path path = configPath(minecraft);
+        JsonObject config = NetherLinkConfig.read(path);
+        String trimmed = instanceName == null ? "" : instanceName.trim();
+        if (trimmed.isEmpty()) {
+            config.remove(NetherLinkConfig.INSTANCE_NAME_KEY);
+        } else {
+            config.addProperty(NetherLinkConfig.INSTANCE_NAME_KEY, trimmed);
+        }
+        NetherLinkConfig.write(path, config);
+    }
+
     static boolean requiresReload(Minecraft minecraft, LinkService current) {
         return current instanceof NliLinkService nli
             && !nli.baseUri().equals(NliV1Config.serverUri(nliPath(minecraft)));

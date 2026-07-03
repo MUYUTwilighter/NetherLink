@@ -12,7 +12,7 @@ final class LinkSettingsRenderers {
     private static final Map<ResourceLocation, Factory> FACTORIES = new ConcurrentHashMap<>();
 
     static {
-        register(NliLinkService.ID, FriendNetworkSettingsRenderer::new);
+        register(NliLinkService.ID, NliSettingsRenderer::new);
         register(OfficialLinkServiceProvider.ID, FriendNetworkSettingsRenderer::new);
     }
 

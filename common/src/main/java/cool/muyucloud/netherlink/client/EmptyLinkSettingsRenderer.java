@@ -21,11 +21,6 @@ final class EmptyLinkSettingsRenderer implements LinkSettingsRenderer {
     }
 
     @Override
-    public Component title() {
-        return this.context.service().name();
-    }
-
-    @Override
     public void visitChildren(Consumer<AbstractWidget> consumer) {
         consumer.accept(this.message);
     }

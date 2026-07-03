@@ -14,6 +14,7 @@ import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,11 +51,26 @@ public final class ClientP2PController {
     }
 
     public static void publish(Minecraft minecraft, IntegratedServer integratedServer) {
+        publish(minecraft, integratedServer, true);
+    }
+
+    public static CompletableFuture<Boolean> refreshPresence(Minecraft minecraft) {
+        IntegratedServer integratedServer = minecraft.getSingleplayerServer();
+        if (integratedServer == null || !integratedServer.isPublished() || !isFriendsOpen(integratedServer)) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return publish(minecraft, integratedServer, false).thenApply(ignored -> true);
+    }
+
+    private static CompletableFuture<Void> publish(Minecraft minecraft, IntegratedServer integratedServer, boolean notify) {
+        CompletableFuture<Void> result = new CompletableFuture<>();
         if (!integratedServer.isPublished()) {
-            return;
+            result.complete(null);
+            return result;
         }
         if (!PENDING.compareAndSet(false, true)) {
-            return;
+            result.complete(null);
+            return result;
         }
         EXECUTOR.execute(() -> {
             try {
@@ -62,7 +78,10 @@ public final class ClientP2PController {
                 if (!sessionAccount.isUsable()) {
                     ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
                     NliConstants.LOG.warn("Launcher account is missing a Minecraft access token or profile id; NetherLink friends access is unavailable");
-                    message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
+                    if (notify) {
+                        message(minecraft, Component.translatable("netherlink.client.friends.unavailable"));
+                    }
+                    result.complete(null);
                     return;
                 }
                 stopPublication();
@@ -77,21 +96,30 @@ public final class ClientP2PController {
                     SIGNALING_READY_TIMEOUT
                 );
                 NliConstants.LOG.info("Published NetherLink client presence for {}", sessionAccount.getMcProfileName());
-                message(minecraft, Component.translatable("netherlink.client.friends.opened"));
+                if (notify) {
+                    message(minecraft, Component.translatable("netherlink.client.friends.opened"));
+                }
+                result.complete(null);
             } catch (RuntimeException e) {
                 ((NetherLinkIntegratedServer)integratedServer).nli$setFriendsOpen(false);
                 if (isMinecraftTokenRejected(e)) {
                     NliConstants.LOG.warn("Launcher Minecraft token was rejected; restart the game to get a fresh token", e);
-                    message(minecraft, Component.translatable("netherlink.client.friends.token_rejected"));
+                    if (notify) {
+                        message(minecraft, Component.translatable("netherlink.client.friends.token_rejected"));
+                    }
                 } else {
                     NliConstants.LOG.warn("Failed to publish NetherLink client presence", e);
-                    message(minecraft, Component.translatable("netherlink.client.friends.failed"));
+                    if (notify) {
+                        message(minecraft, Component.translatable("netherlink.client.friends.failed"));
+                    }
                 }
                 stopPublication();
+                result.completeExceptionally(e);
             } finally {
                 PENDING.set(false);
             }
         });
+        return result;
     }
 
     public static void revoke(Minecraft minecraft) {

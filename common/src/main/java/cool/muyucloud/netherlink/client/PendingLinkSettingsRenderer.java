@@ -28,11 +28,6 @@ final class PendingLinkSettingsRenderer implements LinkSettingsRenderer {
     }
 
     @Override
-    public Component title() {
-        return ClientLinkSettings.serviceName(this.target);
-    }
-
-    @Override
     public void visitChildren(Consumer<AbstractWidget> consumer) {
         consumer.accept(this.message);
     }
