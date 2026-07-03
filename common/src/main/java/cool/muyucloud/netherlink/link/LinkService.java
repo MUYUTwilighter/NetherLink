@@ -29,6 +29,7 @@ public interface LinkService {
         FRIEND_SETTINGS,
         HOSTING,
         JOINING,
+        SELF_PRESENCE,
         MULTI_ACCOUNT_RUNTIME,
         MULTI_PRESENCE
     }

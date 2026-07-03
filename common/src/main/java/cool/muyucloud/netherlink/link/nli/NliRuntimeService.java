@@ -20,9 +20,7 @@ final class NliRuntimeService implements LinkRuntimeService {
     private static final Duration RENEW_MARGIN = Duration.ofMinutes(5L);
     private static final Duration RENEW_RETRY = Duration.ofSeconds(30L);
     private static final Duration PRESENCE_REFRESH = Duration.ofSeconds(45L);
-    private static final LinkPresenceUpdate ONLINE = new LinkPresenceUpdate(
-        LinkPresenceStatus.ONLINE, false, "Minecraft Java instance", null, null, Duration.ofSeconds(90L)
-    );
+    private static final Duration ONLINE_TTL = Duration.ofSeconds(90L);
 
     private final NliApiClient api;
     private final ScheduledExecutorService maintenance;
@@ -81,9 +79,7 @@ final class NliRuntimeService implements LinkRuntimeService {
                 NliApiClient.requiredString(json, "instanceToken"),
                 Instant.parse(NliApiClient.requiredString(json, "expiresAt"))
             );
-            session.desiredPresence(new LinkPresenceUpdate(
-                ONLINE.status(), ONLINE.joinable(), context.displayText(), null, null, ONLINE.ttl()
-            ));
+            session.desiredPresence(online(context.displayText()));
             this.scheduleRenewal(session);
             this.schedulePresence(session);
             this.failures.remove(key);
@@ -181,9 +177,7 @@ final class NliRuntimeService implements LinkRuntimeService {
 
     CompletableFuture<LinkPresence> restoreOnline(String key) {
         LinkRuntimeContext context = LinkContextHooks.require(key);
-        return this.publishPresence(key, new LinkPresenceUpdate(
-            LinkPresenceStatus.ONLINE, false, context.displayText(), null, null, Duration.ofSeconds(90L)
-        ));
+        return this.publishPresence(key, online(context.displayText()));
     }
 
     @Override
@@ -227,6 +221,10 @@ final class NliRuntimeService implements LinkRuntimeService {
     private boolean isCurrent(NliSession session) {
         CompletableFuture<NliSession> current = this.sessions.get(session.runtimeKey());
         return current != null && current.getNow(null) == session;
+    }
+
+    private static LinkPresenceUpdate online(String displayText) {
+        return new LinkPresenceUpdate(LinkPresenceStatus.ONLINE, false, displayText, null, null, ONLINE_TTL);
     }
 
     private static String wireStatus(LinkPresenceStatus status) {

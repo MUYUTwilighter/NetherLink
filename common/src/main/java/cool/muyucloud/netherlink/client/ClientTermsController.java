@@ -3,9 +3,11 @@ package cool.muyucloud.netherlink.client;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
+import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
 import cool.muyucloud.netherlink.link.model.LinkTermsState;
+import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -28,7 +30,9 @@ public final class ClientTermsController {
                 termsState(minecraft, service).thenAccept(state -> {
                     if (state.status().needsPrompt()) {
                         NliConstants.LOG.debug("Prefetched terms status for {}: {}", service.id(), state.status());
+                        return;
                     }
+                    publishOnline(minecraft, service);
                 });
             } catch (RuntimeException error) {
                 NliConstants.LOG.warn("Failed to start silent NetherLink terms prefetch", error);
@@ -84,6 +88,26 @@ public final class ClientTermsController {
 
     static void markAccepted(Minecraft minecraft, LinkService service, LinkTerms terms) {
         CACHE.put(cacheKey(minecraft, service), CompletableFuture.completedFuture(LinkTermsState.accepted(terms)));
+    }
+
+    private static void publishOnline(Minecraft minecraft, LinkService service) {
+        minecraft.execute(() -> {
+            LauncherSessionAccount account = new LauncherSessionAccount(minecraft.getUser());
+            if (!account.isUsable()) {
+                NliConstants.LOG.debug("Skipping NetherLink startup online presence publish because the launcher account has no Minecraft access token");
+                return;
+            }
+            LinkContextHooks.setClientConnection(
+                LinkRuntimeService.CLIENT_KEY,
+                account,
+                NliConstants.resolveInstanceName(),
+                new MinecraftClientConnectionBridge(minecraft)
+            );
+            service.runtime().publishOnline(LinkRuntimeService.CLIENT_KEY).exceptionally(error -> {
+                NliConstants.LOG.warn("Failed to publish NetherLink startup online presence for {}", service.id(), error);
+                return null;
+            });
+        });
     }
 
     private static CompletableFuture<LinkTermsState> requestTermsState(Minecraft minecraft, LinkService service) {

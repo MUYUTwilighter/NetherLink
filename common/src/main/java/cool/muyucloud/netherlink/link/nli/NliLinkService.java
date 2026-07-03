@@ -30,6 +30,7 @@ public final class NliLinkService implements LinkService {
         Capability.FRIEND_SETTINGS,
         Capability.HOSTING,
         Capability.JOINING,
+        Capability.SELF_PRESENCE,
         Capability.MULTI_ACCOUNT_RUNTIME,
         Capability.MULTI_PRESENCE
     );

@@ -119,10 +119,11 @@ final class NliFriendService implements LinkFriendService {
     }
 
     private LinkFriendSnapshot snapshot(JsonObject root) {
+        List<LinkPresence> selfPresences = presences(array(root, "selfPresences"));
         List<LinkFriendEntry> friends = entries(array(root, "friends"), LinkFriendRelationship.FRIEND, true);
         List<LinkFriendEntry> incoming = entries(array(root, "incomingRequests"), LinkFriendRelationship.INCOMING, false);
         List<LinkFriendEntry> outgoing = entries(array(root, "outgoingRequests"), LinkFriendRelationship.OUTGOING, false);
-        return new LinkFriendSnapshot(friends, incoming, outgoing);
+        return new LinkFriendSnapshot(selfPresences, friends, incoming, outgoing);
     }
 
     private List<LinkFriendEntry> entries(JsonArray array, LinkFriendRelationship relationship, boolean includePresence) {

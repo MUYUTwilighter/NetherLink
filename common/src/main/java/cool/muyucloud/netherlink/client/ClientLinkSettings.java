@@ -2,7 +2,6 @@ package cool.muyucloud.netherlink.client;
 
 import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.NetherLinkConfig;
-import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
@@ -19,8 +18,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 final class ClientLinkSettings {
-    private static final ResourceLocation LEGACY_OFFICIAL_ID = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
-    private static final ResourceLocation LEGACY_OFFICIAL_ID_V1 = ResourceLocation.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2");
     static final List<ResourceLocation> AVAILABLE_SERVICES = List.of(NliLinkService.ID, OfficialLinkServiceProvider.ID);
 
     private ClientLinkSettings() {
@@ -28,13 +25,9 @@ final class ClientLinkSettings {
 
     static ResourceLocation activeService(Minecraft minecraft) {
         String configured = NetherLinkConfig.string(NetherLinkConfig.read(path(minecraft)), NetherLinkConfig.ACTIVE_SERVICE_KEY)
-            .or(() -> NetherLinkConfig.string(readLegacyNliConfig(minecraft), NetherLinkConfig.ACTIVE_SERVICE_KEY))
             .orElse(NliLinkService.ID.toString());
         try {
             ResourceLocation id = ResourceLocation.parse(configured);
-            if (LEGACY_OFFICIAL_ID.equals(id) || LEGACY_OFFICIAL_ID_V1.equals(id)) {
-                return OfficialLinkServiceProvider.ID;
-            }
             return AVAILABLE_SERVICES.contains(id) ? id : NliLinkService.ID;
         } catch (RuntimeException ignored) {
             return NliLinkService.ID;
@@ -126,15 +119,6 @@ final class ClientLinkSettings {
 
     private static Path nliPath(Minecraft minecraft) {
         return NliV1Config.path(minecraft.gameDirectory.toPath());
-    }
-
-    private static JsonObject readLegacyNliConfig(Minecraft minecraft) {
-        try {
-            return NliV1Config.read(nliPath(minecraft));
-        } catch (RuntimeException error) {
-            NliConstants.LOG.warn("Unable to read legacy NetherLink settings from {}; ignoring legacy values", nliPath(minecraft), error);
-            return new JsonObject();
-        }
     }
 
 }
