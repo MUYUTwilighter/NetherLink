@@ -41,17 +41,25 @@ public final class ClientTermsController {
         minecraft.execute(() -> {
             ClientLinkSettings.applyConfiguredService(minecraft);
             LinkService service = LinkServices.current();
-            CompletableFuture<TermsGate> gate = termsState(minecraft, service)
-                .thenCombine(friendSettings(minecraft, service), TermsGate::new);
-            gate.whenComplete((result, failure) -> minecraft.execute(() -> {
-                TermsGate resolved = failure == null
-                    ? result
-                    : new TermsGate(LinkTermsState.error(failure), new LinkFriendSettings(true, true));
-                if (canContinue(resolved)) {
+            runAfterAcceptance(minecraft, parent, service, action);
+        });
+    }
+
+    /** Runs an action only after the supplied backend's current terms have been accepted. */
+    public static void runAfterAcceptance(Minecraft minecraft, Screen parent, LinkService service, Runnable action) {
+        minecraft.execute(() -> {
+            CompletableFuture<LinkTermsState> terms = termsState(minecraft, service);
+            if (!terms.isDone()) {
+                minecraft.setScreen(new NetherLinkTermsScreen(parent, service, action));
+                return;
+            }
+            terms.whenComplete((state, failure) -> minecraft.execute(() -> {
+                LinkTermsState resolved = failure == null ? state : LinkTermsState.error(failure);
+                if (resolved.isAccepted()) {
                     action.run();
                     return;
                 }
-                minecraft.setScreen(new NetherLinkTermsScreen(parent, service, action, resolved.state(), resolved.settings()));
+                minecraft.setScreen(new NetherLinkTermsScreen(parent, service, action, resolved, null));
             }));
         });
     }
@@ -71,7 +79,7 @@ public final class ClientTermsController {
         if (!service.supports(LinkService.Capability.FRIEND_SETTINGS)) {
             return CompletableFuture.completedFuture(new LinkFriendSettings(true, true));
         }
-        return new ClientFriendService(minecraft).settings();
+        return new ClientFriendService(minecraft, service).settings();
     }
 
     static void markAccepted(Minecraft minecraft, LinkService service, LinkTerms terms) {
@@ -94,14 +102,6 @@ public final class ClientTermsController {
         return new CacheKey(service.termsCacheScope(), language);
     }
 
-    private static boolean canContinue(TermsGate gate) {
-        return gate.state().terms().isEmpty()
-            || (gate.state().isAccepted() && gate.settings().friendsEnabled());
-    }
-
     private record CacheKey(String serviceScope, String language) {
-    }
-
-    private record TermsGate(LinkTermsState state, LinkFriendSettings settings) {
     }
 }

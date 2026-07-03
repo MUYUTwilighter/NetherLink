@@ -41,24 +41,29 @@ final class ClientLinkSettings {
         }
     }
 
-    static CompletableFuture<Void> use(Minecraft minecraft, ResourceLocation serviceId) {
-        JsonObject config = NetherLinkConfig.read(path(minecraft));
-        config.addProperty(NetherLinkConfig.ACTIVE_SERVICE_KEY, serviceId.toString());
-        NetherLinkConfig.write(path(minecraft), config);
-        return LinkServices.use(create(minecraft, serviceId));
-    }
-
     static Component serviceName(ResourceLocation serviceId) {
         return Component.translatable(serviceId.getNamespace() + ".link." + serviceId.getPath());
+    }
+
+    static CompletableFuture<Void> selectService(Minecraft minecraft, ResourceLocation serviceId) {
+        return selectService(minecraft, create(minecraft, serviceId));
+    }
+
+    static CompletableFuture<Void> selectService(Minecraft minecraft, LinkService service) {
+        return LinkServices.use(service).thenRun(() -> saveConfiguredService(minecraft, service.id()));
     }
 
     static void applyConfiguredService(Minecraft minecraft) {
         ResourceLocation serviceId = activeService(minecraft);
         LinkService current = LinkServices.current();
-        if (current.id().equals(serviceId) && !requiresNliReload(minecraft, current)) {
+        if (current.id().equals(serviceId) && !requiresReload(minecraft, current)) {
             return;
         }
         LinkServices.use(create(minecraft, serviceId)).join();
+    }
+
+    static List<ResourceLocation> availableServiceIds() {
+        return AVAILABLE_SERVICES;
     }
 
     static void updateMinecraftSocialManager(Minecraft minecraft, LinkFriendSettings settings) {
@@ -83,7 +88,7 @@ final class ClientLinkSettings {
         NetherLinkConfig.write(path, config);
     }
 
-    private static LinkService create(Minecraft minecraft, ResourceLocation serviceId) {
+    static LinkService create(Minecraft minecraft, ResourceLocation serviceId) {
         if (OfficialLinkServiceProvider.ID.equals(serviceId)) {
             return OfficialLinkServiceProvider.INSTANCE;
         }
@@ -91,9 +96,20 @@ final class ClientLinkSettings {
         return new NliLinkService(NliV1Config.serverUri(path), path);
     }
 
-    private static boolean requiresNliReload(Minecraft minecraft, LinkService current) {
+    static boolean requiresReload(Minecraft minecraft, LinkService current) {
         return current instanceof NliLinkService nli
             && !nli.baseUri().equals(NliV1Config.serverUri(nliPath(minecraft)));
+    }
+
+    private static void saveConfiguredService(Minecraft minecraft, ResourceLocation id) {
+        Path path = path(minecraft);
+        JsonObject config = NetherLinkConfig.read(path);
+        if (NliLinkService.ID.equals(id)) {
+            config.remove(NetherLinkConfig.ACTIVE_SERVICE_KEY);
+        } else {
+            config.addProperty(NetherLinkConfig.ACTIVE_SERVICE_KEY, id.toString());
+        }
+        NetherLinkConfig.write(path, config);
     }
 
     private static void invoke(Object target, String name, boolean value) {

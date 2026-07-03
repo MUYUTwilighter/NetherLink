@@ -47,6 +47,14 @@ public interface LinkService {
     }
 
     /**
+     * Returns the client-side settings renderer identifier for this backend. This deliberately
+     * stays as data so the common service abstraction never references client-only classes.
+     */
+    default ResourceLocation settingsRendererId() {
+        return this.id();
+    }
+
+    /**
      * Fetches terms that must be accepted before this backend is first used. Backends without
      * service-specific terms return an empty optional.
      */

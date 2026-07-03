@@ -43,6 +43,11 @@ final class NliRuntimeService implements LinkRuntimeService {
         return this.session(key).thenApply(NliSession::identity);
     }
 
+    @Override
+    public CompletableFuture<LinkRuntimeIdentity> publishOnline(String key) {
+        return this.restoreOnline(key).thenApply(ignored -> this.requireSession(key).identity());
+    }
+
     CompletableFuture<NliSession> session(String key) {
         CompletableFuture<NliSession> future = this.sessions.computeIfAbsent(key, this::register);
         return future.whenComplete((ignored1, error) -> {

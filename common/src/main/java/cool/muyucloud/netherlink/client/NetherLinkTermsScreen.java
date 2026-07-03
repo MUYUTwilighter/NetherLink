@@ -33,6 +33,15 @@ final class NetherLinkTermsScreen extends Screen {
     private boolean requestStarted;
     private boolean completed;
 
+    NetherLinkTermsScreen(Screen parent, LinkService service, Runnable action) {
+        super(Component.translatable("netherlink.terms.title", service.name()));
+        this.parent = parent;
+        this.service = service;
+        this.action = action;
+        this.loading = true;
+        this.requestStarted = false;
+    }
+
     NetherLinkTermsScreen(Screen parent, LinkService service, Runnable action, LinkTermsState initialState, @Nullable LinkFriendSettings initialSettings) {
         super(Component.translatable("netherlink.terms.title", service.name()));
         this.parent = parent;
