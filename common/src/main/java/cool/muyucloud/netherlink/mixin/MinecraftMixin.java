@@ -44,7 +44,7 @@ public abstract class MinecraftMixin extends ReentrantBlockableEventLoop<Runnabl
     @Inject(method = "<init>", at = @At("TAIL"))
     private void netherlink$prefetchTerms(GameConfig gameConfig, CallbackInfo callback) {
         Minecraft minecraft = (Minecraft)(Object)this;
-        NliConstants.gameDirectory = () -> minecraft.gameDirectory.toPath();
+        NliConstants.gameDirectory = minecraft.gameDirectory::toPath;
         NliConstants.windowTitle = () -> Optional.ofNullable(MinecraftAccess.createWindowTitle());
         ClientTermsController.prefetch(minecraft);
     }
