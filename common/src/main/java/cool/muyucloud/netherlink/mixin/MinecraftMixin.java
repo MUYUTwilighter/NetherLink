@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler, MinecraftAccess {
-    public MinecraftMixin(String name, boolean propagatesCrashes) {
+    public MinecraftMixin(String name) {
         super(name);
     }
 
