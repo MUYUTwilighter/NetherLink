@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.link;
 
 import cool.muyucloud.netherlink.link.model.LinkTerms;
+import cool.muyucloud.netherlink.link.model.LinkTermsState;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
@@ -51,6 +52,30 @@ public interface LinkService {
      */
     default CompletableFuture<Optional<LinkTerms>> terms(String language) {
         return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    /**
+     * Runtime cache scope for terms checks. Services should include backend-specific
+     * identity here when two instances with the same {@link #id()} may expose different terms.
+     */
+    default String termsCacheScope() {
+        return this.id().toString();
+    }
+
+    /**
+     * Checks the backend's current terms against the backend-owned acceptance store.
+     * Implementations with persistent terms should override this together with
+     * {@link #acceptTerms(LinkTerms)}.
+     */
+    default CompletableFuture<LinkTermsState> termsStatus(String language) {
+        return this.terms(language).thenApply(terms -> terms
+            .map(LinkTermsState::unaccepted)
+            .orElseGet(LinkTermsState::unavailable));
+    }
+
+    /** Records acceptance of the supplied terms in the backend-owned acceptance store. */
+    default CompletableFuture<Void> acceptTerms(LinkTerms terms) {
+        return CompletableFuture.completedFuture(null);
     }
 
     /** Returns the immutable set of optional features supported by this backend. */

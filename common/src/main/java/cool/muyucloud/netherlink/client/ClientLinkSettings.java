@@ -70,7 +70,8 @@ final class ClientLinkSettings {
         if (OfficialLinkServiceProvider.ID.equals(serviceId)) {
             return OfficialLinkServiceProvider.INSTANCE;
         }
-        return new NliLinkService(NliV1Config.serverUri(nliPath(minecraft)));
+        Path path = nliPath(minecraft);
+        return new NliLinkService(NliV1Config.serverUri(path), path);
     }
 
     private static boolean requiresNliReload(Minecraft minecraft, LinkService current) {
