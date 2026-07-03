@@ -5,7 +5,7 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
 
-enum JsonRPCErrors {
+public enum JsonRPCErrors {
     PARSE_ERROR(-32700, "Parse error"),
     INVALID_REQUEST(-32600, "Invalid Request"),
     METHOD_NOT_FOUND(-32601, "Method not found"),
