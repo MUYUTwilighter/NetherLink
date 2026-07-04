@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -148,6 +149,53 @@ class NliLinkServiceContractTest {
         }
     }
 
+
+    @Test
+    void refreshesMinecraftTokenAndRetriesRuntimeRegistrationAfterUnauthorized() throws Exception {
+        AtomicInteger registrationAttempts = new AtomicInteger();
+        AtomicBoolean refreshed = new AtomicBoolean();
+        AtomicReference<String> registrationAuth = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/instances", exchange -> {
+            if (exchange.getRequestURI().getPath().endsWith("/renew")) {
+                respond(exchange, 200, """
+                    {"profileId":"00000000-0000-0000-0000-000000000001","presenceId":"presence-server","instanceToken":"instance-renewed","expiresAt":"2099-02-01T00:00:00Z"}
+                    """);
+                return;
+            }
+            registrationAttempts.incrementAndGet();
+            registrationAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            if ("Bearer stale-secret".equals(registrationAuth.get())) {
+                respond(exchange, 401, "{\"code\":\"INVALID_MINECRAFT_TOKEN\",\"message\":\"Minecraft access token is invalid\"}");
+                return;
+            }
+            respond(exchange, 200, """
+                {"profileId":"00000000-0000-0000-0000-000000000001","name":"Tester","presenceId":"presence-server","instanceToken":"instance-secret","expiresAt":"2099-01-01T00:00:00Z"}
+                """);
+        });
+        server.createContext("/v1/instances/current", exchange -> respond(exchange, 204, ""));
+        server.start();
+
+        String runtimeKey = "test:nli-refresh:" + UUID.randomUUID();
+        MutableTestAccount account = new MutableTestAccount("stale-secret");
+        NliLinkService service = new NliLinkService(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort()));
+        try {
+            LinkContextHooks.setServerConnection(runtimeKey, account, "Test server", _ -> {}, () -> {
+                refreshed.set(true);
+                account.token("fresh-secret");
+            });
+            var identity = service.runtime().open(runtimeKey).join();
+
+            assertTrue(refreshed.get());
+            assertEquals(2, registrationAttempts.get());
+            assertEquals("Bearer fresh-secret", registrationAuth.get());
+            assertEquals("presence-server", identity.presenceId());
+        } finally {
+            service.shutdown().join();
+            LinkContextHooks.remove(runtimeKey);
+            server.stop(0);
+        }
+    }
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -164,6 +212,25 @@ class NliLinkServiceContractTest {
         exchange.close();
     }
 
+
+    private static final class MutableTestAccount implements MinecraftAccount {
+        private String token;
+
+        private MutableTestAccount(String token) {
+            this.token = token;
+        }
+
+        private void token(String token) {
+            this.token = token;
+        }
+
+        @Override
+        public String getMcToken() { return this.token; }
+        @Override
+        public String getMcProfileId() { return "00000000-0000-0000-0000-000000000001"; }
+        @Override
+        public String getMcProfileName() { return "Tester"; }
+    }
     private static final class TestAccount implements MinecraftAccount {
         @Override
         public String getMcToken() { return "minecraft-secret"; }
