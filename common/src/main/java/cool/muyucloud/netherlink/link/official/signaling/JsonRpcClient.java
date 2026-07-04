@@ -1,13 +1,12 @@
 package cool.muyucloud.netherlink.link.official.signaling;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import cool.muyucloud.netherlink.NliConstants;
-import net.minecraft.server.jsonrpc.JsonRPCErrors;
-import net.minecraft.server.jsonrpc.JsonRPCUtils;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.http.WebSocket;
@@ -90,7 +89,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
             String payload = createRequest(id, method, params).toString();
             this.pendingRequests.put(id, future);
             NliConstants.LOG.info("[P2P][jsonrpc] Sending request id={} method={}", id, method);
-            this.sendChain = this.sendChain.<Void>thenCompose(_ -> ws.sendText(payload, true).thenApply(_ -> null)).exceptionally(error -> {
+            this.sendChain = this.sendChain.<Void>thenCompose(ignored2 -> ws.sendText(payload, true).thenApply(ignored3 -> null)).exceptionally(error -> {
                 this.executor.execute(() -> {
                     CompletableFuture<JsonElement> pending = this.pendingRequests.remove(id);
                     if (pending != null) {
@@ -110,7 +109,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
             WebSocket ws = this.webSocket;
             this.teardown(new IOException("JSON-RPC client closed"), false);
             if (ws != null && !ws.isOutputClosed()) {
-                ws.sendClose(1000, "shutdown").whenComplete((_, _) -> done.complete(null));
+                ws.sendClose(1000, "shutdown").whenComplete((ignored1, ignored101) -> done.complete(null));
             } else {
                 done.complete(null);
             }
@@ -121,7 +120,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
     private void send(String payload) {
         WebSocket ws = this.webSocket;
         if (ws != null) {
-            this.sendChain = this.sendChain.<Void>thenCompose(_ -> ws.sendText(payload, true).thenApply(_ -> null)).exceptionally(error -> {
+            this.sendChain = this.sendChain.<Void>thenCompose(ignored4 -> ws.sendText(payload, true).thenApply(ignored5 -> null)).exceptionally(error -> {
                 NliConstants.LOG.warn("WebSocket send failed", error);
                 return null;
             });
@@ -198,7 +197,7 @@ public final class JsonRpcClient implements WebSocket.Listener {
         }
         request.addProperty("method", method);
         if (!params.isEmpty()) {
-            com.google.gson.JsonArray array = new com.google.gson.JsonArray(params.size());
+            JsonArray array = new JsonArray(params.size());
             params.forEach(array::add);
             request.add("params", array);
         }

@@ -298,7 +298,7 @@ public final class ServerP2PManager {
                 result.completeExceptionally(error);
             } else if (result.complete(null)) {
                 NliConstants.LOG.info("[P2P][{}] Handshake completed session={}, accepting guest profile={}", this.accountName, sessionId, profileId);
-                this.acceptGuest(handshakeResult, profileId);
+                this.acceptGuest(handshakeResult);
             } else {
                 RtcChannel.dispose(handshakeResult);
             }
@@ -330,9 +330,9 @@ public final class ServerP2PManager {
         });
     }
 
-    private void acceptGuest(RtcHandshake.HandshakeResult handshakeResult, @Nullable UUID profileId) {
-        NliConstants.LOG.info("[P2P][{}] Registering RTC channel with server profile={}", this.accountName, profileId);
-        this.connectionBridge.accept(new RtcChannel(handshakeResult), profileId);
+    private void acceptGuest(RtcHandshake.HandshakeResult handshakeResult) {
+        NliConstants.LOG.info("[P2P][{}] Registering RTC channel with server", this.accountName);
+        this.connectionBridge.accept(new RtcChannel(handshakeResult));
     }
 
     private @Nullable UUID profileIdFor(LinkPeerRoute peer) {
@@ -365,3 +365,4 @@ public final class ServerP2PManager {
     private record PendingIceKey(String presenceId, String sessionId) {
     }
 }
+

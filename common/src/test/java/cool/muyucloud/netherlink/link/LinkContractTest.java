@@ -28,8 +28,8 @@ class LinkContractTest {
         TestAccount first = TestAccount.create("First");
         TestAccount second = TestAccount.create("Second");
         try {
-            LinkContextHooks.setServerConnection(firstKey, first, "First server", (_, _) -> {});
-            LinkContextHooks.setServerConnection(secondKey, second, "Second server", (_, _) -> {});
+            LinkContextHooks.setServerConnection(firstKey, first, "First server", _ -> {});
+            LinkContextHooks.setServerConnection(secondKey, second, "Second server", _ -> {});
 
             assertSame(first, LinkContextHooks.require(firstKey).account());
             assertSame(second, LinkContextHooks.require(secondKey).account());
@@ -52,10 +52,10 @@ class LinkContractTest {
         TestAccount second = TestAccount.create("Second");
         LinkContextHooks.Registration registration = LinkContextHooks.register(
             key,
-            new LinkRuntimeContext(first, "First", null, (_, _) -> {}, null)
+            new LinkRuntimeContext(first, "First", null, _ -> {}, null)
         );
         try (registration) {
-            LinkContextHooks.register(key, new LinkRuntimeContext(second, "Second", null, (_, _) -> {}, null));
+            LinkContextHooks.register(key, new LinkRuntimeContext(second, "Second", null, _ -> {}, null));
             registration.close();
             assertSame(second, LinkContextHooks.require(key).account());
         } finally {
@@ -71,8 +71,8 @@ class LinkContractTest {
         TestAccount second = TestAccount.create("Second");
         OfficialRuntimeService runtimes = new OfficialRuntimeService();
         try {
-            LinkContextHooks.setServerConnection(firstKey, first, "First", (_, _) -> {});
-            LinkContextHooks.setServerConnection(secondKey, second, "Second", (_, _) -> {});
+            LinkContextHooks.setServerConnection(firstKey, first, "First", _ -> {});
+            LinkContextHooks.setServerConnection(secondKey, second, "Second", _ -> {});
 
             var firstIdentity = runtimes.open(firstKey).join();
             assertEquals(firstIdentity, runtimes.open(firstKey).join());
@@ -131,3 +131,4 @@ class LinkContractTest {
             }
         }
 }
+

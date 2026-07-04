@@ -57,9 +57,6 @@ public final class NetherLinkConfig {
         return string(read(path(gameDirectory)), INSTANCE_NAME_KEY);
     }
 
-    public static String instanceNameOr(Path gameDirectory, String fallback) {
-        return instanceName(gameDirectory).orElseGet(() -> sanitize(fallback).orElse(NliConstants.MOD_NAME));
-    }
 
     public static Optional<String> string(JsonObject object, String key) {
         if (!object.has(key) || object.get(key).isJsonNull()) {
@@ -76,3 +73,4 @@ public final class NetherLinkConfig {
         return trimmed.isEmpty() ? Optional.empty() : Optional.of(trimmed);
     }
 }
+

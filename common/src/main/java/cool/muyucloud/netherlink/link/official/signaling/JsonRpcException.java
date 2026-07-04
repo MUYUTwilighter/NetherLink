@@ -2,7 +2,7 @@ package cool.muyucloud.netherlink.link.official.signaling;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class JsonRpcException extends RuntimeException {
     private final String serverMessage;

@@ -13,10 +13,11 @@ import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
 import cool.muyucloud.netherlink.link.transport.SignalingException;
 import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.RTCIceServer;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -128,7 +129,7 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
             this.pendingRoutes.put(messageId, target);
             this.executor.schedule(() -> this.pendingRoutes.remove(messageId), 30L, TimeUnit.SECONDS);
             return socket.sendText(envelope.toString(), true);
-        }).handle((_, error) -> {
+        }).handle((ignored1, error) -> {
             if (error != null) {
                 this.pendingRoutes.remove(messageId);
                 throw new CompletionException(error);
@@ -178,7 +179,7 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
     }
 
     @Override
-    public CompletionStage<?> onPing(WebSocket webSocket, java.nio.ByteBuffer message) {
+    public CompletionStage<?> onPing(WebSocket webSocket, ByteBuffer message) {
         webSocket.request(1L);
         return webSocket.sendPong(message);
     }

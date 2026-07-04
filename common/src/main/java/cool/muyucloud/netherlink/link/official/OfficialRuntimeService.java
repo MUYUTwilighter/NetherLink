@@ -7,7 +7,7 @@ import cool.muyucloud.netherlink.link.model.LinkRuntimeIdentity;
 import cool.muyucloud.netherlink.link.model.LinkRuntimeSnapshot;
 import cool.muyucloud.netherlink.link.model.LinkRuntimeState;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

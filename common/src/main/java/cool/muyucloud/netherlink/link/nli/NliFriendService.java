@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -51,7 +52,7 @@ final class NliFriendService implements LinkFriendService {
     public CompletableFuture<LinkFriendActionOutcome> remove(UUID profileId) {
         return this.runtimes.session(this.runtimeKey)
             .thenCompose(session -> this.api.delete(path("v1/friends/", profileId), session.token(), this.minecraftToken()))
-            .thenApply(_ -> success(null, LinkOfficialSyncStatus.SUCCESS));
+            .thenApply(ignored1 -> success(null, LinkOfficialSyncStatus.SUCCESS));
     }
 
     @Override
@@ -96,7 +97,7 @@ final class NliFriendService implements LinkFriendService {
     private CompletableFuture<LinkFriendActionOutcome> deleteRequest(UUID profileId) {
         return this.runtimes.session(this.runtimeKey)
             .thenCompose(session -> this.api.delete(path("v1/friends/requests/", profileId), session.token(), this.minecraftToken()))
-            .thenApply(_ -> success(null, LinkOfficialSyncStatus.SUCCESS));
+            .thenApply(ignored2 -> success(null, LinkOfficialSyncStatus.SUCCESS));
     }
 
     private CompletableFuture<LinkFriendActionOutcome> mutate(String path, JsonObject body) {
@@ -118,10 +119,11 @@ final class NliFriendService implements LinkFriendService {
     }
 
     private LinkFriendSnapshot snapshot(JsonObject root) {
+        List<LinkPresence> selfPresences = presences(array(root, "selfPresences"));
         List<LinkFriendEntry> friends = entries(array(root, "friends"), LinkFriendRelationship.FRIEND, true);
         List<LinkFriendEntry> incoming = entries(array(root, "incomingRequests"), LinkFriendRelationship.INCOMING, false);
         List<LinkFriendEntry> outgoing = entries(array(root, "outgoingRequests"), LinkFriendRelationship.OUTGOING, false);
-        return new LinkFriendSnapshot(friends, incoming, outgoing);
+        return new LinkFriendSnapshot(selfPresences, friends, incoming, outgoing);
     }
 
     private List<LinkFriendEntry> entries(JsonArray array, LinkFriendRelationship relationship, boolean includePresence) {
@@ -165,7 +167,7 @@ final class NliFriendService implements LinkFriendService {
         };
     }
 
-    private static @org.jspecify.annotations.Nullable Instant instant(JsonObject object, String key) {
+    private static @Nullable Instant instant(JsonObject object, String key) {
         String value = NliApiClient.nullableString(object, key);
         return value != null ? Instant.parse(value) : null;
     }

@@ -4,7 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
 import cool.muyucloud.netherlink.link.transport.SignalingException;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public final class SignalingErrorMapper {
     private SignalingErrorMapper() {

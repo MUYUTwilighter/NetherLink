@@ -8,7 +8,7 @@ import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,9 +20,7 @@ final class NliRuntimeService implements LinkRuntimeService {
     private static final Duration RENEW_MARGIN = Duration.ofMinutes(5L);
     private static final Duration RENEW_RETRY = Duration.ofSeconds(30L);
     private static final Duration PRESENCE_REFRESH = Duration.ofSeconds(45L);
-    private static final LinkPresenceUpdate ONLINE = new LinkPresenceUpdate(
-        LinkPresenceStatus.ONLINE, false, "Minecraft Java instance", null, null, Duration.ofSeconds(90L)
-    );
+    private static final Duration ONLINE_TTL = Duration.ofSeconds(90L);
 
     private final NliApiClient api;
     private final ScheduledExecutorService maintenance;
@@ -43,9 +41,14 @@ final class NliRuntimeService implements LinkRuntimeService {
         return this.session(key).thenApply(NliSession::identity);
     }
 
+    @Override
+    public CompletableFuture<LinkRuntimeIdentity> publishOnline(String key) {
+        return this.restoreOnline(key).thenApply(ignored -> this.requireSession(key).identity());
+    }
+
     CompletableFuture<NliSession> session(String key) {
         CompletableFuture<NliSession> future = this.sessions.computeIfAbsent(key, this::register);
-        return future.whenComplete((_, error) -> {
+        return future.whenComplete((ignored1, error) -> {
             if (error != null) this.sessions.remove(key, future);
         });
     }
@@ -76,9 +79,7 @@ final class NliRuntimeService implements LinkRuntimeService {
                 NliApiClient.requiredString(json, "instanceToken"),
                 Instant.parse(NliApiClient.requiredString(json, "expiresAt"))
             );
-            session.desiredPresence(new LinkPresenceUpdate(
-                ONLINE.status(), ONLINE.joinable(), context.displayText(), null, null, ONLINE.ttl()
-            ));
+            session.desiredPresence(online(context.displayText()));
             this.scheduleRenewal(session);
             this.schedulePresence(session);
             this.failures.remove(key);
@@ -108,12 +109,12 @@ final class NliRuntimeService implements LinkRuntimeService {
         if (old != null) old.cancel(false);
         long remaining = Math.max(1L, Duration.between(Instant.now(), session.expiresAt()).toMillis());
         long delay = Math.max(1_000L, remaining - Math.min(RENEW_MARGIN.toMillis(), remaining / 3L));
-        session.renewalTask(this.maintenance.schedule(() -> this.renewSession(session).whenComplete((_, error) -> {
+        session.renewalTask(this.maintenance.schedule(() -> this.renewSession(session).whenComplete((ignored2, error) -> {
             if (error != null && this.isCurrent(session)) {
                 this.failures.put(session.runtimeKey(), LinkFailures.from(error));
                 NliConstants.LOG.warn("NLI runtime renewal failed for {}", session.runtimeKey(), error);
                 session.renewalTask(this.maintenance.schedule(
-                    () -> this.renewSession(session).whenComplete((_, retryError) -> {
+                    () -> this.renewSession(session).whenComplete((ignored3, retryError) -> {
                         if (retryError != null && this.isCurrent(session)) this.scheduleRetry(session);
                     }),
                     RENEW_RETRY.toMillis(), TimeUnit.MILLISECONDS
@@ -127,7 +128,7 @@ final class NliRuntimeService implements LinkRuntimeService {
             LinkFailureCode.SERVICE_UNAVAILABLE, "NLI runtime renewal is retrying", true
         ));
         session.renewalTask(this.maintenance.schedule(
-            () -> this.renewSession(session).whenComplete((_, error) -> {
+            () -> this.renewSession(session).whenComplete((ignored4, error) -> {
                 if (error != null && this.isCurrent(session)) this.scheduleRetry(session);
             }),
             RENEW_RETRY.toMillis(), TimeUnit.MILLISECONDS
@@ -176,9 +177,7 @@ final class NliRuntimeService implements LinkRuntimeService {
 
     CompletableFuture<LinkPresence> restoreOnline(String key) {
         LinkRuntimeContext context = LinkContextHooks.require(key);
-        return this.publishPresence(key, new LinkPresenceUpdate(
-            LinkPresenceStatus.ONLINE, false, context.displayText(), null, null, Duration.ofSeconds(90L)
-        ));
+        return this.publishPresence(key, online(context.displayText()));
     }
 
     @Override
@@ -200,7 +199,7 @@ final class NliRuntimeService implements LinkRuntimeService {
     @Override
     public CompletableFuture<Void> closeAll() {
         return CompletableFuture.allOf(new ArrayList<>(this.sessions.keySet()).stream()
-            .map(this::close).toArray(CompletableFuture[]::new)).whenComplete((_, _) -> this.maintenance.shutdown());
+            .map(this::close).toArray(CompletableFuture[]::new)).whenComplete((ignored5, ignored101) -> this.maintenance.shutdown());
     }
 
     @Override
@@ -222,6 +221,10 @@ final class NliRuntimeService implements LinkRuntimeService {
     private boolean isCurrent(NliSession session) {
         CompletableFuture<NliSession> current = this.sessions.get(session.runtimeKey());
         return current != null && current.getNow(null) == session;
+    }
+
+    private static LinkPresenceUpdate online(String displayText) {
+        return new LinkPresenceUpdate(LinkPresenceStatus.ONLINE, false, displayText, null, null, ONLINE_TTL);
     }
 
     private static String wireStatus(LinkPresenceStatus status) {

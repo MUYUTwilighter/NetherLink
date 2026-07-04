@@ -2,7 +2,7 @@ package cool.muyucloud.netherlink.link.service;
 
 import cool.muyucloud.netherlink.link.model.LinkRuntimeIdentity;
 import cool.muyucloud.netherlink.link.model.LinkRuntimeSnapshot;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -22,6 +22,15 @@ public interface LinkRuntimeService {
      * Implementations own credential renewal and keep the runtime valid until {@link #close(String)} is called.
      */
     CompletableFuture<LinkRuntimeIdentity> open(String key);
+
+    /**
+     * Opens the keyed runtime and publishes a non-joinable online presence when the backend
+     * supports account-level online presence. Backends that only publish joinable hosting
+     * presences may treat this as a plain {@link #open(String)}.
+     */
+    default CompletableFuture<LinkRuntimeIdentity> publishOnline(String key) {
+        return this.open(key);
+    }
 
     /**
      * Renews implementation-private credentials for the keyed runtime while preserving its public Presence identity.
