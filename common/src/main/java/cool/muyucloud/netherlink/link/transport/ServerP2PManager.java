@@ -8,11 +8,12 @@ import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -103,7 +104,7 @@ public final class ServerP2PManager {
         return result;
     }
 
-    public void updatePresence(java.util.Map<String, UUID> profileIdsByPresence) {
+    public void updatePresence(Map<String, UUID> profileIdsByPresence) {
         this.profileIdsByPresence.clear();
         this.profileIdsByPresence.putAll(profileIdsByPresence);
         NliConstants.LOG.info("[P2P][{}] Updated presence peer map: {} entries", this.accountName, profileIdsByPresence.size());
@@ -163,7 +164,7 @@ public final class ServerP2PManager {
     }
 
     private void warmupTurnAuth() {
-        this.signaling.requestTurnAuth().whenComplete((ignored1, error) -> {
+        this.signaling.requestTurnAuth().whenComplete((ignored2, error) -> {
             if (error != null) {
                 NliConstants.LOG.warn("[P2P][{}] TURN auth warmup failed: {}", this.accountName, error.toString());
             } else {
@@ -249,13 +250,13 @@ public final class ServerP2PManager {
                 return CompletableFuture.failedFuture(new IllegalStateException("Failed to create handshake"));
             }
             return handshake.acceptOffer(offerSdp)
-                .whenComplete((ignored1, error) -> {
+                .whenComplete((ignored3, error) -> {
                     if (error == null) {
                         NliConstants.LOG.info("[P2P][{}] Created answer SDP for session={}", this.accountName, sessionId);
                     }
                 })
                 .thenCompose(answer -> this.signaling.sendClientMessage(peer, SignalingMessage.answer(sessionId, answer)));
-        }).whenComplete((ignored1, error) -> {
+        }).whenComplete((ignored4, error) -> {
             if (error != null) {
                 result.completeExceptionally(error);
             }
@@ -274,7 +275,7 @@ public final class ServerP2PManager {
                 config,
                 sessionId,
                 false,
-                candidate -> this.signaling.sendClientMessage(peer, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(ignored1 -> null)
+                candidate -> this.signaling.sendClientMessage(peer, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(ignored6 -> null)
             );
             if (this.handshakes.putIfAbsent(peer.presenceId(), handshake) != null) {
                 handshake.abort("duplicate");
@@ -311,7 +312,7 @@ public final class ServerP2PManager {
         if (handshake == null || !handshake.id().equals(ice.sessionId())) {
             if (this.shouldBufferIceCandidate(source.presenceId(), ice.sessionId())) {
                 PendingIceKey key = new PendingIceKey(source.presenceId(), ice.sessionId());
-                this.pendingIceCandidates.compute(key, (ignored1, existing) -> {
+                this.pendingIceCandidates.compute(key, (ignored5, existing) -> {
                     List<RTCIceCandidate> candidates = existing != null ? existing : new ArrayList<>();
                     candidates.add(ice.toRtcIceCandidate());
                     return candidates;

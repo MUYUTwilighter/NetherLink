@@ -3,7 +3,7 @@ package cool.muyucloud.netherlink.link.hook;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
 import cool.muyucloud.netherlink.link.bridge.LinkServerConnectionBridge;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +56,7 @@ public final class LinkContextHooks {
      */
     public static void setServerConnection(String runtimeKey, MinecraftAccount account, String displayText, LinkServerConnectionBridge connection, @Nullable LinkCredentialRefresh credentialRefresh) {
         requireKey(runtimeKey);
-        CONTEXTS.compute(runtimeKey, (ignored1, existing) -> existing == null
+        CONTEXTS.compute(runtimeKey, (ignored2, existing) -> existing == null
             ? new LinkRuntimeContext(account, displayText, null, connection, credentialRefresh)
             : existing.withServerConnection(account, displayText, connection, credentialRefresh));
     }
@@ -64,7 +64,7 @@ public final class LinkContextHooks {
     /** Removes the client capability, deleting the context only when no capability remains. */
     @SuppressWarnings("unused")
     public static void removeClientConnection(String runtimeKey) {
-        CONTEXTS.computeIfPresent(runtimeKey, (ignored1, existing) -> {
+        CONTEXTS.computeIfPresent(runtimeKey, (ignored3, existing) -> {
             LinkRuntimeContext next = existing.withoutClientConnection();
             return next.hasCapabilities() ? next : null;
         });
@@ -72,7 +72,7 @@ public final class LinkContextHooks {
 
     /** Removes the server and credential-refresh capabilities, preserving any client capability. */
     public static void removeServerConnection(String runtimeKey) {
-        CONTEXTS.computeIfPresent(runtimeKey, (ignored1, existing) -> {
+        CONTEXTS.computeIfPresent(runtimeKey, (ignored4, existing) -> {
             LinkRuntimeContext next = existing.withoutServerConnection();
             return next.hasCapabilities() ? next : null;
         });

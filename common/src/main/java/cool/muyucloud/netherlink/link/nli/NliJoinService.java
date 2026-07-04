@@ -2,14 +2,14 @@ package cool.muyucloud.netherlink.link.nli;
 
 import cool.muyucloud.netherlink.link.model.LinkJoinOperation;
 import cool.muyucloud.netherlink.link.model.LinkJoinTarget;
-import cool.muyucloud.netherlink.link.official.OfficialJoinService;
+import cool.muyucloud.netherlink.link.transport.OutgoingJoinService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 
 final class NliJoinService implements LinkJoinService {
-    private final OfficialJoinService delegate;
+    private final OutgoingJoinService delegate;
 
     NliJoinService(NliApiClient api, NliRuntimeService runtimes) {
-        this.delegate = new OfficialJoinService(runtimeKey -> new NliSignalingClient(
+        this.delegate = new OutgoingJoinService(runtimeKey -> new NliSignalingClient(
             api,
             runtimes.requireSession(runtimeKey),
             "NetherLink NLI Client Signaling-" + runtimeKey

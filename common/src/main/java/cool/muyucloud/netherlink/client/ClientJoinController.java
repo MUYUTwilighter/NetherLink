@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.client;
 
+import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkJoinOperation;
@@ -37,11 +38,11 @@ public final class ClientJoinController {
         LinkContextHooks.setClientConnection(
             LinkRuntimeService.CLIENT_KEY,
             account,
-            "Minecraft Java instance",
+            NliConstants.resolveInstanceName(),
             new MinecraftClientConnectionBridge(minecraft, progressScreen, statusChanged)
         );
         return LinkServices.current().runtime().open(LinkRuntimeService.CLIENT_KEY)
-            .thenApply(ignored1 -> LinkServices.current().joining().join(
+            .thenApply(ignored2 -> LinkServices.current().joining().join(
                 LinkRuntimeService.CLIENT_KEY,
                 new LinkJoinTarget(hostProfileId, hostPresenceId)
             ));

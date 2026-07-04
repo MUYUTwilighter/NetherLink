@@ -2,7 +2,7 @@ package cool.muyucloud.netherlink.link.nli;
 
 import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
 import cool.muyucloud.netherlink.link.model.LinkRuntimeIdentity;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;

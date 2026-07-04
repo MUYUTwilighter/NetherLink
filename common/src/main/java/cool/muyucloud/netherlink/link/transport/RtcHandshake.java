@@ -2,7 +2,7 @@ package cool.muyucloud.netherlink.link.transport;
 
 import cool.muyucloud.netherlink.NliConstants;
 import dev.onvoid.webrtc.*;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -54,7 +54,7 @@ public final class RtcHandshake {
             ? CompletableFuture.failedFuture(new IllegalStateException("Cannot accept offer after handshake has started"))
             : this.startSdpExchange(
                 this.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, offerSdp))
-                    .thenCompose(ignored1 -> this.createAnswerSdp())
+                    .thenCompose(ignored3 -> this.createAnswerSdp())
                     .thenCompose(this::setLocalDescription)
             );
     }
@@ -122,7 +122,7 @@ public final class RtcHandshake {
                 this.completeSdp(sdpFuture);
             }
         });
-        return sdpFuture.whenComplete((ignored1, ignored2) -> this.sdpResult = null);
+        return sdpFuture.whenComplete((ignored2, ignored101) -> this.sdpResult = null);
     }
 
     private CompletableFuture<Void> setRemoteDescription(RTCSessionDescription description) {

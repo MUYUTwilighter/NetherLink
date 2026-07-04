@@ -2,15 +2,13 @@ package cool.muyucloud.netherlink.account;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
 import cool.muyucloud.netherlink.account.data.Endpoint;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 
 import java.io.IOException;
@@ -18,9 +16,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
@@ -168,7 +164,7 @@ public class AuthRequest {
             JsonObject response = postJson(MC_LOGIN, body);
             String mcToken = requiredString(response, "access_token");
             account.setMcToken(mcToken);
-            account.setMcExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
+            account.setMcExpireAt(expiresAtFromSeconds(JsonHttp.requiredLong(response, "expires_in")));
         } finally {
             pendingMcToken = false;
         }
@@ -212,7 +208,7 @@ public class AuthRequest {
         long intervalMillis = endpoint.getInterval() * 1000L;
         while (System.currentTimeMillis() < deadline) {
             sleep(intervalMillis);
-            HttpResult result = postFormRaw(MS_TOKEN, Map.of(
+            JsonHttp.JsonResponse result = postFormRaw(MS_TOKEN, Map.of(
                 "grant_type", "urn:ietf:params:oauth:grant-type:device_code",
                 "client_id", NliConstants.MS_CLIENT_ID.get(),
                 "device_code", endpoint.getDeviceCode()
@@ -222,7 +218,7 @@ public class AuthRequest {
                 return;
             }
 
-            String error = optionalString(result.body(), "error");
+            String error = JsonHttp.string(result.body(), "error");
             if ("authorization_pending".equals(error)) {
                 continue;
             }
@@ -242,7 +238,7 @@ public class AuthRequest {
     }
 
     private void refreshMicrosoftToken() {
-        HttpResult result = postFormRaw(MS_TOKEN, Map.of(
+        JsonHttp.JsonResponse result = postFormRaw(MS_TOKEN, Map.of(
             "grant_type", "refresh_token",
             "client_id", NliConstants.MS_CLIENT_ID.get(),
             "refresh_token", account.getMsRefreshToken(),
@@ -260,7 +256,7 @@ public class AuthRequest {
         if (response.has("refresh_token")) {
             account.setMsRefreshToken(response.get("refresh_token").getAsString());
         }
-        account.setMsExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
+        account.setMsExpireAt(expiresAtFromSeconds(JsonHttp.requiredLong(response, "expires_in")));
     }
 
     private void sendDeviceCodeMessage(Endpoint endpoint) {
@@ -276,8 +272,7 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.BLUE)
-                .withClickEvent(new ClickEvent.OpenUrl(URI.create(uri)))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Open login page"))));
+                .withInsertion(uri));
     }
 
     private static MutableComponent copyToClipboard(String value) {
@@ -285,20 +280,18 @@ public class AuthRequest {
             .withStyle(ChatFormatting.UNDERLINE)
             .withStyle(style -> style
                 .withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent.CopyToClipboard(value))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copy to clipboard")))
                 .withInsertion(value));
     }
 
     private JsonObject postForm(URI uri, Map<String, String> form) {
-        HttpResult result = postFormRaw(uri, form);
+        JsonHttp.JsonResponse result = postFormRaw(uri, form);
         if (!result.isSuccess()) {
             throw fail("Request failed: " + describeError(result));
         }
         return result.body();
     }
 
-    private HttpResult postFormRaw(URI uri, Map<String, String> form) {
+    private JsonHttp.JsonResponse postFormRaw(URI uri, Map<String, String> form) {
         return send(HttpRequest.newBuilder(uri)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .POST(HttpRequest.BodyPublishers.ofString(encodeForm(form)))
@@ -306,10 +299,10 @@ public class AuthRequest {
     }
 
     private JsonObject postJson(URI uri, JsonObject body) {
-        HttpResult result = send(HttpRequest.newBuilder(uri)
+        JsonHttp.JsonResponse result = send(HttpRequest.newBuilder(uri)
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .POST(JsonHttp.jsonBody(body))
             .build());
         if (!result.isSuccess()) {
             if (MC_LOGIN.equals(uri) && result.statusCode() == 403) {
@@ -323,7 +316,7 @@ public class AuthRequest {
     private JsonObject getJson(URI uri, Map<String, String> headers) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri).GET().header("Accept", "application/json");
         headers.forEach(builder::header);
-        HttpResult result = send(builder.build());
+        JsonHttp.JsonResponse result = send(builder.build());
         if (!result.isSuccess()) {
             if (result.statusCode() == 401) {
                 throw new UnauthorizedException("Request failed: " + describeError(result));
@@ -333,13 +326,9 @@ public class AuthRequest {
         return result.body();
     }
 
-    private HttpResult send(HttpRequest request) {
+    private JsonHttp.JsonResponse send(HttpRequest request) {
         try {
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            JsonObject body = response.body() == null || response.body().isBlank()
-                ? new JsonObject()
-                : JsonParser.parseString(response.body()).getAsJsonObject();
-            return new HttpResult(response.statusCode(), body);
+            return JsonHttp.sendJson(http, request);
         } catch (IOException e) {
             throw new NetherLinkAuthException("Network request failed", e);
         } catch (InterruptedException e) {
@@ -364,7 +353,7 @@ public class AuthRequest {
     }
 
     private long parseNotAfter(JsonObject response) {
-        return Instant.parse(requiredString(response, "NotAfter")).toEpochMilli();
+        return JsonHttp.requiredInstant(response, "NotAfter").toEpochMilli();
     }
 
     private String extractUserHash(JsonObject response) {
@@ -376,22 +365,19 @@ public class AuthRequest {
     }
 
     private String requiredString(JsonObject object, String key) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
+        try {
+            return JsonHttp.requiredString(object, key);
+        } catch (RuntimeException error) {
             throw fail("Authentication response missed field: " + key);
         }
-        return object.get(key).getAsString();
     }
 
-    private String optionalString(JsonObject object, String key) {
-        return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : null;
-    }
-
-    private String describeError(HttpResult result) {
-        String error = optionalString(result.body(), "error");
-        String description = optionalString(result.body(), "error_description");
-        String errorMessage = optionalString(result.body(), "errorMessage");
-        String errorType = optionalString(result.body(), "errorType");
-        String path = optionalString(result.body(), "path");
+    private String describeError(JsonHttp.JsonResponse result) {
+        String error = JsonHttp.string(result.body(), "error");
+        String description = JsonHttp.string(result.body(), "error_description");
+        String errorMessage = JsonHttp.string(result.body(), "errorMessage");
+        String errorType = JsonHttp.string(result.body(), "errorType");
+        String path = JsonHttp.string(result.body(), "path");
         if (error == null && errorMessage == null && errorType == null) {
             return "HTTP " + result.statusCode() + " " + result.body();
         }
@@ -429,12 +415,6 @@ public class AuthRequest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new NetherLinkAuthException("Authentication request interrupted", e);
-        }
-    }
-
-    private record HttpResult(int statusCode, JsonObject body) {
-        private boolean isSuccess() {
-            return statusCode >= 200 && statusCode < 300;
         }
     }
 

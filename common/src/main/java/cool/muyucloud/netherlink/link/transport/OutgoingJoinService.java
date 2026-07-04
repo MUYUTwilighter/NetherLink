@@ -1,4 +1,4 @@
-package cool.muyucloud.netherlink.link.official;
+package cool.muyucloud.netherlink.link.transport;
 
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
@@ -7,17 +7,13 @@ import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
 import cool.muyucloud.netherlink.link.model.*;
-import cool.muyucloud.netherlink.link.official.signaling.OfficialSignalingClient;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkSignalingClient;
-import cool.muyucloud.netherlink.link.transport.RtcChannel;
-import cool.muyucloud.netherlink.link.transport.RtcHandshake;
-import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.PeerConnectionFactory;
 import dev.onvoid.webrtc.RTCConfiguration;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import dev.onvoid.webrtc.RTCIceServer;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Objects;
@@ -28,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-public final class OfficialJoinService implements LinkJoinService {
+public final class OutgoingJoinService implements LinkJoinService {
     private static final long JOIN_TIMEOUT_SECONDS = 60L;
     private static final long HANDSHAKE_TIMEOUT_SECONDS = 30L;
 
@@ -38,21 +34,11 @@ public final class OfficialJoinService implements LinkJoinService {
     private final Function<String, LinkSignalingClient> signalingFactory;
     private @Nullable PeerConnectionFactory factory;
 
-    public OfficialJoinService() {
-        this(
-            runtimeKey -> LinkContextHooks.require(runtimeKey).account().getMcToken(),
-            runtimeKey -> new OfficialSignalingClient(
-                LinkContextHooks.require(runtimeKey).account().getMcToken(),
-                "NetherLink Client Signaling-" + runtimeKey
-            )
-        );
-    }
-
-    public OfficialJoinService(Function<String, LinkSignalingClient> signalingFactory) {
+    public OutgoingJoinService(Function<String, LinkSignalingClient> signalingFactory) {
         this(runtimeKey -> runtimeKey, signalingFactory);
     }
 
-    private OfficialJoinService(
+    public OutgoingJoinService(
         Function<String, Object> signalingIdentity,
         Function<String, LinkSignalingClient> signalingFactory
     ) {
@@ -84,7 +70,7 @@ public final class OfficialJoinService implements LinkJoinService {
             return raced;
         }
 
-        operation.completion().whenComplete((ignored1, ignored2) -> {
+        operation.completion().whenComplete((ignored1, ignored101) -> {
             this.outgoing.remove(key, operation);
             this.maybeDisconnectSignaling(runtimeKey);
         });
@@ -95,7 +81,7 @@ public final class OfficialJoinService implements LinkJoinService {
             }
         });
         session.signaling().sendClientMessage(host, new SignalingMessage.FriendJoin.Request(operation.sessionId()))
-            .whenComplete((ignored1, error) -> {
+            .whenComplete((ignored2, error) -> {
                 if (error != null) {
                     operation.fail(error);
                 }
@@ -146,14 +132,14 @@ public final class OfficialJoinService implements LinkJoinService {
         signaling.setWebRtcSignalingHandler((source, message) -> this.handleWebRtc(runtimeKey, source, message));
         signaling.addConnectionListener(new LinkSignalingClient.ConnectionListener() {
             @Override
-            public void onSignalingError(@Nullable LinkPeerRoute peer, cool.muyucloud.netherlink.link.transport.SignalingException cause) {
+            public void onSignalingError(@Nullable LinkPeerRoute peer, SignalingException cause) {
                 if (peer == null) {
-                    OfficialJoinService.this.outgoing.forEach((key, operation) -> {
+                    OutgoingJoinService.this.outgoing.forEach((key, operation) -> {
                         if (key.runtimeKey().equals(runtimeKey)) operation.fail(cause);
                     });
                     return;
                 }
-                OutgoingJoin operation = OfficialJoinService.this.outgoing.get(new JoinKey(runtimeKey, peer.presenceId()));
+                OutgoingJoin operation = OutgoingJoinService.this.outgoing.get(new JoinKey(runtimeKey, peer.presenceId()));
                 if (operation != null) operation.fail(cause);
             }
         });
@@ -164,17 +150,12 @@ public final class OfficialJoinService implements LinkJoinService {
 
     private void handleFriendJoin(String runtimeKey, LinkPeerRoute source, SignalingMessage.FriendJoin message) {
         JoinKey key = new JoinKey(runtimeKey, source.presenceId());
-        switch (message) {
-            case SignalingMessage.FriendJoin.Accepted accepted -> this.handleAccepted(key, source, accepted.sessionId());
-            case SignalingMessage.FriendJoin.Rejected rejected -> {
-                OutgoingJoin operation = this.outgoing.get(key);
-                if (operation != null && operation.sessionId().equals(rejected.sessionId())) {
-                    operation.reject();
-                }
-            }
-            case SignalingMessage.FriendJoin.Request ignored -> {
-            }
-            case SignalingMessage.FriendJoin.InviteDeclined ignored -> {
+        if (message instanceof SignalingMessage.FriendJoin.Accepted(String sessionId)) {
+            this.handleAccepted(key, source, sessionId);
+        } else if (message instanceof SignalingMessage.FriendJoin.Rejected(String sessionId)) {
+            OutgoingJoin operation = this.outgoing.get(key);
+            if (operation != null && operation.sessionId().equals(sessionId)) {
+                operation.reject();
             }
         }
     }
@@ -192,7 +173,7 @@ public final class OfficialJoinService implements LinkJoinService {
         operation.transition(LinkJoinState.NEGOTIATING);
         session.signaling().requestTurnAuth()
             .thenCompose(turn -> this.startHandshake(session.signaling(), host, sessionId, turn, operation))
-            .whenComplete((ignored1, error) -> {
+            .whenComplete((ignored3, error) -> {
                 if (error != null) {
                     operation.fail(error);
                 }
@@ -210,7 +191,7 @@ public final class OfficialJoinService implements LinkJoinService {
         config.iceServers.add(turn);
         config.portAllocatorConfig.setEnableIpv6(true).setEnableIpv6OnWifi(true);
         RtcHandshake handshake = new RtcHandshake(this.factory(), config, sessionId, true,
-            candidate -> signaling.sendClientMessage(host, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(ignored1 -> null));
+            candidate -> signaling.sendClientMessage(host, SignalingMessage.iceCandidate(sessionId, candidate)).exceptionally(ignored4 -> null));
         operation.setHandshake(handshake);
         CompletableFuture.delayedExecutor(HANDSHAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS).execute(() -> {
             if (!operation.completion().isDone()) {
@@ -241,17 +222,14 @@ public final class OfficialJoinService implements LinkJoinService {
         if (handshake == null || !handshake.id().equals(message.sessionId())) {
             return;
         }
-        switch (message) {
-            case SignalingMessage.WebRtc.Answer answer -> handshake.applyAnswer(answer.sdp()).exceptionally(error -> {
+        if (message instanceof SignalingMessage.WebRtc.Answer answer) {
+            handshake.applyAnswer(answer.sdp()).exceptionally(error -> {
                 handshake.abort("answer failed: " + error.getMessage());
                 return null;
             });
-            case SignalingMessage.WebRtc.IceCandidate ice -> {
-                RTCIceCandidate candidate = ice.toRtcIceCandidate();
-                handshake.addRemoteIceCandidate(candidate).exceptionally(ignored1 -> null);
-            }
-            case SignalingMessage.WebRtc.Offer ignored -> {
-            }
+        } else if (message instanceof SignalingMessage.WebRtc.IceCandidate ice) {
+            RTCIceCandidate candidate = ice.toRtcIceCandidate();
+            handshake.addRemoteIceCandidate(candidate).exceptionally(ignored5 -> null);
         }
     }
 
@@ -321,7 +299,7 @@ public final class OfficialJoinService implements LinkJoinService {
                     return false;
                 }
                 if (this.sdpStarted && this.handshake == null) {
-                    this.signaling.sendClientMessage(this.target.route(), SignalingMessage.inviteDeclined(this.sessionId)).exceptionally(ignored1 -> null);
+                    this.signaling.sendClientMessage(this.target.route(), SignalingMessage.inviteDeclined(this.sessionId)).exceptionally(ignored6 -> null);
                 }
                 this.snapshot = new LinkJoinSnapshot(this.runtimeKey, this.target, LinkJoinState.CANCELLED, null);
                 if (this.handshake != null) {

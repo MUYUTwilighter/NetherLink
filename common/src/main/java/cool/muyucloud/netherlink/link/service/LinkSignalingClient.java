@@ -4,7 +4,7 @@ import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
 import cool.muyucloud.netherlink.link.transport.SignalingException;
 import cool.muyucloud.netherlink.link.transport.SignalingMessage;
 import dev.onvoid.webrtc.RTCIceServer;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 

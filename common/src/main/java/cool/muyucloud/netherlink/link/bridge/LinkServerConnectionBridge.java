@@ -1,7 +1,7 @@
 package cool.muyucloud.netherlink.link.bridge;
 
 import io.netty.channel.Channel;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 

@@ -3,7 +3,7 @@ package cool.muyucloud.netherlink.link.hook;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.link.bridge.LinkClientConnectionBridge;
 import cool.muyucloud.netherlink.link.bridge.LinkServerConnectionBridge;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Game-owned context made available to a {@code LinkService} implementation.

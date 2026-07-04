@@ -4,7 +4,7 @@ import cool.muyucloud.netherlink.link.exception.LinkFailureSource;
 import cool.muyucloud.netherlink.link.model.LinkFailure;
 import cool.muyucloud.netherlink.link.model.LinkFailureCode;
 import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /** Internal signaling error carrying an optional peer route and normalized public failure. */
 public abstract class SignalingException extends RuntimeException implements LinkFailureSource {

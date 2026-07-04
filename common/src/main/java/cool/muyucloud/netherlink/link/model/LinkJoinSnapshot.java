@@ -1,6 +1,6 @@
 package cool.muyucloud.netherlink.link.model;
 
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /** Token-free point-in-time state of an outgoing join operation. */
 public record LinkJoinSnapshot(

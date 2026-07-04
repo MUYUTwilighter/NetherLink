@@ -31,7 +31,6 @@ public abstract class MinecraftServerMixin implements Messenger {
     public void nli$sendMessage(Supplier<Component> msg) {
         this.sendSystemMessage(msg.get());
     }
-
     @Override
     public PermissionSet nli$permissions() {
         return PermissionSet.ALL_PERMISSIONS;

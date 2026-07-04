@@ -1,6 +1,6 @@
 package cool.muyucloud.netherlink.link.model;
 
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Result of a friend graph mutation.

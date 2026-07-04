@@ -12,13 +12,11 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.EventLoopGroupHolder;
 import net.minecraft.server.network.ServerConnectionListener;
 import net.minecraft.server.network.ServerHandshakePacketListenerImpl;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.UUID;
 
 public final class MinecraftServerConnectionBridge implements LinkServerConnectionBridge {
-    private static final @Nullable Method SET_INTENDED_PROFILE_ID = findSetIntendedProfileId();
     private final MinecraftServer server;
 
     public MinecraftServerConnectionBridge(MinecraftServer server) {
@@ -26,11 +24,11 @@ public final class MinecraftServerConnectionBridge implements LinkServerConnecti
     }
 
     @Override
-    public void accept(Channel channel, @Nullable UUID profileId) {
-        this.server.execute(() -> this.acceptOnServerThread(channel, profileId));
+    public void accept(Channel channel, @Nullable UUID ignoredProfileId) {
+        this.server.execute(() -> this.acceptOnServerThread(channel));
     }
 
-    private void acceptOnServerThread(Channel channel, @Nullable UUID profileId) {
+    private void acceptOnServerThread(Channel channel) {
         ServerConnectionListener listener = this.server.getConnection();
         channel.pipeline().addLast(new ChannelInitializer<>() {
             @Override
@@ -43,30 +41,9 @@ public final class MinecraftServerConnectionBridge implements LinkServerConnecti
                 Connection.configureSerialization(pipeline, PacketFlow.SERVERBOUND, false, null);
                 connection.configurePacketHandler(pipeline);
                 connection.setListenerForServerboundHandshake(new ServerHandshakePacketListenerImpl(MinecraftServerConnectionBridge.this.server, connection));
-                setIntendedProfileId(connection, profileId);
                 listener.getConnections().add(connection);
             }
         });
         EventLoopGroupHolder.local().eventLoopGroup().register(channel).syncUninterruptibly();
-    }
-
-    private static void setIntendedProfileId(Connection connection, @Nullable UUID profileId) {
-        if (SET_INTENDED_PROFILE_ID == null) {
-            return;
-        }
-        try {
-            SET_INTENDED_PROFILE_ID.invoke(connection, profileId);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to set intended profile id", e);
-        }
-    }
-
-    @SuppressWarnings("JavaReflectionMemberAccess")
-    private static @Nullable Method findSetIntendedProfileId() {
-        try {
-            return Connection.class.getMethod("setIntendedProfileId", UUID.class);
-        } catch (NoSuchMethodException e) {
-            return null;
-        }
     }
 }

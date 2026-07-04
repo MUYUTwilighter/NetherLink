@@ -12,8 +12,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -42,7 +42,7 @@ final class NetherLinkJoinScreen extends Screen {
 
     @Override
     protected void init() {
-        this.cancelButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, ignored1 -> this.cancelOrClose())
+        this.cancelButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, ignored2 -> this.cancelOrClose())
             .bounds(this.width / 2 - 100, this.height / 2 + 60, 200, 20)
             .build());
         if (!this.started) {
@@ -188,7 +188,7 @@ final class NetherLinkJoinScreen extends Screen {
     }
 
     @Override
-    public void render(@NonNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, this.height / 2 - 58, -1);
         graphics.drawCenteredString(this.font, this.status, this.width / 2, this.height / 2 - 30, -1);

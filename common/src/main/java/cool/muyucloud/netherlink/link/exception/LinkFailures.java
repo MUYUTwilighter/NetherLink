@@ -3,6 +3,8 @@ package cool.muyucloud.netherlink.link.exception;
 import cool.muyucloud.netherlink.link.model.LinkFailure;
 import cool.muyucloud.netherlink.link.model.LinkFailureCode;
 
+import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -25,10 +27,10 @@ public final class LinkFailures {
         if (cause instanceof CancellationException) {
             return new LinkFailure(LinkFailureCode.CANCELLED, message(cause), false);
         }
-        if (cause instanceof TimeoutException || message(cause).toLowerCase(java.util.Locale.ROOT).contains("timed out")) {
+        if (cause instanceof TimeoutException || message(cause).toLowerCase(Locale.ROOT).contains("timed out")) {
             return new LinkFailure(LinkFailureCode.TIMEOUT, message(cause), true);
         }
-        if (cause instanceof java.io.IOException) {
+        if (cause instanceof IOException) {
             return new LinkFailure(LinkFailureCode.NETWORK, message(cause), true);
         }
         if (cause instanceof InterruptedException) {

@@ -5,7 +5,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.onvoid.webrtc.RTCIceCandidate;
 import net.minecraft.util.StringRepresentable;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Supplier;
 
@@ -151,7 +151,7 @@ public sealed interface SignalingMessage permits SignalingMessage.FriendJoin, Si
         }
 
         @Override
-        public @NonNull String getSerializedName() {
+        public @NotNull String getSerializedName() {
             return this.name();
         }
     }

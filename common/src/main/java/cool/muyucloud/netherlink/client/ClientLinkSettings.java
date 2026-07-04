@@ -2,7 +2,6 @@ package cool.muyucloud.netherlink.client;
 
 import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.NetherLinkConfig;
-import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.LinkServices;
 import cool.muyucloud.netherlink.link.model.LinkFriendSettings;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 final class ClientLinkSettings {
-    private static final Identifier LEGACY_OFFICIAL_ID = Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, "moj_26_2_s8");
     static final List<Identifier> AVAILABLE_SERVICES = List.of(NliLinkService.ID, OfficialLinkServiceProvider.ID);
 
     private ClientLinkSettings() {
@@ -27,37 +25,38 @@ final class ClientLinkSettings {
 
     static Identifier activeService(Minecraft minecraft) {
         String configured = NetherLinkConfig.string(NetherLinkConfig.read(path(minecraft)), NetherLinkConfig.ACTIVE_SERVICE_KEY)
-            .or(() -> NetherLinkConfig.string(readLegacyNliConfig(minecraft), NetherLinkConfig.ACTIVE_SERVICE_KEY))
             .orElse(NliLinkService.ID.toString());
         try {
             Identifier id = Identifier.parse(configured);
-            if (LEGACY_OFFICIAL_ID.equals(id)) {
-                return OfficialLinkServiceProvider.ID;
-            }
             return AVAILABLE_SERVICES.contains(id) ? id : NliLinkService.ID;
         } catch (RuntimeException ignored) {
             return NliLinkService.ID;
         }
     }
 
-    static CompletableFuture<Void> use(Minecraft minecraft, Identifier serviceId) {
-        JsonObject config = NetherLinkConfig.read(path(minecraft));
-        config.addProperty(NetherLinkConfig.ACTIVE_SERVICE_KEY, serviceId.toString());
-        NetherLinkConfig.write(path(minecraft), config);
-        return LinkServices.use(create(minecraft, serviceId));
+    static Component serviceName(Identifier serviceId) {
+        return Component.translatable(serviceId.getNamespace() + ".link." + serviceId.getPath());
     }
 
-    static Component createName(Identifier serviceId) {
-        return Component.translatable(serviceId.getNamespace() + ".link." + serviceId.getPath());
+    static CompletableFuture<Void> selectService(Minecraft minecraft, Identifier serviceId) {
+        return selectService(minecraft, create(minecraft, serviceId));
+    }
+
+    static CompletableFuture<Void> selectService(Minecraft minecraft, LinkService service) {
+        return LinkServices.use(service).thenRun(() -> saveConfiguredService(minecraft, service.id()));
     }
 
     static void applyConfiguredService(Minecraft minecraft) {
         Identifier serviceId = activeService(minecraft);
         LinkService current = LinkServices.current();
-        if (current.id().equals(serviceId) && !requiresNliReload(minecraft, current)) {
+        if (current.id().equals(serviceId) && !requiresReload(minecraft, current)) {
             return;
         }
         LinkServices.use(create(minecraft, serviceId)).join();
+    }
+
+    static List<Identifier> availableServiceIds() {
+        return AVAILABLE_SERVICES;
     }
 
     static void updateMinecraftSocialManager(Minecraft minecraft, LinkFriendSettings settings) {
@@ -66,16 +65,44 @@ final class ClientLinkSettings {
         invoke(manager, "setAllowFriendRequests", settings.acceptInvites());
     }
 
-    private static LinkService create(Minecraft minecraft, Identifier serviceId) {
+    static String configuredInstanceName(Minecraft minecraft) {
+        return NetherLinkConfig.instanceName(minecraft.gameDirectory.toPath()).orElse("");
+    }
+
+    static void saveInstanceName(Minecraft minecraft, String instanceName) {
+        Path path = path(minecraft);
+        JsonObject config = NetherLinkConfig.read(path);
+        String trimmed = instanceName == null ? "" : instanceName.trim();
+        if (trimmed.isEmpty()) {
+            config.remove(NetherLinkConfig.INSTANCE_NAME_KEY);
+        } else {
+            config.addProperty(NetherLinkConfig.INSTANCE_NAME_KEY, trimmed);
+        }
+        NetherLinkConfig.write(path, config);
+    }
+
+    static LinkService create(Minecraft minecraft, Identifier serviceId) {
         if (OfficialLinkServiceProvider.ID.equals(serviceId)) {
             return OfficialLinkServiceProvider.INSTANCE;
         }
-        return new NliLinkService(NliV1Config.serverUri(nliPath(minecraft)));
+        Path path = nliPath(minecraft);
+        return new NliLinkService(NliV1Config.serverUri(path), path);
     }
 
-    private static boolean requiresNliReload(Minecraft minecraft, LinkService current) {
+    static boolean requiresReload(Minecraft minecraft, LinkService current) {
         return current instanceof NliLinkService nli
             && !nli.baseUri().equals(NliV1Config.serverUri(nliPath(minecraft)));
+    }
+
+    private static void saveConfiguredService(Minecraft minecraft, Identifier id) {
+        Path path = path(minecraft);
+        JsonObject config = NetherLinkConfig.read(path);
+        if (NliLinkService.ID.equals(id)) {
+            config.remove(NetherLinkConfig.ACTIVE_SERVICE_KEY);
+        } else {
+            config.addProperty(NetherLinkConfig.ACTIVE_SERVICE_KEY, id.toString());
+        }
+        NetherLinkConfig.write(path, config);
     }
 
     private static void invoke(Object target, String name, boolean value) {
@@ -92,15 +119,6 @@ final class ClientLinkSettings {
 
     private static Path nliPath(Minecraft minecraft) {
         return NliV1Config.path(minecraft.gameDirectory.toPath());
-    }
-
-    private static JsonObject readLegacyNliConfig(Minecraft minecraft) {
-        try {
-            return NliV1Config.read(nliPath(minecraft));
-        } catch (RuntimeException error) {
-            NliConstants.LOG.warn("Unable to read legacy NetherLink settings from {}; ignoring legacy values", nliPath(minecraft), error);
-            return new JsonObject();
-        }
     }
 
 }
