@@ -1,7 +1,6 @@
 package cool.muyucloud.netherlink.account.data;
 
 import com.google.gson.JsonObject;
-import cool.muyucloud.netherlink.http.JsonHttp;
 
 public class Endpoint {
     private String deviceCode;
@@ -14,13 +13,15 @@ public class Endpoint {
 
     public static Endpoint fromJson(JsonObject json) {
         Endpoint endpoint = new Endpoint();
-        endpoint.deviceCode = JsonHttp.requiredString(json, "device_code");
-        endpoint.userCode = JsonHttp.requiredString(json, "user_code");
-        endpoint.verificationUri = JsonHttp.requiredString(json, "verification_uri");
-        endpoint.verificationUriComplete = JsonHttp.string(json, "verification_uri_complete");
-        endpoint.expiresIn = JsonHttp.requiredLong(json, "expires_in");
-        endpoint.interval = JsonHttp.longValue(json, "interval", 5L);
-        endpoint.message = JsonHttp.string(json, "message");
+        endpoint.deviceCode = json.get("device_code").getAsString();
+        endpoint.userCode = json.get("user_code").getAsString();
+        endpoint.verificationUri = json.get("verification_uri").getAsString();
+        if (json.has("verification_uri_complete")) {
+            endpoint.verificationUriComplete = json.get("verification_uri_complete").getAsString();
+        }
+        endpoint.expiresIn = json.get("expires_in").getAsLong();
+        endpoint.interval = json.has("interval") ? json.get("interval").getAsLong() : 5L;
+        endpoint.message = json.has("message") ? json.get("message").getAsString() : null;
         return endpoint;
     }
 

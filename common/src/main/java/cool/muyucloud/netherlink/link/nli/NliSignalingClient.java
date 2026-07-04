@@ -3,9 +3,9 @@ package cool.muyucloud.netherlink.link.nli;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import cool.muyucloud.netherlink.NliConstants;
-import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.model.LinkFailure;
 import cool.muyucloud.netherlink.link.model.LinkFailureCode;
 import cool.muyucloud.netherlink.link.model.LinkPeerRoute;
@@ -142,9 +142,9 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
     public CompletableFuture<RTCIceServer> requestTurnAuth() {
         return this.api.post("v1/turn", this.session.token(), null).thenApply(json -> {
             RTCIceServer server = new RTCIceServer();
-            server.username = JsonHttp.requiredString(json, "username");
-            server.password = JsonHttp.requiredString(json, "credential");
-            JsonArray urls = JsonHttp.array(json, "urls");
+            server.username = NliApiClient.requiredString(json, "username");
+            server.password = NliApiClient.requiredString(json, "credential");
+            JsonArray urls = json.has("urls") && json.get("urls").isJsonArray() ? json.getAsJsonArray("urls") : new JsonArray();
             for (JsonElement url : urls) server.urls.add(url.getAsString());
             if (server.urls.isEmpty()) throw new IllegalStateException("NLI TURN response contains no URLs");
             return server;
@@ -209,15 +209,15 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
 
     private void handleFrame(String frame) {
         try {
-            JsonObject envelope = JsonHttp.parseObject(frame);
-            String type = JsonHttp.requiredString(envelope, "type");
+            JsonObject envelope = JsonParser.parseString(frame).getAsJsonObject();
+            String type = NliApiClient.requiredString(envelope, "type");
             if ("ERROR".equals(type)) {
                 this.handleError(envelope);
                 return;
             }
             LinkPeerRoute source = new LinkPeerRoute(
-                JsonHttp.requiredUuid(envelope, "from"),
-                JsonHttp.requiredString(envelope, "fromPresenceId")
+                UUID.fromString(NliApiClient.requiredString(envelope, "from")),
+                NliApiClient.requiredString(envelope, "fromPresenceId")
             );
             JsonElement payload = envelope.get("payload");
             SignalingMessage message = SignalingMessage.CODEC.parse(JsonOps.INSTANCE, payload)
@@ -235,10 +235,10 @@ final class NliSignalingClient implements LinkSignalingClient, WebSocket.Listene
     }
 
     private void handleError(JsonObject envelope) {
-        String code = JsonHttp.string(envelope, "code", "UNKNOWN");
-        String message = JsonHttp.string(envelope, "message", "NLI signaling rejected the request");
+        String code = NliApiClient.string(envelope, "code", "UNKNOWN");
+        String message = NliApiClient.string(envelope, "message", "NLI signaling rejected the request");
         SignalingException error = new NliSignalException(failureCode(code), message);
-        String id = JsonHttp.string(envelope, "id");
+        String id = NliApiClient.nullableString(envelope, "id");
         LinkPeerRoute peer = id != null ? this.pendingRoutes.remove(id) : null;
         this.listeners.forEach(listener -> listener.onSignalingError(peer, error));
         if ("INVALID_INSTANCE_TOKEN".equals(code)) this.disconnect();

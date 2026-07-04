@@ -147,8 +147,8 @@ final class NliApiClient implements AutoCloseable {
         try {
             if (body != null && !body.isBlank()) {
                 JsonObject json = JsonHttp.parseObject(body);
-                code = JsonHttp.string(json, "code", "");
-                message = JsonHttp.string(json, "message", message);
+                code = string(json, "code", "");
+                message = string(json, "message", message);
             }
         } catch (RuntimeException ignored) {
         }
@@ -180,6 +180,21 @@ final class NliApiClient implements AutoCloseable {
         return this.baseUri.resolve(path.startsWith("/") ? path.substring(1) : path);
     }
 
+    static String requiredString(JsonObject object, String key) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
+            throw new IllegalStateException("NLI response is missing " + key);
+        }
+        return JsonHttp.requiredString(object, key);
+    }
+
+    static @Nullable String nullableString(JsonObject object, String key) {
+        return JsonHttp.string(object, key);
+    }
+
+    static String string(JsonObject object, String key, String fallback) {
+        String value = nullableString(object, key);
+        return value != null ? value : fallback;
+    }
     @Override
     public void close() {
         this.http.close();

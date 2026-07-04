@@ -1,6 +1,5 @@
 package cool.muyucloud.netherlink.http;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -57,21 +56,6 @@ public final class JsonHttp {
         return object.get(key).getAsString();
     }
 
-    public static long requiredLong(JsonObject object, String key) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            throw new IllegalStateException("HTTP response is missing " + key);
-        }
-        return object.get(key).getAsLong();
-    }
-
-    public static UUID requiredUuid(JsonObject object, String key) {
-        return UUID.fromString(requiredString(object, key));
-    }
-
-    public static Instant requiredInstant(JsonObject object, String key) {
-        return Instant.parse(requiredString(object, key));
-    }
-
     public static @Nullable String string(JsonObject object, String key) {
         if (!object.has(key) || !object.get(key).isJsonPrimitive()) {
             return null;
@@ -79,40 +63,9 @@ public final class JsonHttp {
         return object.get(key).getAsString();
     }
 
-    public static Optional<String> stringOptional(JsonObject object, String key) {
-        String value = string(object, key);
-        return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
-    }
-
     public static String string(JsonObject object, String key, String fallback) {
         String value = string(object, key);
         return value != null ? value : fallback;
-    }
-
-    public static long longValue(JsonObject object, String key, long fallback) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return fallback;
-        }
-        return object.get(key).getAsLong();
-    }
-
-    public static boolean bool(JsonObject object, String key) {
-        return bool(object, key, false);
-    }
-
-    public static boolean bool(JsonObject object, String key, boolean fallback) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return fallback;
-        }
-        return object.get(key).getAsBoolean();
-    }
-
-    public static JsonArray array(JsonObject object, String key) {
-        return object.has(key) && object.get(key).isJsonArray() ? object.getAsJsonArray(key) : new JsonArray();
-    }
-
-    public static JsonObject object(JsonObject object, String key) {
-        return object.has(key) && object.get(key).isJsonObject() ? object.getAsJsonObject(key) : new JsonObject();
     }
 
     public static @Nullable Instant instant(JsonObject object, String key) {
@@ -125,11 +78,6 @@ public final class JsonHttp {
         } catch (RuntimeException ignored) {
             return null;
         }
-    }
-
-    public static @Nullable Instant strictInstant(JsonObject object, String key) {
-        String value = string(object, key);
-        return value == null ? null : Instant.parse(value);
     }
 
     public static @Nullable UUID uuid(JsonObject object, String key) {

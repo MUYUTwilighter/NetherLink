@@ -290,8 +290,11 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     private static List<Friend> parseFriends(JsonObject root, String key) {
+        if (!root.has(key) || !root.get(key).isJsonArray()) {
+            return List.of();
+        }
         List<Friend> friends = new ArrayList<>();
-        for (JsonElement element : JsonHttp.array(root, key)) {
+        for (JsonElement element : root.getAsJsonArray(key)) {
             if (!element.isJsonObject()) {
                 continue;
             }
@@ -307,7 +310,9 @@ public final class OfficialFriendService implements LinkFriendService {
 
     private static Map<UUID, Presence> parsePresence(String body) {
         JsonObject root = JsonHttp.parseObject(body);
-        JsonArray presence = JsonHttp.array(root, "presence");
+        JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
+            ? root.getAsJsonArray("presence")
+            : new JsonArray();
         Map<UUID, Presence> statuses = new HashMap<>();
         for (JsonElement element : presence) {
             if (!element.isJsonObject()) {
@@ -388,7 +393,9 @@ public final class OfficialFriendService implements LinkFriendService {
 
     private static LinkFriendSettings parseSettings(String body) {
         JsonObject root = JsonHttp.parseObject(body);
-        JsonObject preferences = JsonHttp.object(root, "friendsPreferences");
+        JsonObject preferences = root.has("friendsPreferences") && root.get("friendsPreferences").isJsonObject()
+            ? root.getAsJsonObject("friendsPreferences")
+            : new JsonObject();
         return new LinkFriendSettings(
             "ENABLED".equalsIgnoreCase(JsonHttp.string(preferences, "friends")),
             "ENABLED".equalsIgnoreCase(JsonHttp.string(preferences, "acceptInvites"))

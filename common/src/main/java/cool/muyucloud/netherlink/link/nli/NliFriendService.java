@@ -3,13 +3,14 @@ package cool.muyucloud.netherlink.link.nli;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.*;
 import cool.muyucloud.netherlink.link.service.LinkFriendService;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -77,15 +78,19 @@ final class NliFriendService implements LinkFriendService {
         return this.runtimes.session(this.runtimeKey)
             .thenCompose(session -> this.api.put("v1/friends/settings", session.token(), body, this.minecraftToken()))
             .thenApply(json -> new LinkFriendSettings(
-                JsonHttp.bool(json, "friendsEnabled", settings.friendsEnabled()),
-                JsonHttp.bool(json, "acceptInvites", settings.acceptInvites())
+                json.has("friendsEnabled") && !json.get("friendsEnabled").isJsonNull()
+                    ? json.get("friendsEnabled").getAsBoolean()
+                    : settings.friendsEnabled(),
+                json.has("acceptInvites") && !json.get("acceptInvites").isJsonNull()
+                    ? json.get("acceptInvites").getAsBoolean()
+                    : settings.acceptInvites()
             ));
     }
 
     private static LinkFriendSettings settings(JsonObject json) {
         return new LinkFriendSettings(
-            JsonHttp.bool(json, "friendsEnabled"),
-            JsonHttp.bool(json, "acceptInvites")
+            json.has("friendsEnabled") && !json.get("friendsEnabled").isJsonNull() && json.get("friendsEnabled").getAsBoolean(),
+            json.has("acceptInvites") && !json.get("acceptInvites").isJsonNull() && json.get("acceptInvites").getAsBoolean()
         );
     }
 
@@ -99,7 +104,7 @@ final class NliFriendService implements LinkFriendService {
         return this.runtimes.session(this.runtimeKey)
             .thenCompose(session -> this.api.post(path, session.token(), body, this.minecraftToken()))
             .thenApply(json -> {
-                String relation = JsonHttp.string(json, "relationship", "");
+                String relation = NliApiClient.string(json, "relationship", "");
                 LinkFriendRelationship relationship = switch (relation) {
                     case "ACCEPTED" -> LinkFriendRelationship.FRIEND;
                     case "REQUESTED" -> LinkFriendRelationship.OUTGOING;
@@ -114,10 +119,10 @@ final class NliFriendService implements LinkFriendService {
     }
 
     private LinkFriendSnapshot snapshot(JsonObject root) {
-        List<LinkPresence> selfPresences = presences(JsonHttp.array(root, "selfPresences"));
-        List<LinkFriendEntry> friends = entries(JsonHttp.array(root, "friends"), LinkFriendRelationship.FRIEND, true);
-        List<LinkFriendEntry> incoming = entries(JsonHttp.array(root, "incomingRequests"), LinkFriendRelationship.INCOMING, false);
-        List<LinkFriendEntry> outgoing = entries(JsonHttp.array(root, "outgoingRequests"), LinkFriendRelationship.OUTGOING, false);
+        List<LinkPresence> selfPresences = presences(array(root, "selfPresences"));
+        List<LinkFriendEntry> friends = entries(array(root, "friends"), LinkFriendRelationship.FRIEND, true);
+        List<LinkFriendEntry> incoming = entries(array(root, "incomingRequests"), LinkFriendRelationship.INCOMING, false);
+        List<LinkFriendEntry> outgoing = entries(array(root, "outgoingRequests"), LinkFriendRelationship.OUTGOING, false);
         return new LinkFriendSnapshot(selfPresences, friends, incoming, outgoing);
     }
 
@@ -126,9 +131,9 @@ final class NliFriendService implements LinkFriendService {
         for (JsonElement element : array) {
             if (!element.isJsonObject()) continue;
             JsonObject object = element.getAsJsonObject();
-            UUID profileId = JsonHttp.requiredUuid(object, "profileId");
-            List<LinkPresence> presences = includePresence ? presences(JsonHttp.array(object, "presences")) : List.of();
-            entries.add(new LinkFriendEntry(profileId, JsonHttp.string(object, "name"), relationship, presences));
+            UUID profileId = UUID.fromString(NliApiClient.requiredString(object, "profileId"));
+            List<LinkPresence> presences = includePresence ? presences(array(object, "presences")) : List.of();
+            entries.add(new LinkFriendEntry(profileId, NliApiClient.nullableString(object, "name"), relationship, presences));
         }
         return List.copyOf(entries);
     }
@@ -139,14 +144,14 @@ final class NliFriendService implements LinkFriendService {
             if (!element.isJsonObject()) continue;
             JsonObject object = element.getAsJsonObject();
             result.add(new LinkPresence(
-                JsonHttp.requiredString(object, "presenceId"),
-                status(JsonHttp.requiredString(object, "status")),
-                JsonHttp.bool(object, "joinable"),
-                JsonHttp.string(object, "displayText", ""),
-                JsonHttp.string(object, "sessionId"),
-                JsonHttp.string(object, "endpoint"),
-                JsonHttp.strictInstant(object, "updatedAt"),
-                JsonHttp.strictInstant(object, "expiresAt")
+                NliApiClient.requiredString(object, "presenceId"),
+                status(NliApiClient.requiredString(object, "status")),
+                object.has("joinable") && object.get("joinable").getAsBoolean(),
+                NliApiClient.string(object, "displayText", ""),
+                NliApiClient.nullableString(object, "sessionId"),
+                NliApiClient.nullableString(object, "endpoint"),
+                instant(object, "updatedAt"),
+                instant(object, "expiresAt")
             ));
         }
         return List.copyOf(result);
@@ -162,13 +167,21 @@ final class NliFriendService implements LinkFriendService {
         };
     }
 
+    private static @Nullable Instant instant(JsonObject object, String key) {
+        String value = NliApiClient.nullableString(object, key);
+        return value != null ? Instant.parse(value) : null;
+    }
+
+    private static JsonArray array(JsonObject object, String key) {
+        return object.has(key) && object.get(key).isJsonArray() ? object.getAsJsonArray(key) : new JsonArray();
+    }
 
     private static String path(String prefix, UUID profileId) {
         return prefix + URLEncoder.encode(profileId.toString(), StandardCharsets.UTF_8);
     }
 
     private static LinkOfficialSyncStatus officialSync(JsonObject response) {
-        return switch (JsonHttp.string(response, "officialSync", "SKIPPED")) {
+        return switch (NliApiClient.string(response, "officialSync", "SKIPPED")) {
             case "SUCCESS" -> LinkOfficialSyncStatus.SUCCESS;
             case "FAILED" -> LinkOfficialSyncStatus.FAILED;
             case "UNSUPPORTED" -> LinkOfficialSyncStatus.UNSUPPORTED;

@@ -154,14 +154,21 @@ public final class NliLinkService implements LinkService {
     private Optional<String> acceptedRevision(String language) {
         synchronized (this.termsLock) {
             JsonObject accepted = NliV1Config.acceptedTerms(NliV1Config.read(this.configPath));
-            Optional<String> revision = JsonHttp.stringOptional(accepted, key(this.id(), language));
+            Optional<String> revision = string(accepted, key(this.id(), language));
             if (revision.isPresent()) {
                 return revision;
             }
             Path legacyPath = this.configPath.resolveSibling("config.json");
             JsonObject legacy = NetherLinkConfig.read(legacyPath);
-            return JsonHttp.stringOptional(JsonHttp.object(legacy, NliV1Config.ACCEPTED_TERMS_KEY), key(this.id(), language));
+            if (legacy.has(NliV1Config.ACCEPTED_TERMS_KEY) && legacy.get(NliV1Config.ACCEPTED_TERMS_KEY).isJsonObject()) {
+                return string(legacy.getAsJsonObject(NliV1Config.ACCEPTED_TERMS_KEY), key(this.id(), language));
+            }
+            return Optional.empty();
         }
+    }
+    private static Optional<String> string(JsonObject object, String key) {
+        String value = JsonHttp.string(object, key);
+        return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
     }
     private static String key(Identifier backendId, String language) {
         return backendId + "|" + language;

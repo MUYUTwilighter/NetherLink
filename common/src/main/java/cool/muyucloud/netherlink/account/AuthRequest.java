@@ -17,6 +17,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
@@ -164,7 +165,7 @@ public class AuthRequest {
             JsonObject response = postJson(MC_LOGIN, body);
             String mcToken = requiredString(response, "access_token");
             account.setMcToken(mcToken);
-            account.setMcExpireAt(expiresAtFromSeconds(JsonHttp.requiredLong(response, "expires_in")));
+            account.setMcExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
         } finally {
             pendingMcToken = false;
         }
@@ -218,7 +219,7 @@ public class AuthRequest {
                 return;
             }
 
-            String error = JsonHttp.string(result.body(), "error");
+            String error = optionalString(result.body(), "error");
             if ("authorization_pending".equals(error)) {
                 continue;
             }
@@ -256,7 +257,7 @@ public class AuthRequest {
         if (response.has("refresh_token")) {
             account.setMsRefreshToken(response.get("refresh_token").getAsString());
         }
-        account.setMsExpireAt(expiresAtFromSeconds(JsonHttp.requiredLong(response, "expires_in")));
+        account.setMsExpireAt(expiresAtFromSeconds(response.get("expires_in").getAsLong()));
     }
 
     private void sendDeviceCodeMessage(Endpoint endpoint) {
@@ -353,7 +354,7 @@ public class AuthRequest {
     }
 
     private long parseNotAfter(JsonObject response) {
-        return JsonHttp.requiredInstant(response, "NotAfter").toEpochMilli();
+        return Instant.parse(requiredString(response, "NotAfter")).toEpochMilli();
     }
 
     private String extractUserHash(JsonObject response) {
@@ -365,19 +366,22 @@ public class AuthRequest {
     }
 
     private String requiredString(JsonObject object, String key) {
-        try {
-            return JsonHttp.requiredString(object, key);
-        } catch (RuntimeException error) {
+        if (!object.has(key) || object.get(key).isJsonNull()) {
             throw fail("Authentication response missed field: " + key);
         }
+        return JsonHttp.requiredString(object, key);
+    }
+
+    private String optionalString(JsonObject object, String key) {
+        return JsonHttp.string(object, key);
     }
 
     private String describeError(JsonHttp.JsonResponse result) {
-        String error = JsonHttp.string(result.body(), "error");
-        String description = JsonHttp.string(result.body(), "error_description");
-        String errorMessage = JsonHttp.string(result.body(), "errorMessage");
-        String errorType = JsonHttp.string(result.body(), "errorType");
-        String path = JsonHttp.string(result.body(), "path");
+        String error = optionalString(result.body(), "error");
+        String description = optionalString(result.body(), "error_description");
+        String errorMessage = optionalString(result.body(), "errorMessage");
+        String errorType = optionalString(result.body(), "errorType");
+        String path = optionalString(result.body(), "path");
         if (error == null && errorMessage == null && errorType == null) {
             return "HTTP " + result.statusCode() + " " + result.body();
         }

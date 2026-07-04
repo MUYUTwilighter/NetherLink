@@ -3,7 +3,6 @@ package cool.muyucloud.netherlink.link.nli;
 import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
-import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.exception.LinkFailures;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.hook.LinkRuntimeContext;
@@ -14,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.concurrent.*;
 
 final class NliRuntimeService implements LinkRuntimeService {
@@ -73,11 +73,11 @@ final class NliRuntimeService implements LinkRuntimeService {
         return this.api.post("v1/instances", minecraftToken, body).thenApply(json -> {
             NliSession session = new NliSession(
                 key,
-                JsonHttp.requiredUuid(json, "profileId"),
-                JsonHttp.requiredString(json, "name"),
-                JsonHttp.requiredString(json, "presenceId"),
-                JsonHttp.requiredString(json, "instanceToken"),
-                JsonHttp.requiredInstant(json, "expiresAt")
+                UUID.fromString(NliApiClient.requiredString(json, "profileId")),
+                NliApiClient.requiredString(json, "name"),
+                NliApiClient.requiredString(json, "presenceId"),
+                NliApiClient.requiredString(json, "instanceToken"),
+                Instant.parse(NliApiClient.requiredString(json, "expiresAt"))
             );
             session.desiredPresence(online(context.displayText()));
             this.scheduleRenewal(session);
@@ -95,8 +95,8 @@ final class NliRuntimeService implements LinkRuntimeService {
     private CompletableFuture<NliSession> renewSession(NliSession session) {
         return this.api.post("v1/instances/renew", session.token(), null).thenApply(json -> {
             session.rotate(
-                JsonHttp.requiredString(json, "instanceToken"),
-                JsonHttp.requiredInstant(json, "expiresAt")
+                NliApiClient.requiredString(json, "instanceToken"),
+                Instant.parse(NliApiClient.requiredString(json, "expiresAt"))
             );
             this.failures.remove(session.runtimeKey());
             this.scheduleRenewal(session);
@@ -165,7 +165,7 @@ final class NliRuntimeService implements LinkRuntimeService {
             if (update.sessionId() != null) body.addProperty("sessionId", update.sessionId());
             if (update.endpoint() != null) body.addProperty("endpoint", update.endpoint());
             return this.api.put("v1/presence", session.token(), body).thenApply(json -> {
-                Instant expiresAt = JsonHttp.requiredInstant(json, "expiresAt");
+                Instant expiresAt = Instant.parse(NliApiClient.requiredString(json, "expiresAt"));
                 this.failures.remove(key);
                 return new LinkPresence(
                     session.presenceId(), update.status(), update.joinable(), update.displayText(),

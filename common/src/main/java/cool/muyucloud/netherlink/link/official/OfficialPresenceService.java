@@ -86,7 +86,9 @@ public final class OfficialPresenceService implements LinkPresenceService {
 
     private static Map<String, UUID> parsePresence(String body) {
         JsonObject root = JsonHttp.parseObject(body);
-        JsonArray presence = JsonHttp.array(root, "presence");
+        JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
+            ? root.getAsJsonArray("presence")
+            : new JsonArray();
         Map<String, UUID> peers = new HashMap<>();
         presence.forEach(element -> {
             if (!element.isJsonObject()) {
