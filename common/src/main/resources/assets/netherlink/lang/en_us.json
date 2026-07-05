@@ -100,7 +100,6 @@
   "netherlink.friends.settings.loaded": "Friend settings loaded.",
   "netherlink.friends.settings.load_failed": "Failed to load friend settings: %s",
   "netherlink.friends.settings.saving": "Saving friend settings...",
-  "netherlink.friends.settings.terms": "Review the target API terms to finish switching.",
   "netherlink.friends.settings.saved": "Friend settings saved.",
   "netherlink.friends.settings.failed": "Failed to save friend settings: %s",
   "netherlink.failure.unauthorized": "Your sign-in session has expired. Sign in again and retry.",
