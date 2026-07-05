@@ -3,10 +3,10 @@ package cool.muyucloud.netherlink.link.official;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.exception.LinkException;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
 import cool.muyucloud.netherlink.link.model.*;
@@ -112,12 +112,12 @@ public final class OfficialFriendService implements LinkFriendService {
             builder.header("If-None-Match", this.friendsEtag);
         }
         try {
-            HttpResponse<String> response = this.http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = JsonHttp.sendString(this.http, builder.build());
             if (response.statusCode() == 304) {
                 this.updateFriendPollInterval(response);
                 return this.friendCache;
             }
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            if (!JsonHttp.isSuccess(response.statusCode())) {
                 throw requestFailure("Friend list request", response.statusCode());
             }
             this.updateFriendPollInterval(response);
@@ -136,19 +136,19 @@ public final class OfficialFriendService implements LinkFriendService {
         body.addProperty("status", "ONLINE");
         HttpRequest.Builder builder = this.authorized(PRESENCE_URI)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString()));
+            .POST(JsonHttp.jsonBody(body));
         if (this.presenceEtag != null) {
             builder.header("If-None-Match", this.presenceEtag);
         }
         try {
-            HttpResponse<String> response = this.http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = JsonHttp.sendString(this.http, builder.build());
             if (response.statusCode() == 304) {
                 return this.presenceCache;
             }
             if (response.statusCode() == 401) {
                 throw new LinkUnauthorizedException("Friend presence request failed: HTTP 401");
             }
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            if (!JsonHttp.isSuccess(response.statusCode())) {
                 NliConstants.LOG.warn("Friend presence request failed: HTTP {}", response.statusCode());
                 return this.presenceCache;
             }
@@ -167,8 +167,8 @@ public final class OfficialFriendService implements LinkFriendService {
     private LinkFriendSettings getSettings() {
         HttpRequest request = this.authorized(ATTRIBUTES_URI).GET().build();
         try {
-            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            HttpResponse<String> response = JsonHttp.sendString(this.http, request);
+            if (!JsonHttp.isSuccess(response.statusCode())) {
                 throw requestFailure("Friend settings request", response.statusCode());
             }
             return parseSettings(response.body());
@@ -188,11 +188,11 @@ public final class OfficialFriendService implements LinkFriendService {
         body.add("friendsPreferences", preferences);
         HttpRequest request = this.authorized(ATTRIBUTES_URI)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .POST(JsonHttp.jsonBody(body))
             .build();
         try {
-            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            HttpResponse<String> response = JsonHttp.sendString(this.http, request);
+            if (!JsonHttp.isSuccess(response.statusCode())) {
                 throw requestFailure("Friend settings update", response.statusCode());
             }
             return settings;
@@ -216,10 +216,10 @@ public final class OfficialFriendService implements LinkFriendService {
 
         HttpRequest request = this.authorized(FRIENDS_URI)
             .header("Content-Type", "application/json")
-            .PUT(HttpRequest.BodyPublishers.ofString(body.toString()))
+            .PUT(JsonHttp.jsonBody(body))
             .build();
         try {
-            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = JsonHttp.sendString(this.http, request);
             LinkFriendActionResult result = handleHttpStatus(response.statusCode());
             if (response.statusCode() == 401) {
                 throw new LinkUnauthorizedException("Friend action failed: HTTP 401");
@@ -281,7 +281,7 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     private static FriendLists parseFriendLists(String body) {
-        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        JsonObject root = JsonHttp.parseObject(body);
         return new FriendLists(
             parseFriends(root, "friends"),
             parseFriends(root, "incomingRequests"),
@@ -299,8 +299,8 @@ public final class OfficialFriendService implements LinkFriendService {
                 continue;
             }
             JsonObject object = element.getAsJsonObject();
-            UUID profileId = parseUuid(object, "profileId");
-            String name = string(object, "name");
+            UUID profileId = JsonHttp.uuidLenient(object, "profileId");
+            String name = JsonHttp.string(object, "name");
             if (profileId != null && name != null && !name.isBlank()) {
                 friends.add(new Friend(profileId, name));
             }
@@ -309,7 +309,7 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     private static Map<UUID, Presence> parsePresence(String body) {
-        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        JsonObject root = JsonHttp.parseObject(body);
         JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
             ? root.getAsJsonArray("presence")
             : new JsonArray();
@@ -319,13 +319,13 @@ public final class OfficialFriendService implements LinkFriendService {
                 continue;
             }
             JsonObject object = element.getAsJsonObject();
-            UUID profileId = parseUuid(object, "profileId");
+            UUID profileId = JsonHttp.uuidLenient(object, "profileId");
             if (profileId == null) {
                 continue;
             }
-            UUID presenceId = parseUuid(object, "pmid");
-            String status = string(object, "status");
-            Instant lastUpdated = instant(object, "lastUpdated");
+            UUID presenceId = JsonHttp.uuidLenient(object, "pmid");
+            String status = JsonHttp.string(object, "status");
+            Instant lastUpdated = JsonHttp.instant(object, "lastUpdated");
             LinkPresenceStatus mappedStatus = officialStatus(status != null ? status : "OFFLINE");
             statuses.put(profileId, new Presence(
                 presenceId != null ? presenceId.toString() : null,
@@ -369,7 +369,7 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     private static LinkFriendActionResult handleHttpStatus(int status) {
-        if (status >= 200 && status < 300) {
+        if (JsonHttp.isSuccess(status)) {
             return LinkFriendActionResult.SUCCESS;
         }
         if (status == 400) {
@@ -388,27 +388,17 @@ public final class OfficialFriendService implements LinkFriendService {
     }
 
     private void updateFriendPollInterval(HttpResponse<?> response) {
-        retryAfter(response).ifPresent(duration -> this.nextFriendRequest = Instant.now().plus(duration));
-    }
-
-    private static Optional<Duration> retryAfter(HttpResponse<?> response) {
-        return response.headers().firstValue("Retry-After").flatMap(value -> {
-            try {
-                return Optional.of(Duration.ofSeconds(Long.parseLong(value.trim())));
-            } catch (NumberFormatException ignored) {
-                return Optional.empty();
-            }
-        });
+        JsonHttp.retryAfter(response).ifPresent(duration -> this.nextFriendRequest = Instant.now().plus(duration));
     }
 
     private static LinkFriendSettings parseSettings(String body) {
-        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        JsonObject root = JsonHttp.parseObject(body);
         JsonObject preferences = root.has("friendsPreferences") && root.get("friendsPreferences").isJsonObject()
             ? root.getAsJsonObject("friendsPreferences")
             : new JsonObject();
         return new LinkFriendSettings(
-            "ENABLED".equalsIgnoreCase(string(preferences, "friends")),
-            "ENABLED".equalsIgnoreCase(string(preferences, "acceptInvites"))
+            "ENABLED".equalsIgnoreCase(JsonHttp.string(preferences, "friends")),
+            "ENABLED".equalsIgnoreCase(JsonHttp.string(preferences, "acceptInvites"))
         );
     }
 
@@ -427,18 +417,6 @@ public final class OfficialFriendService implements LinkFriendService {
         return new LinkException(new LinkFailure(LinkFailureCode.NETWORK, message, true), error);
     }
 
-    private static @Nullable Instant instant(JsonObject object, String key) {
-        String value = string(object, key);
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Instant.parse(value);
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
     private static @Nullable LinkFailure failureFor(LinkFriendActionResult result) {
         return switch (result) {
             case SUCCESS -> null;
@@ -448,36 +426,6 @@ public final class OfficialFriendService implements LinkFriendService {
             case UNKNOWN_PROFILE -> new LinkFailure(LinkFailureCode.PROFILE_NOT_FOUND, "Minecraft profile was not found", false);
             case ERROR -> new LinkFailure(LinkFailureCode.UNKNOWN, "Friend action failed", false);
         };
-    }
-
-    private static @Nullable String string(JsonObject object, String key) {
-        if (!object.has(key) || !object.get(key).isJsonPrimitive()) {
-            return null;
-        }
-        return object.get(key).getAsString();
-    }
-
-    private static @Nullable UUID parseUuid(JsonObject object, String key) {
-        String value = string(object, key);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value);
-        } catch (IllegalArgumentException ignored) {
-            String compact = value.replace("-", "");
-            if (compact.length() != 32) {
-                return null;
-            }
-            try {
-                return UUID.fromString(compact.replaceFirst(
-                    "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)",
-                    "$1-$2-$3-$4-$5"
-                ).toLowerCase(Locale.ROOT));
-            } catch (IllegalArgumentException ignoredAgain) {
-                return null;
-            }
-        }
     }
 
     private record FriendLists(List<Friend> friends, List<Friend> incoming, List<Friend> outgoing) {

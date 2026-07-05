@@ -2,24 +2,22 @@ package cool.muyucloud.netherlink.link.official;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.account.MinecraftAccount;
 import cool.muyucloud.netherlink.account.NetherLinkAuthException;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.exception.LinkUnauthorizedException;
 import cool.muyucloud.netherlink.link.hook.LinkContextHooks;
 import cool.muyucloud.netherlink.link.model.LinkPresence;
 import cool.muyucloud.netherlink.link.model.LinkPresenceStatus;
 import cool.muyucloud.netherlink.link.model.LinkPresenceUpdate;
 import cool.muyucloud.netherlink.link.service.LinkPresenceService;
-import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -62,14 +60,14 @@ public final class OfficialPresenceService implements LinkPresenceService {
         HttpRequest request = HttpRequest.newBuilder(PRESENCE_URI)
             .header("Authorization", "Bearer " + token)
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+            .POST(JsonHttp.jsonBody(requestBody))
             .build();
         try {
-            HttpResponse<String> response = this.http.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = JsonHttp.sendString(this.http, request);
             if (response.statusCode() == 401) {
                 throw new LinkUnauthorizedException("Presence " + status + " failed: HTTP 401");
             }
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            if (!JsonHttp.isSuccess(response.statusCode())) {
                 NliConstants.LOG.warn("Presence {} failed: HTTP {}", status, response.statusCode());
                 return Map.of();
             }
@@ -87,7 +85,7 @@ public final class OfficialPresenceService implements LinkPresenceService {
     }
 
     private static Map<String, UUID> parsePresence(String body) {
-        JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+        JsonObject root = JsonHttp.parseObject(body);
         JsonArray presence = root.has("presence") && root.get("presence").isJsonArray()
             ? root.getAsJsonArray("presence")
             : new JsonArray();
@@ -97,38 +95,15 @@ public final class OfficialPresenceService implements LinkPresenceService {
                 return;
             }
             JsonObject entry = element.getAsJsonObject();
-            UUID pmid = parseUuid(entry, "pmid");
-            UUID profileId = parseUuid(entry, "profileId");
-            String status = entry.has("status") ? entry.get("status").getAsString() : "OFFLINE";
-            Instant lastUpdated = parseInstant(entry, "lastUpdated");
+            UUID pmid = JsonHttp.uuid(entry, "pmid");
+            UUID profileId = JsonHttp.uuid(entry, "profileId");
+            String status = JsonHttp.string(entry, "status", "OFFLINE");
             if (pmid != null && profileId != null) {
                 peers.putIfAbsent(pmid.toString(), profileId);
             }
-            NliConstants.LOG.debug("Official presence profile={} pmid={} status={} lastUpdated={}", profileId, pmid, status, lastUpdated);
+            NliConstants.LOG.debug("Official presence profile={} pmid={} status={} lastUpdated={}", profileId, pmid, status, JsonHttp.instant(entry, "lastUpdated"));
         });
         return Map.copyOf(peers);
-    }
-
-    private static @Nullable Instant parseInstant(JsonObject object, String key) {
-        if (!object.has(key) || !object.get(key).isJsonPrimitive()) {
-            return null;
-        }
-        try {
-            return Instant.parse(object.get(key).getAsString());
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-    }
-
-    private static @Nullable UUID parseUuid(JsonObject object, String key) {
-        if (!object.has(key) || !object.get(key).isJsonPrimitive()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(object.get(key).getAsString());
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
     }
 
     private enum PresenceStatus {
