@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.stream.JsonWriter;
 import com.mojang.serialization.JsonOps;
-import cool.muyucloud.netherlink.NetherLinkConfig;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.access.Messenger;
 import cool.muyucloud.netherlink.account.data.Account;
@@ -25,6 +24,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -110,7 +110,7 @@ public class AccountManager {
             messenger.nli$sendMessage(() -> Component.literal("NetherLink account %s is disabled".formatted(name)));
             return;
         }
-        AuthRequest request = REQUESTS.computeIfAbsent(name, _ -> new AuthRequest(account, messenger));
+        AuthRequest request = REQUESTS.computeIfAbsent(name, ignored5 -> new AuthRequest(account, messenger));
         synchronized (request) {
             if (!request.isPending()) {
                 request.setMessenger(messenger);
@@ -164,7 +164,7 @@ public class AccountManager {
     }
 
     public static void dumpMessages() {
-        REQUESTS.forEach((name, _) -> dumpMessages(name));
+        REQUESTS.forEach((name, ignored1) -> dumpMessages(name));
     }
 
     public static void clearRequests() {
@@ -200,7 +200,7 @@ public class AccountManager {
     }
 
     public static void dump() {
-        ACCOUNTS.forEach((name, _) -> dump(name));
+        ACCOUNTS.forEach((name, ignored2) -> dump(name));
     }
 
     public static void load(String name) {
@@ -248,7 +248,7 @@ public class AccountManager {
         refresh(name, false, Messenger.of(currentServer));
         try {
             publishOrRefresh(name, account, currentServer);
-        } catch (NetherLinkAuthException e) {
+        } catch (RuntimeException e) {
             if (!isMinecraftTokenRejected(e)) {
                 throw e;
             }
@@ -262,7 +262,7 @@ public class AccountManager {
     }
 
     public static void publish() {
-        ACCOUNTS.forEach((s, _) -> publish(s));
+        ACCOUNTS.forEach((s, ignored3) -> publish(s));
     }
 
     public static void revoke(String name) {
@@ -283,7 +283,7 @@ public class AccountManager {
     }
 
     public static void revoke() {
-        ACCOUNTS.forEach((s, _) -> revoke(s));
+        ACCOUNTS.forEach((s, ignored4) -> revoke(s));
     }
 
     public static void setInability(String name, boolean enable) {
@@ -408,9 +408,9 @@ public class AccountManager {
     }
 
     private static void ensureP2P(String name, Account account, MinecraftServer currentServer) {
-        P2P.computeIfAbsent(name, _ -> {
+        P2P.computeIfAbsent(name, ignored6 -> {
             String runtimeKey = runtimeKey(account);
-            String instanceName = instanceName(currentServer);
+            String instanceName = NliConstants.resolveInstanceName();
             NliConstants.LOG.info("Starting NetherLink P2P manager for account {} as runtime {}", name, runtimeKey);
             LinkContextHooks.setServerConnection(
                 runtimeKey,
@@ -440,11 +440,7 @@ public class AccountManager {
         if (profileId == null || profileId.isBlank()) {
             throw new NetherLinkAuthException("Minecraft profile id was not found");
         }
-        return "dedicated:" + profileId.toLowerCase(java.util.Locale.ROOT);
-    }
-
-    private static String instanceName(MinecraftServer currentServer) {
-        return NetherLinkConfig.instanceNameOr(currentServer.getServerDirectory(), currentServer.getMotd());
+        return "dedicated:" + profileId.toLowerCase(Locale.ROOT);
     }
 
     private static void refreshAccount(Account account, MinecraftServer currentServer) {

@@ -44,6 +44,14 @@ neoForge {
     }
 }
 
+configurations {
+    webrtcNativeBundle {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 // Implement mcgradleconventions loader attribute
@@ -66,8 +74,14 @@ sourceSets.configureEach {
 }
 
 dependencies {
+    compileOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+
+    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    jarJar files(configurations.webrtcNativeBundle)
+
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    webrtcNativeBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 }
 
 modrinth {

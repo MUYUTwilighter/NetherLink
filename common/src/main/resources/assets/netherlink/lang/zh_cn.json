@@ -31,6 +31,10 @@
   "netherlink.friends.instances.title": "%s 的实例",
   "netherlink.friends.instances.count": "%s 个活跃实例",
   "netherlink.friends.instances.empty": "没有可用实例。",
+  "netherlink.friends.self.instance": "我的游戏实例",
+  "netherlink.friends.self.instances.marker": "（我的实例）",
+  "netherlink.friends.self.instances.count": "%s 个自己的活跃实例",
+  "netherlink.friends.self.instances.empty": "没有自己的可用实例。",
   "netherlink.friends.requests.empty": "暂无好友申请。",
   "netherlink.friends.revoke": "撤回",
   "netherlink.friends.short": "友",
@@ -87,6 +91,11 @@
   "netherlink.friends.status.unknown": "状态未知",
   "netherlink.friends.status.joinable": "可加入",
   "netherlink.friends.settings.api": "联机 API",
+  "netherlink.friends.settings.api_instance": "API 实例设置",
+  "netherlink.friends.settings.instance_name": "实例名称",
+  "netherlink.friends.settings.instance_name.hint": "自动：窗口标题/MOTD",
+  "netherlink.friends.settings.instance_name.saved": "实例名称已保存。",
+  "netherlink.friends.settings.empty": "此 API 暂无可配置项。",
   "netherlink.friends.settings.network": "开启好友网络",
   "netherlink.friends.settings.requests": "接收好友申请",
   "netherlink.friends.settings.apply": "应用",
@@ -204,3 +213,4 @@
   "item.netherlink.intro_card_pale_oak_sign": "苍白橡木介绍牌",
   "item.netherlink.intro_card_pale_oak_hanging_sign": "苍白橡木悬挂式介绍牌"
 }
+

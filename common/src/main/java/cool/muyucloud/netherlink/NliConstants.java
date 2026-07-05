@@ -1,6 +1,10 @@
 package cool.muyucloud.netherlink;
 
+import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.MinecraftServer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 public class NliConstants {
@@ -45,4 +50,53 @@ public class NliConstants {
     public static final Integer INTERVAL_TOKEN = 1200;
     public static final Path ACCOUNT_DIR = Path.of("netherlink/accounts");
     public static final NliCommand<CommandSourceStack> SERVER_COMMAND = new NliCommand<>();
+    @Nullable
+    public static volatile MinecraftServer server;
+    @NotNull
+    public static volatile Supplier<Path> gameDirectory = () -> {
+        MinecraftServer current = server;
+        return current == null ? Path.of("") : current.getServerDirectory();
+    };
+    @NotNull
+    public static volatile Supplier<Optional<String>> windowTitle = Optional::empty;
+    public static volatile String platform = "Vanilla";
+
+    public static String resolveInstanceName() {
+        return NetherLinkConfig.instanceName(gameDirectory())
+            .or(NliConstants::windowTitle)
+            .or(NliConstants::serverMotd)
+            .orElseGet(() -> "Minecraft %s %s".formatted(SharedConstants.getCurrentVersion().name(), platform));
+    }
+
+    private static Path gameDirectory() {
+        try {
+            Path path = gameDirectory.get();
+            return path == null ? Path.of("") : path;
+        } catch (RuntimeException error) {
+            LOG.debug("Unable to resolve NetherLink game directory; using current directory", error);
+            return Path.of("");
+        }
+    }
+
+    private static Optional<String> windowTitle() {
+        try {
+            return windowTitle.get().flatMap(NliConstants::sanitize);
+        } catch (RuntimeException error) {
+            LOG.debug("Unable to resolve Minecraft window title; using server MOTD fallback", error);
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<String> serverMotd() {
+        MinecraftServer current = server;
+        return current == null ? Optional.empty() : sanitize(current.getMotd());
+    }
+
+    private static Optional<String> sanitize(@Nullable String value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? Optional.empty() : Optional.of(trimmed);
+    }
 }

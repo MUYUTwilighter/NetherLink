@@ -22,8 +22,9 @@ public abstract class CommonButtonsMixin {
             ClientTermsController.runAfterAcceptance(
                 minecraft,
                 parent,
-                () -> minecraft.gui.setScreen(new NetherLinkFriendsScreen(parent, parent == null))
+                () -> minecraft.gui.setScreen(new NetherLinkFriendsScreen(parent))
             );
         }, friendsAvailable));
     }
 }
+
