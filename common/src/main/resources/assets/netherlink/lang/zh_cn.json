@@ -100,7 +100,6 @@
   "netherlink.friends.settings.loaded": "好友设置已加载。",
   "netherlink.friends.settings.load_failed": "好友设置加载失败：%s",
   "netherlink.friends.settings.saving": "正在保存好友设置……",
-  "netherlink.friends.settings.terms": "请确认目标 API 的服务条款以完成切换。",
   "netherlink.friends.settings.saved": "好友设置已保存。",
   "netherlink.friends.settings.failed": "好友设置保存失败：%s",
   "netherlink.failure.unauthorized": "登录凭据已失效，请重新登录后重试。",
