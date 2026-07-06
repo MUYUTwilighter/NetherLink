@@ -53,14 +53,9 @@ configurations {
 }
 
 dependencies {
-    jarJar "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
+    jarJar runtimeOnly(compileOnly("dev.onvoid.webrtc:webrtc-java:${webrtc_version}"))
     jarJar files(configurations.webrtcNativeBundle)
-
-    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    additionalRuntimeClasspath "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-    webrtcNativeBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
+    runtimeOnly webrtcNativeBundle("dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64")
 
     runtimeOnly "me.djtheredstoner:DevAuth-${project.name}:1.2.2"
 }
@@ -78,7 +73,7 @@ def loaderAttribute = Attribute.of('io.github.mcgradleconventions.loader', Strin
 }
 
 sourceSets.configureEach {
-    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName, it.getTaskName(null, 'jarJar')].each { variant->
+    [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName, it.getTaskName(null, 'jarJar')].each { variant ->
         configurations.named("$variant") {
             attributes {
                 attribute(loaderAttribute, 'neoforge')

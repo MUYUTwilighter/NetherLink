@@ -31,8 +31,6 @@ dependencies {
 
     implementation "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
     runtimeOnly "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}"
-    webrtcBundle "dev.onvoid.webrtc:webrtc-java:${webrtc_version}:windows-x86_64"
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
