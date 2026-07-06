@@ -173,12 +173,12 @@ public class AuthRequest {
     }
 
     public void refreshMcProfileId(boolean force) throws NetherLinkAuthException {
-        if (pendingProfileId || !(force || account.getMcProfileId() == null || account.getMcProfileName() == null))
-            return;
+        if (pendingProfileId) return;
         if (account.shouldRefreshMcToken()) {
             refreshMcToken(force);
             if (account.getMcProfileId() != null && account.getMcProfileName() != null) return;
         }
+        if (!(force || account.getMcProfileId() == null || account.getMcProfileName() == null)) return;
 
         pendingProfileId = true;
         try {

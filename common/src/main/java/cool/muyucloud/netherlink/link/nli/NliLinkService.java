@@ -1,6 +1,8 @@
 package cool.muyucloud.netherlink.link.nli;
 
 import com.google.gson.JsonObject;
+import cool.muyucloud.netherlink.NetherLinkConfig;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.NliConstants;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
@@ -152,20 +154,22 @@ public final class NliLinkService implements LinkService {
     private Optional<String> acceptedRevision(String language) {
         synchronized (this.termsLock) {
             JsonObject accepted = NliV1Config.acceptedTerms(NliV1Config.read(this.configPath));
-            return string(accepted, key(this.id(), language));
+            Optional<String> revision = string(accepted, key(this.id(), language));
+            if (revision.isPresent()) {
+                return revision;
+            }
+            Path legacyPath = this.configPath.resolveSibling("config.json");
+            JsonObject legacy = NetherLinkConfig.read(legacyPath);
+            if (legacy.has(NliV1Config.ACCEPTED_TERMS_KEY) && legacy.get(NliV1Config.ACCEPTED_TERMS_KEY).isJsonObject()) {
+                return string(legacy.getAsJsonObject(NliV1Config.ACCEPTED_TERMS_KEY), key(this.id(), language));
+            }
+            return Optional.empty();
         }
     }
 
     private static Optional<String> string(JsonObject object, String key) {
-        if (!object.has(key) || object.get(key).isJsonNull()) {
-            return Optional.empty();
-        }
-        try {
-            String value = object.get(key).getAsString();
-            return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
-        } catch (RuntimeException ignored) {
-            return Optional.empty();
-        }
+        String value = JsonHttp.string(object, key);
+        return value == null || value.isBlank() ? Optional.empty() : Optional.of(value);
     }
 
     private static String key(ResourceLocation backendId, String language) {

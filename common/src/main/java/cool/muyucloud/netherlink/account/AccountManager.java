@@ -248,7 +248,7 @@ public class AccountManager {
         refresh(name, false, Messenger.of(currentServer));
         try {
             publishOrRefresh(name, account, currentServer);
-        } catch (NetherLinkAuthException e) {
+        } catch (RuntimeException e) {
             if (!isMinecraftTokenRejected(e)) {
                 throw e;
             }
