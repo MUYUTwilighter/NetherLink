@@ -240,10 +240,17 @@ public class NetherLinkFriendsScreen extends Screen {
 
         @Override
         public void doLayout(ScreenRectangle area) {
-            this.heading.setPosition((NetherLinkFriendsScreen.this.width - NetherLinkFriendsScreen.this.font.width(this.heading.getMessage())) / 2, area.top() + 7);
+            this.positionHeading(area.top() + 7);
             int listTop = area.top() + 22;
             this.list.updateSizeAndPosition(NetherLinkFriendsScreen.this.width, NetherLinkFriendsScreen.this.height - FOOTER_HEIGHT - listTop, listTop);
             this.layoutFooter();
+        }
+
+        private void positionHeading(int y) {
+            int textWidth = NetherLinkFriendsScreen.this.font.width(this.heading.getMessage());
+            int width = Math.min(textWidth, Math.max(0, NetherLinkFriendsScreen.this.width - 16));
+            this.heading.setWidth(width);
+            this.heading.setPosition((NetherLinkFriendsScreen.this.width - width) / 2, y);
         }
 
         private void setSnapshot(ClientFriendService.Snapshot snapshot) {
@@ -271,6 +278,7 @@ public class NetherLinkFriendsScreen extends Screen {
                 ClientFriendService.Friend friend = this.viewedFriend;
                 this.list.setRows(friend.instances().stream().map(instance -> (Row)new InstanceRow(friend, instance)).toList());
             }
+            this.positionHeading(this.heading.getY());
             this.layoutFooter();
             this.updateButtons();
         }
