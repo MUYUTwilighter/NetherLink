@@ -1,6 +1,7 @@
 package cool.muyucloud.netherlink.teacon;
 
 import cool.muyucloud.netherlink.NliConstants;
+import net.minecraft.IdentifierException;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -61,6 +62,8 @@ public final class Bootstrap {
             String name = wood.name().toLowerCase(java.util.Locale.ROOT);
             SoundType woodSound = woodSound(wood);
 
+            if (!validateWoodName(name)) return;
+
             // Standing sign
             var standingKey = blockKey("intro_card_" + name + "_standing_sign");
             var standing = new IntroCardStandingSignBlock(wood,
@@ -99,7 +102,14 @@ public final class Bootstrap {
         registeredBlocks = true;
     }
 
-    // ---- Items ----
+    private static boolean validateWoodName(String name) {
+        try {
+            Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, name);
+            return true;
+        } catch (IdentifierException e) {
+            return false;
+        }
+    }
 
     private static void registerItems() {
         if (registeredItems) return;
@@ -136,8 +146,6 @@ public final class Bootstrap {
         registeredItems = true;
     }
 
-    // ---- Wood Type Helpers ----
-
     /** Map wood type to the appropriate SoundType for standing/wall signs. */
     private static SoundType woodSound(WoodType wood) {
         String name = wood.name();
@@ -146,8 +154,6 @@ public final class Bootstrap {
         if (name.equals("CRIMSON") || name.equals("WARPED")) return SoundType.NETHER_WOOD;
         return SoundType.WOOD;
     }
-
-    // ---- Helpers ----
 
     private static ResourceKey<Block> blockKey(String name) {
         return ResourceKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(NliConstants.MOD_ID, name));
