@@ -9,9 +9,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.main.GameConfig;
 import net.minecraft.network.Connection;
 import net.minecraft.util.thread.ReentrantBlockableEventLoop;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -26,25 +25,17 @@ public abstract class MinecraftMixin extends ReentrantBlockableEventLoop<Runnabl
         super(name);
     }
 
-    @Shadow
-    private @Nullable Connection pendingConnection;
-
+    @Override
     @Invoker("createTitle")
-    protected abstract String nli$invokeCreateTitle();
+    public abstract String nli$createWindowTitle();
 
     @Override
-    public String nli$createWindowTitle() {
-        return this.nli$invokeCreateTitle();
-    }
-
-    @Override
-    public void nli$setPendingConnection(Connection connection) {
-        this.pendingConnection = connection;
-    }
+    @Accessor("pendingConnection")
+    public abstract void nli$setPendingConnection(Connection connection);
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void netherlink$prefetchTerms(GameConfig gameConfig, CallbackInfo callback) {
-        Minecraft minecraft = (Minecraft)(Object)this;
+        Minecraft minecraft = (Minecraft) (Object) this;
         NliConstants.gameDirectory = minecraft.gameDirectory::toPath;
         NliConstants.windowTitle = () -> Optional.ofNullable(MinecraftAccess.createWindowTitle());
         ClientTermsController.prefetch(minecraft);
