@@ -2,8 +2,8 @@ package cool.muyucloud.netherlink.link.nli;
 
 import com.google.gson.JsonObject;
 import cool.muyucloud.netherlink.NetherLinkConfig;
-import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.NliConstants;
+import cool.muyucloud.netherlink.http.JsonHttp;
 import cool.muyucloud.netherlink.link.LinkService;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
 import cool.muyucloud.netherlink.link.model.LinkTermsState;

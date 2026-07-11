@@ -12,6 +12,7 @@ import net.minecraft.util.thread.ReentrantBlockableEventLoop;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -28,12 +29,12 @@ public abstract class MinecraftMixin extends ReentrantBlockableEventLoop<Runnabl
     @Shadow
     private @Nullable Connection pendingConnection;
 
-    @Shadow
-    protected abstract String createTitle();
+    @Invoker("createTitle")
+    protected abstract String nli$invokeCreateTitle();
 
     @Override
     public String nli$createWindowTitle() {
-        return this.createTitle();
+        return this.nli$invokeCreateTitle();
     }
 
     @Override
