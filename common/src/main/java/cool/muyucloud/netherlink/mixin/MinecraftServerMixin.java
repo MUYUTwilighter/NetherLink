@@ -5,7 +5,7 @@ import cool.muyucloud.netherlink.account.AccountManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -15,20 +15,21 @@ import java.util.function.Supplier;
 
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin implements Messenger {
-    @Shadow
-    public abstract int getTickCount();
 
-    @Shadow
-    public abstract void sendSystemMessage(Component message);
+    @Invoker("getTickCount")
+    public abstract int nli$getTickCount();
+
+    @Invoker("sendSystemMessage")
+    public abstract void nli$sendSystemMessage(Component message);
 
     @Inject(method = "tickServer", at = @At("TAIL"))
     private void afterTickServer(BooleanSupplier haveTime, CallbackInfo ci) {
-        AccountManager.tick(this.getTickCount(), this);
+        AccountManager.tick(this.nli$getTickCount(), this);
     }
 
     @Override
     public void nli$sendMessage(Supplier<Component> msg) {
-        this.sendSystemMessage(msg.get());
+        this.nli$sendSystemMessage(msg.get());
     }
 
     @Override

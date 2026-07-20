@@ -7,10 +7,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.level.GameType;
 import org.jetbrains.annotations.Nullable;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,12 +17,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(IntegratedServer.class)
 public abstract class IntegratedServerMixin implements NetherLinkIntegratedServer {
-    @Shadow
-    @Final
-    private Minecraft minecraft;
-
     @Unique
     private boolean netherlink$friendsOpen;
+
+    @Accessor("minecraft")
+    public abstract Minecraft nli$getMinecraft();
 
     @Override
     public boolean nli$isFriendsOpen() {
@@ -38,7 +36,7 @@ public abstract class IntegratedServerMixin implements NetherLinkIntegratedServe
     @Inject(method = "publishServer", at = @At("RETURN"))
     private void onPublishServer(@Nullable GameType gameMode, boolean allowCommands, int port, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValueZ()) {
-            ClientP2PController.setFriendsOpen(this.minecraft, (IntegratedServer)(Object)this, ClientLanSettings.friendsOpen());
+            ClientP2PController.setFriendsOpen(this.nli$getMinecraft(), (IntegratedServer) (Object) this, ClientLanSettings.friendsOpen());
         }
     }
 
