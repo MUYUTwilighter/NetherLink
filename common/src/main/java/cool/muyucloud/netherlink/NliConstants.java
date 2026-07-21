@@ -53,10 +53,7 @@ public class NliConstants {
     @Nullable
     public static volatile MinecraftServer server;
     @NotNull
-    public static volatile Supplier<Path> gameDirectory = () -> {
-        MinecraftServer current = server;
-        return current == null ? Path.of("") : current.getServerDirectory().toPath();
-    };
+    public static volatile Supplier<Path> gameDirectory = () -> Path.of(".").normalize();
     @NotNull
     public static volatile Supplier<Optional<String>> windowTitle = Optional::empty;
     public static volatile String platform = "Vanilla";
