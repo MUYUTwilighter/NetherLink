@@ -2,6 +2,8 @@ package cool.muyucloud.netherlink.teacon.block;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import cool.muyucloud.netherlink.teacon.CommonReg;
+import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -14,8 +16,6 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.phys.BlockHitResult;
-import cool.muyucloud.netherlink.teacon.CommonReg;
-import cool.muyucloud.netherlink.teacon.entity.DoubleSidedSignBlockEntity;
 
 public class IntroCardWallHangingSignBlock extends WallHangingSignBlock {
     public static final MapCodec<WallHangingSignBlock> CODEC = RecordCodecBuilder.mapCodec(

@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.teacon.entity;
 
+import cool.muyucloud.netherlink.teacon.block.IntroCardSignLogic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -114,12 +115,15 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
     public void setEditor(@Nullable UUID editor) {
         this.recordedEditor = editor;
         if (editor == null) {
+            IntroCardSignLogic.removePlayerFromRecord(this.recordedEditorName);
             this.recordedEditorName = null;
         }
         this.setChanged();
     }
 
     public void setEditor(UUID editor, String editorName) {
+        IntroCardSignLogic.removePlayerFromRecord(this.recordedEditorName);
+        IntroCardSignLogic.addPlayerToRecord(editorName);
         this.recordedEditor = editor;
         this.recordedEditorName = editorName;
         this.setChanged();
@@ -142,5 +146,11 @@ public class DoubleSidedSignBlockEntity extends SignBlockEntity {
         if (type != null && type.get() != null) return type.get();
         return (BlockEntityType<SignBlockEntity>) BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
             Identifier.fromNamespaceAndPath("minecraft", "sign"));
+    }
+
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        IntroCardSignLogic.removePlayerFromRecord(this.recordedEditorName);
     }
 }

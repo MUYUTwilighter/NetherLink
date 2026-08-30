@@ -1,21 +1,6 @@
 package cool.muyucloud.netherlink.teacon;
 
 import cool.muyucloud.netherlink.NliConstants;
-import net.minecraft.IdentifierException;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.block.state.properties.WoodType;
-import net.minecraft.world.level.material.MapColor;
 import cool.muyucloud.netherlink.teacon.block.IntroCardCeilingHangingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardStandingSignBlock;
 import cool.muyucloud.netherlink.teacon.block.IntroCardWallHangingSignBlock;
@@ -24,6 +9,18 @@ import cool.muyucloud.netherlink.teacon.item.FriendCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardHangingSignItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardItem;
 import cool.muyucloud.netherlink.teacon.item.IntroCardSignItem;
+import net.minecraft.IdentifierException;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.properties.WoodType;
+import net.minecraft.world.level.material.MapColor;
 
 /**
  * Common registration — blocks, items, creative tab via vanilla {@link Registry#register}.

@@ -1,15 +1,15 @@
 package cool.muyucloud.netherlink.link;
 
-import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.model.LinkTerms;
+import cool.muyucloud.netherlink.link.service.LinkFriendService;
 import cool.muyucloud.netherlink.link.service.LinkHostingService;
 import cool.muyucloud.netherlink.link.service.LinkJoinService;
 import cool.muyucloud.netherlink.link.service.LinkRuntimeService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
-import java.util.Set;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 

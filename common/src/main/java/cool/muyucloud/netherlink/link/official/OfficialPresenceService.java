@@ -19,10 +19,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Map;
-import java.util.UUID;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public final class OfficialPresenceService implements LinkPresenceService {
     private static final URI PRESENCE_URI = URI.create("https://api.minecraftservices.com/presence");

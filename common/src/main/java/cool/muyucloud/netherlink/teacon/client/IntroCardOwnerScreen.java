@@ -1,5 +1,6 @@
 package cool.muyucloud.netherlink.teacon.client;
 
+import cool.muyucloud.netherlink.teacon.network.IntroCardActionPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.LinearLayout;
@@ -7,7 +8,6 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
-import cool.muyucloud.netherlink.teacon.network.IntroCardActionPayload;
 
 /** Owner's sign interaction menu: Edit, Clear, or Cancel. */
 public class IntroCardOwnerScreen extends ConfirmScreen {

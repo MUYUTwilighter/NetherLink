@@ -3,7 +3,8 @@ package cool.muyucloud.netherlink.teacon;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.state.properties.WoodType;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Static holder for Teacon item instances. */
 public final class ModItems {

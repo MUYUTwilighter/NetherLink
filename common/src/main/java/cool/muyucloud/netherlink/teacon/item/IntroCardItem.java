@@ -1,9 +1,9 @@
 package cool.muyucloud.netherlink.teacon.item;
 
+import cool.muyucloud.netherlink.teacon.block.IntroCardSignLogic;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
-import cool.muyucloud.netherlink.teacon.block.IntroCardSignLogic;
 
 /**
  * Intro Card item — right-click on an intro-card sign to write text,
