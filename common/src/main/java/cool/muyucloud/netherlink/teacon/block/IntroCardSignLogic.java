@@ -89,7 +89,6 @@ public final class IntroCardSignLogic {
         boolean hasText = ds != null && ds.getEditor() != null;
 
         if (ds != null && stack.isEmpty() && player.isCrouching() && CLEARABLE.contains(player.getUUID())) {
-            System.out.println("cleared");
             ds.setEditor(null);
             ds.setText(new SignText(), true);
             return InteractionResult.SUCCESS;
